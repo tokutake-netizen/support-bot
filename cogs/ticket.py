@@ -24,7 +24,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from services import storage
-from services.i18n import normalize_locale
+from services.i18n import get_ui_lang, normalize_locale
 
 log = logging.getLogger(__name__)
 
@@ -242,7 +242,7 @@ class TicketOpenView(discord.ui.View):
             )
             return
 
-        lang = normalize_locale(str(interaction.locale))
+        lang = get_ui_lang(str(interaction.locale), feature="ticket")
         if lang == "en":
             welcome = (
                 f"🎫 **Ticket #{n:04d}**\n"

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Optional
@@ -22,6 +23,26 @@ def normalize_locale(locale: Optional[str]) -> str:
     if locale.startswith("ja"):
         return "ja"
     return "en"
+
+
+def get_ui_lang(interaction_locale: Optional[str] = None, feature: str = "") -> str:
+    """Resolve the UI language for a given feature.
+
+    Priority:
+      1. FORCE_UI_LANG_<FEATURE> env var (e.g. FORCE_UI_LANG_SHIPPING=en)
+      2. FORCE_UI_LANG env var (global)
+      3. Auto-detect from the user's Discord interaction locale.
+
+    Acceptable values: "en" or "ja".
+    """
+    if feature:
+        per = os.getenv(f"FORCE_UI_LANG_{feature.upper()}", "").strip().lower()
+        if per in ("en", "ja"):
+            return per
+    forced = os.getenv("FORCE_UI_LANG", "").strip().lower()
+    if forced in ("en", "ja"):
+        return forced
+    return normalize_locale(interaction_locale)
 
 
 @lru_cache(maxsize=4)

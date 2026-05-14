@@ -38,6 +38,19 @@ class SheetsClient:
 
     def _connect(self) -> gspread.Client:
         if self._client is None:
+            # 1. Try base64-encoded JSON in env (Railway / cloud-friendly)
+            b64 = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_B64", "").strip()
+            if b64:
+                import base64
+                import json as _json
+                try:
+                    info = _json.loads(base64.b64decode(b64))
+                    creds = Credentials.from_service_account_info(info, scopes=SCOPES)
+                    self._client = gspread.authorize(creds)
+                    return self._client
+                except Exception:
+                    log.exception("failed to load service account from b64 env, falling back to file")
+            # 2. Fallback: file path (local dev)
             creds = Credentials.from_service_account_file(self.cred_path, scopes=SCOPES)
             self._client = gspread.authorize(creds)
         return self._client

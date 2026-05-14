@@ -23,7 +23,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from services.country_search import Country, CountryRegistry
-from services.i18n import normalize_locale, t
+from services.i18n import get_ui_lang, normalize_locale, t
 from services.sheets_client import SheetsClient
 
 log = logging.getLogger(__name__)
@@ -703,7 +703,7 @@ class ShippingCog(commands.Cog):
 
     @app_commands.command(name="shipping", description="送料を計算 / Calculate shipping")
     async def shipping(self, interaction: discord.Interaction) -> None:
-        lang = normalize_locale(str(interaction.locale))
+        lang = get_ui_lang(str(interaction.locale), feature="shipping")
         view = ShippingView(self, self.registry, self.products, self.sheets, lang=lang)
         await interaction.response.send_message(**view.render(), ephemeral=True)
         view.message = await interaction.original_response()
