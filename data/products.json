@@ -1,0 +1,59 @@
+{
+  "version": "2026-05-09",
+  "products": [
+    {
+      "id": "wanpiece_case",
+      "name_ja": "わんぴーすCASE",
+      "name_en": "One Piece CASE",
+      "emoji": "🧰",
+      "weight_g": 5300,
+      "unit_ja": "個",
+      "unit_en": ""
+    },
+    {
+      "id": "wanpiece_box",
+      "name_ja": "わんぴーすBOX",
+      "name_en": "One Piece BOX",
+      "emoji": "🍞",
+      "weight_g": 400,
+      "unit_ja": "個",
+      "unit_en": ""
+    },
+    {
+      "id": "pokemon_case",
+      "name_ja": "ポケモンCASE",
+      "name_en": "Pokémon CASE",
+      "emoji": "🧰",
+      "weight_g": 4000,
+      "unit_ja": "個",
+      "unit_en": ""
+    },
+    {
+      "id": "pokemon_box",
+      "name_ja": "ポケモンBOX",
+      "name_en": "Pokémon BOX",
+      "emoji": "⚡",
+      "weight_g": 300,
+      "unit_ja": "個",
+      "unit_en": ""
+    },
+    {
+      "id": "psa",
+      "name_ja": "PSA",
+      "name_en": "PSA",
+      "emoji": "🏆",
+      "weight_g": 40,
+      "unit_ja": "枚",
+      "unit_en": ""
+    },
+    {
+      "id": "single_card",
+      "name_ja": "Single card",
+      "name_en": "Single Card",
+      "emoji": "🃏",
+      "weight_g": 3,
+      "unit_ja": "枚",
+      "unit_en": ""
+    }
+  ]
+}

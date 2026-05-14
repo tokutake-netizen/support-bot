@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Support Bot — コマンド＆使い方ガイド</title>
+<style>
+  :root {
+    --bg: #1e1f22;
+    --bg2: #2b2d31;
+    --bg3: #313338;
+    --bg-card: #232428;
+    --text: #dbdee1;
+    --muted: #949ba4;
+    --accent: #5865f2;
+    --green: #23a55a;
+    --red: #f23f43;
+    --yellow: #f0b232;
+    --pink: #eb459e;
+    --cyan: #00a8fc;
+    --border: #3f4147;
+  }
+  *,*::before,*::after { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "gg sans", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 15px;
+  }
+
+  /* === Layout === */
+  .container { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
+  @media (max-width: 900px) { .container { grid-template-columns: 1fr; } .sidebar { position: static !important; height: auto !important; } }
+
+  /* === Sidebar === */
+  .sidebar {
+    background: var(--bg2);
+    padding: 24px 16px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+  }
+  .sidebar h1 {
+    font-size: 18px;
+    color: #fff;
+    margin: 0 0 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sidebar .ver { color: var(--muted); font-size: 11px; margin-bottom: 24px; }
+  .sidebar nav { display: flex; flex-direction: column; gap: 2px; }
+  .sidebar nav h3 {
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 16px 8px 4px;
+    font-weight: 700;
+  }
+  .sidebar nav a {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--text);
+    text-decoration: none;
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  .sidebar nav a:hover { background: var(--bg3); color: #fff; }
+  .sidebar nav a.active { background: var(--accent); color: #fff; }
+
+  /* === Content === */
+  .content {
+    padding: 40px 48px;
+    max-width: 960px;
+    width: 100%;
+  }
+  @media (max-width: 600px) { .content { padding: 24px 18px; } }
+
+  h2 {
+    font-size: 28px;
+    color: #fff;
+    margin: 48px 0 8px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--accent);
+    display: flex; align-items: center; gap: 8px;
+  }
+  h2:first-of-type { margin-top: 0; }
+  h3 { font-size: 20px; color: #fff; margin: 28px 0 8px; }
+  h4 { font-size: 15px; color: #fff; margin: 16px 0 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  p { margin: 8px 0; }
+
+  /* === Cards === */
+  .card {
+    background: var(--bg-card);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 12px 0;
+    border-left: 3px solid var(--accent);
+  }
+  .card.green { border-left-color: var(--green); }
+  .card.red   { border-left-color: var(--red); }
+  .card.yellow{ border-left-color: var(--yellow); }
+  .card.pink  { border-left-color: var(--pink); }
+  .card.cyan  { border-left-color: var(--cyan); }
+
+  /* === Code === */
+  code {
+    background: var(--bg);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: Consolas, Monaco, "Courier New", monospace;
+    font-size: 13px;
+    color: #ffd24d;
+  }
+  pre {
+    background: var(--bg);
+    padding: 12px 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-family: Consolas, Monaco, "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text);
+    margin: 8px 0;
+    border: 1px solid var(--border);
+  }
+  pre code { background: none; padding: 0; color: inherit; }
+
+  /* === Table === */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    background: var(--bg-card);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    vertical-align: top;
+  }
+  th { background: var(--bg2); color: #fff; font-weight: 600; font-size: 13px; }
+  tr:last-child td { border-bottom: none; }
+  td code { font-size: 12px; }
+
+  /* === Badges === */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 10px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .badge.admin { background: rgba(235,69,158,.2); color: var(--pink); border: 1px solid rgba(235,69,158,.4); }
+  .badge.all   { background: rgba(35,165,90,.2); color: var(--green); border: 1px solid rgba(35,165,90,.4); }
+  .badge.new   { background: rgba(255,210,77,.2); color: var(--yellow); border: 1px solid rgba(255,210,77,.4); }
+  .badge.optional { background: rgba(149,155,164,.2); color: var(--muted); border: 1px solid rgba(149,155,164,.4); }
+
+  .feature-icon { font-size: 24px; }
+
+  ul.spec, ol.spec { margin: 6px 0; padding-left: 22px; }
+  ul.spec li, ol.spec li { margin: 4px 0; }
+
+  .toc-item { display: flex; align-items: center; gap: 8px; }
+  .toc-item .ico { width: 18px; text-align: center; }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+
+  /* Discord-style example block */
+  .example {
+    background: var(--bg3);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 8px 0;
+    border-left: 3px solid #4e5058;
+  }
+  .example .meta {
+    display: flex; gap: 8px; align-items: baseline;
+    margin-bottom: 4px;
+    font-size: 13px;
+  }
+  .example .meta .name { font-weight: 600; color: #fff; }
+  .example .meta .bot  { background: var(--accent); color: #fff; font-size: 10px; padding: 1px 5px; border-radius: 3px; }
+  .example .meta .time { color: var(--muted); font-size: 11px; }
+  .example .body { font-size: 14px; }
+
+  .alert {
+    background: rgba(240,178,50,.1);
+    border-left: 3px solid var(--yellow);
+    padding: 10px 14px;
+    border-radius: 4px;
+    margin: 12px 0;
+    font-size: 13px;
+  }
+  .alert.danger { background: rgba(242,63,67,.1); border-left-color: var(--red); }
+  .alert.info { background: rgba(0,168,252,.1); border-left-color: var(--cyan); }
+
+  kbd {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-size: 12px;
+    font-family: monospace;
+  }
+
+  .quick-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .quick-grid .card {
+    margin: 0;
+  }
+  .quick-grid h4 {
+    margin: 0 0 4px;
+    font-size: 14px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <h1>🤖 Support Bot</h1>
+    <div class="ver">Manual v1.0 — 2026-05-12</div>
+
+    <nav>
+      <h3>はじめに</h3>
+      <a href="#overview" class="toc-item"><span class="ico">📋</span>概要</a>
+      <a href="#permissions" class="toc-item"><span class="ico">🔐</span>権限について</a>
+
+      <h3>コマンド</h3>
+      <a href="#help" class="toc-item"><span class="ico">📚</span>/help</a>
+      <a href="#translate" class="toc-item"><span class="ico">🌐</span>/translate</a>
+      <a href="#suggest" class="toc-item"><span class="ico">🤖</span>/suggest</a>
+      <a href="#shipping" class="toc-item"><span class="ico">📦</span>/shipping</a>
+      <a href="#ticket" class="toc-item"><span class="ico">🎫</span>/ticket</a>
+      <a href="#welcome" class="toc-item"><span class="ico">🎊</span>/welcome</a>
+      <a href="#giveaway" class="toc-item"><span class="ico">🎉</span>/giveaway</a>
+
+      <h3>仕様</h3>
+      <a href="#spec-translation" class="toc-item"><span class="ico">⚙</span>翻訳の仕組み</a>
+      <a href="#spec-shipping" class="toc-item"><span class="ico">⚙</span>送料計算ロジック</a>
+      <a href="#spec-ticket" class="toc-item"><span class="ico">⚙</span>チケット仕様</a>
+      <a href="#spec-config" class="toc-item"><span class="ico">⚙</span>環境変数</a>
+
+      <h3>運用</h3>
+      <a href="#troubleshoot" class="toc-item"><span class="ico">🛠</span>トラブルシュート</a>
+      <a href="#multi-server" class="toc-item"><span class="ico">🌍</span>複数サーバー</a>
+    </nav>
+  </aside>
+
+  <!-- ============ CONTENT ============ -->
+  <main class="content">
+
+    <!-- ===== Overview ===== -->
+    <h2 id="overview">📋 概要</h2>
+    <p>多機能Discordサポートボット。<strong>1サーバーごとに独立プロセス</strong>で動く設計。</p>
+
+    <div class="quick-grid">
+      <div class="card cyan">
+        <h4>🌐 翻訳</h4>
+        <p>英⇄日 双方向自動翻訳<br><code>DeepL</code> または <code>Claude</code></p>
+      </div>
+      <div class="card yellow">
+        <h4>🤖 意図判定</h4>
+        <p>商品/配送相談を検知して誘導文を自動投稿</p>
+      </div>
+      <div class="card green">
+        <h4>📦 送料計算</h4>
+        <p>カート式UI＋Google Sheets連携</p>
+      </div>
+      <div class="card pink">
+        <h4>🎫 チケット</h4>
+        <p>Mee6風、個別チャンネル作成</p>
+      </div>
+      <div class="card red">
+        <h4>🎊 Welcome</h4>
+        <p>新規メンバー自動歓迎＋バナー画像</p>
+      </div>
+      <div class="card">
+        <h4>🎉 Giveaway</h4>
+        <p>時間指定抽選、参加ボタン式</p>
+      </div>
+    </div>
+
+    <!-- ===== Permissions ===== -->
+    <h2 id="permissions">🔐 権限について</h2>
+    <table>
+      <thead><tr><th>バッジ</th><th>意味</th><th>該当コマンド</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="badge admin">Admin</span></td>
+          <td>サーバー管理者権限が必要</td>
+          <td>ほぼ全ての <code>/translate</code>, <code>/suggest</code>, <code>/ticket</code>, <code>/welcome</code>, <code>/giveaway</code>, <code>/shippingadmin</code></td>
+        </tr>
+        <tr>
+          <td><span class="badge all">全員</span></td>
+          <td>誰でも実行可</td>
+          <td><code>/shipping</code>, <code>/help</code></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="alert info">非Adminが管理コマンドを打つと Discord側で「You do not have permission to use this command」とブロックされ、botまでリクエストは届きません。</div>
+
+    <hr>
+
+    <!-- ===== /help ===== -->
+    <h2 id="help"><span class="feature-icon">📚</span>/help <span class="badge all">全員</span></h2>
+    <p>コマンドの一覧・詳細をDiscord内で確認。</p>
+
+    <h4>コマンド</h4>
+    <table>
+      <thead><tr><th>使い方</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td><code>/help</code></td><td>全機能の概要を表示</td></tr>
+        <tr><td><code>/help category:translate</code></td><td>翻訳カテゴリの詳細</td></tr>
+        <tr><td><code>/help category:shipping</code></td><td>送料計算カテゴリの詳細</td></tr>
+        <tr><td><code>/help category:&lt;...&gt;</code></td><td>その他: suggest / ticket / welcome / giveaway</td></tr>
+      </tbody>
+    </table>
+    <div class="example">
+      <div class="meta"><span class="name">あなた</span> <span class="time">/help category:translate</span></div>
+      <div class="body">→ 翻訳の詳細コマンド一覧が ephemeral（あなたのみ表示）で出ます</div>
+    </div>
+
+    <hr>
+
+    <!-- ===== /translate ===== -->
+    <h2 id="translate"><span class="feature-icon">🌐</span>/translate <span class="badge admin">Admin</span></h2>
+    <p>英⇄日 双方向自動翻訳。指定チャンネルで投稿された英文/日本文に対して、bot が自動で訳文をreplyします。</p>
+
+    <h4>コマンド</h4>
+    <table>
+      <thead><tr><th>使い方</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td><code>/translate on</code></td><td>このチャンネルで自動翻訳を有効化</td></tr>
+        <tr><td><code>/translate off</code></td><td>このチャンネルの自動翻訳を停止</td></tr>
+        <tr><td><code>/translate mode direction:&lt;both|en2ja|ja2en&gt;</code></td><td>翻訳方向を変更</td></tr>
+        <tr><td><code>/translate status</code></td><td>有効チャンネル一覧、プロバイダ、月使用量を表示</td></tr>
+        <tr><td><code>/translate text text:&lt;文字列&gt; [direction:&lt;...&gt;]</code></td><td>任意文字列を即時翻訳</td></tr>
+      </tbody>
+    </table>
+
+    <h4>使用例</h4>
+    <div class="example">
+      <div class="meta"><span class="name">john_smith</span><span class="time">card-game · 10:24</span></div>
+      <div class="body">Hello, my package hasn't arrived yet.</div>
+    </div>
+    <div class="example">
+      <div class="meta"><span class="name">SupportBot</span><span class="bot">✓ BOT</span><span class="time">card-game · 10:24</span></div>
+      <div class="body">🇯🇵 こんにちは、まだ荷物が届いていません。</div>
+    </div>
+
+    <h4>翻訳方向 (mode)</h4>
+    <table>
+      <thead><tr><th>値</th><th>動作</th></tr></thead>
+      <tbody>
+        <tr><td><code>both</code> （既定）</td><td>英→日、日→英 双方向</td></tr>
+        <tr><td><code>en2ja</code></td><td>英→日のみ。日本人同士の会話チャンネル向け</td></tr>
+        <tr><td><code>ja2en</code></td><td>日→英のみ。海外向け案内チャンネル向け</td></tr>
+        <tr><td><code>off</code></td><td>停止（<code>/translate off</code>と同じ）</td></tr>
+      </tbody>
+    </table>
+
+    <hr>
+
+    <!-- ===== /suggest ===== -->
+    <h2 id="suggest"><span class="feature-icon">🤖</span>/suggest <span class="badge admin">Admin</span></h2>
+    <p>全体交流会チャンネル（<code>COMMUNITY_CHANNEL_ID</code>）の発言をAIで分類し、商品問合せ／配送相談に該当する場合のみ誘導文をreply。</p>
+
+    <h4>コマンド</h4>
+    <table>
+      <thead><tr><th>使い方</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td><code>/suggest on</code></td><td>意図判定機能を有効化</td></tr>
+        <tr><td><code>/suggest off</code></td><td>停止</td></tr>
+        <tr><td><code>/suggest status</code></td><td>現在の状態を確認</td></tr>
+      </tbody>
+    </table>
+
+    <h4>使用例</h4>
+    <div class="example">
+      <div class="meta"><span class="name">takuya</span><span class="time">free-talk · 14:10</span></div>
+      <div class="body">こんばんは！PSA10のピカチュウ151ありますか？</div>
+    </div>
+    <div class="example">
+      <div class="meta"><span class="name">SupportBot</span><span class="bot">✓ BOT</span><span class="time">free-talk · 14:10</span></div>
+      <div class="body">@takuya 商品のお問い合わせは <code>#ticket</code> でチケットを開いてお聞きください🎫<br>
+      <em style="color:var(--muted);font-size:12px">※ AI自動判定です（信頼度 92%）。違ったらスルーしてください。</em></div>
+    </div>
+
+    <h4>分類ラベル</h4>
+    <ul class="spec">
+      <li><code>product_inquiry</code> — 商品の在庫/価格/状態/取置き → <strong>誘導文を返す</strong></li>
+      <li><code>shipping_inquiry</code> — 配送/送料/追跡/関税 → <strong>/shipping案内＋誘導文を返す</strong></li>
+      <li><code>general_chat</code> — 雑談/挨拶 → スキップ</li>
+      <li><code>other</code> — その他 → スキップ</li>
+    </ul>
+    <ul class="spec">
+      <li>信頼度しきい値 <code>SUGGEST_MIN_CONFIDENCE</code>（既定0.70）未満は反応なし</li>
+      <li>同一メッセージへの reply は1回限り（連投チェック）</li>
+      <li>投稿者の言語に応じて日本語／英語を自動切替</li>
+    </ul>
+
+    <hr>
+
+    <!-- ===== /shipping ===== -->
+    <h2 id="shipping"><span class="feature-icon">📦</span>/shipping <span class="badge all">全員</span></h2>
+    <p>カート式UIで複数商品＋宛先国を選択し、Google Sheets「比較表US基準」を参照して送料を算出。</p>
+
+    <h4>コマンド</h4>
+    <table>
+      <thead><tr><th>使い方</th><th>説明</th><th>権限</th></tr></thead>
+      <tbody>
+        <tr><td><code>/shipping</code></td><td>送料計算パネルを ephemeral で起動</td><td><span class="badge all">全員</span></td></tr>
+        <tr><td><code>/shippingadmin reload</code></td><td>商品マスタとスプシキャッシュを再読込</td><td><span class="badge admin">Admin</span></td></tr>
+      </tbody>
+    </table>
+
+    <h4>パネル操作フロー</h4>
+    <ol class="spec">
+      <li><code>/shipping</code> 実行 → ephemeralパネルが表示</li>
+      <li>🎁 商品 を選択（6種類）</li>
+      <li>🔢 数量 を選択（1, 2, 3, 5, 10, 20, 50, 100, その他）</li>
+      <li>🏳️ 宛先 を選択（リージョン → 国、または 🔍検索）</li>
+      <li>3つ全部入力後、緑の <strong>📥 送信（カートに追加）</strong> でカートへ</li>
+      <li>同じ操作で複数商品を追加可能。<strong>宛先はリセットされない</strong></li>
+      <li><strong>🧮 送料を計算</strong> ボタンで結果表示</li>
+      <li>必要なら <strong>📤 公開する</strong> でチャンネルにシェア</li>
+    </ol>
+
+    <h4>商品マスタ</h4>
+    <table>
+      <thead><tr><th>商品</th><th>絵文字</th><th>重量(g/個)</th><th>単位</th></tr></thead>
+      <tbody>
+        <tr><td>わんぴーすCASE</td><td>🧰</td><td>5,300</td><td>個</td></tr>
+        <tr><td>わんぴーすBOX</td><td>🍞</td><td>400</td><td>個</td></tr>
+        <tr><td>ポケモンCASE</td><td>🧰</td><td>4,000</td><td>個</td></tr>
+        <tr><td>ポケモンBOX</td><td>⚡</td><td>300</td><td>個</td></tr>
+        <tr><td>PSA</td><td>🏆</td><td>40</td><td>枚</td></tr>
+        <tr><td>Single card</td><td>🃏</td><td>3</td><td>枚</td></tr>
+      </tbody>
+    </table>
+
+    <h4>結果表示例</h4>
+    <pre>📦 送料計算パネル — 結果
+🛒 内容
+  ・⚡ ポケモンBOX × 5個 ＝ 1,500g
+  ・🃏 Single card × 10枚 ＝ 30g
+─────────────────────────────
+  ⚖ 商品合計 : 1,530g
+  ＋ 梱包材    : 1,000g
+  ＝ 総重量    : 2,530g  (重量帯 3.0kg)
+
+  🏳️ 宛先   : 🇺🇸 アメリカ
+  📮 配送方法 : DHL（シート指定の安い方）
+  💴 料金    : ¥9,400</pre>
+
+    <hr>
+
+    <!-- ===== /ticket ===== -->
+    <h2 id="ticket"><span class="feature-icon">🎫</span>/ticket <span class="badge admin">Admin</span></h2>
+    <p>Mee6風のサポートチケット。ユーザーがボタンを押すと、<strong>Created Tickets</strong> カテゴリ配下に個別チャンネルが作成される。</p>
+
+    <h4>コマンド</h4>
+    <table>
+      <thead><tr><th>使い方</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td><code>/ticket panel</code></td><td>このチャンネルにチケット起票パネルを設置</td></tr>
+        <tr><td><code>/ticket close</code></td><td>このチケットチャンネルを閉じる（5秒後に削除）</td></tr>
+      </tbody>
+    </table>
+
+    <h4>動作仕様</h4>
+    <ul class="spec">
+      <li>パネルの「🎫 チケットを開く」押下 → <code>0001-username</code> 形式のチャンネル作成</li>
+      <li><strong>同一ユーザーは1チケットまで</strong>。重複時は既存チケットを案内</li>
+      <li>権限: 開設者＋運営ロール（<code>TICKET_STAFF_ROLE_IDS</code>）のみ閲覧可</li>
+      <li>welcome メッセージで運営ロールを自動メンション</li>
+      <li>チャンネル内の「🔒 クローズ」or <code>/ticket close</code> で5秒カウント後に削除</li>
+    </ul>
+
+    <h4>使用例</h4>
+    <div class="example">
+      <div class="meta"><span class="name">SupportBot</span><span class="bot">✓ BOT</span><span class="time">📩ticket · パネル</span></div>
+      <div class="body">
+        🎫 <strong>サポートチケット</strong><br>
+        下のボタンを押すと、あなた専用の個別チャットが作成されます。<br><br>
+        <button style="background:var(--accent);color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:14px;">🎫 チケットを開く</button>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- ===== /welcome ===== -->
+    <h2 id="welcome"><span class="feature-icon">🎊</span>/welcome <span class="badge admin">Admin</span></h2>
+    <p>新規メンバー入室時に自動でウェルカムメッセージを投稿。バナー画像、テキストカスタマイズ可能。</p>
+
+    <h4>コマンド</h4>
+    <table>
+      <thead><tr><th>使い方</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td><code>/welcome test</code></td><td>自分にウェルカムメッセージのプレビューを表示</td></tr>
+        <tr><td><code>/welcome status</code></td><td>現在の設定を確認</td></tr>
+        <tr><td><code>/welcome setbanner image:[ファイル] url:&lt;URL&gt;</code></td><td>バナー画像を設定。引数なし＝クリア</td></tr>
+      </tbody>
+    </table>
+
+    <h4>カスタマイズ可能項目（.env）</h4>
+    <table>
+      <thead><tr><th>変数</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td><code>WELCOME_BANNER_URL</code></td><td>大きなバナー画像URL（<code>/welcome setbanner</code>で自動設定）</td></tr>
+        <tr><td><code>WELCOME_THUMBNAIL_URL</code></td><td>サムネ画像（既定: ユーザーアバター）</td></tr>
+        <tr><td><code>WELCOME_TITLE</code></td><td>Embedタイトル</td></tr>
+        <tr><td><code>WELCOME_COLOR</code></td><td>Embedの色（16進、例 <code>0x57F287</code>）</td></tr>
+        <tr><td><code>WELCOME_DESCRIPTION</code></td><td>本文テンプレ</td></tr>
+        <tr><td><code>WELCOME_AUTOROLE_IDS</code></td><td>自動付与ロールID（カンマ区切り）</td></tr>
+      </tbody>
+    </table>
+
+    <h4>本文プレースホルダ</h4>
+    <ul class="spec">
+      <li><code>{user_mention}</code> — @メンション</li>
+      <li><code>{user_name}</code> — 表示名</li>
+      <li><code>{guild_name}</code> — サーバー名</li>
+      <li><code>{member_count}</code> — 現在のメンバー数</li>
+      <li><code>{rules}</code> — ルールチャンネルへのリンク</li>
+      <li><code>{intro}</code> — 自己紹介チャンネルへのリンク</li>
+    </ul>
+
+    <hr>
+
+    <!-- ===== /giveaway ===== -->
+    <h2 id="giveaway"><span class="feature-icon">🎉</span>/giveaway <span class="badge admin">Admin</span></h2>
+    <p>時間指定の抽選ツール。参加者は🎉ボタンを押すだけ。期限切れで自動的に当選者発表。</p>
+
+    <h4>コマンド</h4>
+    <table>
+      <thead><tr><th>使い方</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td><code>/giveaway create prize:&lt;賞品&gt; duration:&lt;期間&gt; [winners] [required_role] [image] [image_url]</code></td><td>新規Giveaway開始</td></tr>
+        <tr><td><code>/giveaway end message_id:&lt;ID&gt;</code></td><td>早期終了して即座に当選者発表</td></tr>
+        <tr><td><code>/giveaway reroll message_id:&lt;ID&gt; [winners]</code></td><td>終了済み抽選の再抽選</td></tr>
+        <tr><td><code>/giveaway list</code></td><td>進行中のGiveaway一覧</td></tr>
+      </tbody>
+    </table>
+
+    <h4>期間 (duration) フォーマット</h4>
+    <table>
+      <thead><tr><th>入力</th><th>意味</th></tr></thead>
+      <tbody>
+        <tr><td><code>30s</code></td><td>30秒</td></tr>
+        <tr><td><code>5m</code></td><td>5分</td></tr>
+        <tr><td><code>1h</code></td><td>1時間</td></tr>
+        <tr><td><code>1d</code></td><td>1日</td></tr>
+        <tr><td><code>1d2h30m</code></td><td>組み合わせ</td></tr>
+      </tbody>
+    </table>
+
+    <h4>使用例</h4>
+    <pre>/giveaway create prize:Amazonギフト1000円 duration:1h winners:3
+/giveaway create prize:限定カード duration:1d winners:1 image:[添付] required_role:@VIP
+/giveaway end message_id:1502...
+/giveaway reroll message_id:1502... winners:2</pre>
+
+    <h4>動作仕様</h4>
+    <ul class="spec">
+      <li>30秒ごとに期限チェック → 自動終了＆当選者発表</li>
+      <li>同じユーザーが再度ボタン押すと参加取消（トグル）</li>
+      <li><code>required_role</code> 指定時はそのロール持ちのみ参加可</li>
+      <li>賞品画像は添付ファイル or URL で指定可</li>
+    </ul>
+
+    <hr>
+
+    <!-- ===== Spec: Translation ===== -->
+    <h2 id="spec-translation"><span class="feature-icon">⚙</span>翻訳の仕組み</h2>
+
+    <h4>プロバイダ切替</h4>
+    <p><code>.env</code> の <code>TRANSLATE_PROVIDER</code> で選択。</p>
+    <table>
+      <thead><tr><th>値</th><th>用途</th><th>コスト</th><th>必要キー</th></tr></thead>
+      <tbody>
+        <tr><td><code>deepl</code> （推奨）</td><td>日常翻訳</td><td>Free 100万字/月</td><td><code>DEEPL_API_KEY</code></td></tr>
+        <tr><td><code>claude</code></td><td>意訳寄り、文脈理解</td><td>従量課金</td><td><code>ANTHROPIC_API_KEY</code></td></tr>
+      </tbody>
+    </table>
+
+    <h4>処理フロー</h4>
+    <ol class="spec">
+      <li><code>on_message</code> イベントを受信</li>
+      <li>bot/コマンド/プレフィックス済(🇯🇵🇺🇸)はスキップ</li>
+      <li>長さチェック（2文字以上 / 2000文字以下）</li>
+      <li>URL/絵文字/コードブロックを除去して言語判定</li>
+      <li><code>langdetect</code> 信頼度 ≥ <code>TRANSLATE_MIN_CONFIDENCE</code> のみ続行</li>
+      <li><code>en</code> → 日本語、<code>ja</code> → 英語、それ以外はスキップ</li>
+      <li>チャンネルmodeチェック（both/en2ja/ja2en/off）</li>
+      <li>プロバイダで翻訳 → reply</li>
+      <li>失敗時は ⚠️ リアクションのみ（チャンネル静音）</li>
+    </ol>
+
+    <hr>
+
+    <!-- ===== Spec: Shipping ===== -->
+    <h2 id="spec-shipping"><span class="feature-icon">⚙</span>送料計算ロジック</h2>
+
+    <h4>計算手順</h4>
+    <ol class="spec">
+      <li>商品リストから商品合計重量を算出: <code>Σ(weight_g × qty)</code></li>
+      <li>梱包材 <code>PACKAGING_WEIGHT_G</code>（既定1000g）を加算</li>
+      <li>kg換算後、0.5kg刻みで <strong>切り上げ</strong>: <code>math.ceil(total_kg / 0.5) * 0.5</code></li>
+      <li>20kg超の場合: 自動で複数箱に分割発送（各箱 商品19kg + 梱包1kg = 20kg）</li>
+      <li>スプシから国 × 重量帯の <code>安い方</code> 列を取得 → DHL or FedEx 確定</li>
+      <li>料金を返す（分割時は箱ごとの料金を合算）</li>
+    </ol>
+
+    <h4>計算例</h4>
+    <div class="card">
+      <strong>例1: 単一発送</strong>
+      <pre>ポケモンBOX × 5個 = 1,500g
++ Single card × 10枚 = 30g
++ 梱包材 = 1,000g
+= 総重量 2,530g → 3.0kg帯
+→ DHL ¥9,400 (アメリカ宛)</pre>
+    </div>
+    <div class="card">
+      <strong>例2: 分割発送</strong>
+      <pre>ポケモンCASE × 6個 = 24,000g
+→ 2箱に分割 (各12,000g + 梱包1kg = 13,000g)
+→ 各箱 13.0kg帯で計算 → 合計料金</pre>
+    </div>
+
+    <h4>スプシ仕様</h4>
+    <ul class="spec">
+      <li>シート: <code>比較表US基準</code></li>
+      <li>B列 = 重量(kg)、C列以降 = 国ごと3列ブロック (DHL/FedEx/安い方)</li>
+      <li>0.5kg刻み、最大68kg対応</li>
+      <li>5分メモリキャッシュ。<code>/shippingadmin reload</code> で即時更新</li>
+    </ul>
+
+    <hr>
+
+    <!-- ===== Spec: Ticket ===== -->
+    <h2 id="spec-ticket"><span class="feature-icon">⚙</span>チケット仕様</h2>
+
+    <h4>権限構成</h4>
+    <table>
+      <thead><tr><th>対象</th><th>権限</th></tr></thead>
+      <tbody>
+        <tr><td>@everyone</td><td>❌ チャンネル非表示</td></tr>
+        <tr><td>開設者本人</td><td>✅ 閲覧/送信/添付</td></tr>
+        <tr><td>運営ロール（複数指定可）</td><td>✅ 閲覧/送信/管理</td></tr>
+        <tr><td>BOT</td><td>✅ 全権限</td></tr>
+      </tbody>
+    </table>
+
+    <h4>命名規則</h4>
+    <p>チャンネル名: <code>NNNN-username</code> (例: <code>0001-yamazaki</code>)<br>
+    通し番号は <code>data/ticket_counter.json</code> で持続管理。</p>
+
+    <h4>重複防止</h4>
+    <p><code>data/ticket_owners.json</code> に <code>{user_id: channel_id}</code> マッピングを保持。
+    既存チケットがあれば新規作成せずリンクを案内。チャンネル削除時は自動でクリーンアップ。</p>
+
+    <hr>
+
+    <!-- ===== Spec: Config ===== -->
+    <h2 id="spec-config"><span class="feature-icon">⚙</span>環境変数</h2>
+    <p>各デプロイは <code>deployments/&lt;server&gt;/.env</code> を持ち、以下を設定:</p>
+
+    <h4>共通</h4>
+    <pre>DISCORD_TOKEN_SUPPORT=     # Bot token
+GUILD_ID=                  # サーバーID
+ADMIN_USER_ID=             # 管理者ユーザーID
+MODERATOR_CHANNEL_ID=      # 通知用チャンネル</pre>
+
+    <h4>翻訳</h4>
+    <pre>TRANSLATE_PROVIDER=deepl
+DEEPL_API_KEY=             # DeepL Free key (...:fx)
+TRANSLATE_CHANNEL_IDS=     # 自動翻訳対象チャンネル
+TRANSLATE_DEFAULT_MODE=both
+TRANSLATE_MIN_CONFIDENCE=0.85</pre>
+
+    <h4>送料計算</h4>
+    <pre>SHIPPING_SHEET_ID=         # Google Sheet ID
+SHIPPING_SHEET_NAME=比較表US基準
+GOOGLE_SERVICE_ACCOUNT_JSON=./credentials/service_account.json
+PACKAGING_WEIGHT_G=1000
+MAX_BOX_TOTAL_KG=20</pre>
+
+    <h4>その他</h4>
+    <p>詳細は <code>deployments/template/.env.example</code> 参照。</p>
+
+    <hr>
+
+    <!-- ===== Troubleshoot ===== -->
+    <h2 id="troubleshoot"><span class="feature-icon">🛠</span>トラブルシュート</h2>
+    <table>
+      <thead><tr><th>症状</th><th>原因</th><th>対処</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>⚠️ リアクションが付く</td>
+          <td>翻訳API失敗（クレジット切れ・ネットワーク）</td>
+          <td>API残高確認、<code>support_bot.log</code> でエラー詳細確認</td>
+        </tr>
+        <tr>
+          <td>翻訳が動かない</td>
+          <td>チャンネル未登録</td>
+          <td><code>/translate on</code> 実行 or <code>.env</code> の <code>TRANSLATE_CHANNEL_IDS</code> に追加</td>
+        </tr>
+        <tr>
+          <td>スラッシュコマンドが見えない</td>
+          <td><code>GUILD_ID</code> 未設定 / 同期未完了</td>
+          <td><code>.env</code> に <code>GUILD_ID</code> 設定して再起動</td>
+        </tr>
+        <tr>
+          <td><code>PrivilegedIntentsRequired</code></td>
+          <td>Discord Developer Portal で intent OFF</td>
+          <td>MESSAGE CONTENT + SERVER MEMBERS を ON</td>
+        </tr>
+        <tr>
+          <td><code>/shipping</code> で「block not configured」</td>
+          <td>countries.json の block名がスプシヘッダと不一致</td>
+          <td><code>i18n/countries.json</code> で <code>block</code> を実ヘッダに合わせる</td>
+        </tr>
+        <tr>
+          <td>BOTが2重で投稿</td>
+          <td>多重起動</td>
+          <td><code>pkill -f main.py</code> で全停止 → 1つだけ起動</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <hr>
+
+    <!-- ===== Multi-server ===== -->
+    <h2 id="multi-server"><span class="feature-icon">🌍</span>複数サーバー運用</h2>
+    <p>サーバーごとに <strong>独立したプロセス</strong> として動作。各 <code>deployments/&lt;server&gt;/</code> に別の Discord token / API キー / チャンネル ID を設定。</p>
+
+    <h4>追加サーバーのセットアップ</h4>
+    <pre>cp -r deployments/template deployments/myserver
+cp deployments/myserver/.env.example deployments/myserver/.env
+# .env を編集して値を埋める
+# 必要なら credentials/service_account.json を配置
+
+./run.sh deployments/myserver</pre>
+
+    <h4>並列実行</h4>
+    <pre># systemd / Docker / PM2 などで永続化
+./run.sh deployments/server-tokyo &
+./run.sh deployments/server-osaka &
+./run.sh deployments/server-test &</pre>
+    <p>詳細は <a href="SETUP.md" style="color:var(--cyan)">SETUP.md</a> を参照。</p>
+
+    <hr>
+
+    <p style="color:var(--muted);font-size:12px;text-align:center;margin-top:48px">
+      Discord Support Bot — MIT License — 2026
+    </p>
+  </main>
+</div>
+
+<script>
+  // Active link highlight on scroll
+  const sections = document.querySelectorAll("h2[id]");
+  const links = document.querySelectorAll(".sidebar nav a");
+  function onScroll() {
+    let active = null;
+    const y = window.scrollY + 80;
+    sections.forEach(s => {
+      if (s.offsetTop <= y) active = s.id;
+    });
+    links.forEach(l => l.classList.toggle("active", l.getAttribute("href") === "#" + active));
+  }
+  window.addEventListener("scroll", onScroll);
+  onScroll();
+</script>
+</body>
+</html>

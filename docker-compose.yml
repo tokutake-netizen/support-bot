@@ -1,0 +1,25 @@
+version: "3.9"
+
+# One service per Discord server. Add/duplicate as needed.
+# Each service mounts its own deployment dir (env, credentials, data).
+
+x-bot-base: &bot-base
+  build: .
+  restart: unless-stopped
+  init: true
+
+services:
+  bot-tokyo:
+    <<: *bot-base
+    container_name: bot-tokyo
+    command: ["python3", "main.py", "--env-dir", "/data"]
+    volumes:
+      - ./deployments/tokyo:/data
+
+  # Uncomment to add more servers:
+  # bot-osaka:
+  #   <<: *bot-base
+  #   container_name: bot-osaka
+  #   command: ["python3", "main.py", "--env-dir", "/data"]
+  #   volumes:
+  #     - ./deployments/osaka:/data

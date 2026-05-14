@@ -1,0 +1,29 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# --- Logs ---
+*.log
+
+# --- Secrets / per-deployment state (NEVER commit) ---
+.env
+.env.*
+!*.env.example
+deployments/*/.env
+deployments/*/.env.*
+!deployments/*/.env.example
+!deployments/template/.env.example
+deployments/*/credentials/*
+!deployments/*/credentials/.gitkeep
+deployments/*/data/*
+!deployments/*/data/.gitkeep
+deployments/*/*.log
+
+# --- Misc ---
+.DS_Store
+.idea/
+.vscode/
