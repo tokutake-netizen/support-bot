@@ -69,21 +69,21 @@
     "ai_note": "※ AI自動判定です。違ったらスルーしてください。"
   },
   "ticket": {
-    "panel_title": "🎫 サポートチケット",
-    "panel_desc": "{card_game} で気になるカードを見つけたら、**ここでチケットを開いてオーダーをお知らせください**。配送相談やその他のご質問も受け付けています。",
-    "panel_desc_no_cardgame": "下のボタンを押すと、運営との **個別チャンネル** が作成されます。カードゲームのオーダー、配送相談、その他なんでもどうぞ。",
-    "panel_bullets": "・💰 カードゲームのオーダー／在庫・価格\n・📦 配送・送料\n・❓ その他のご質問",
-    "panel_footer": "運営が個別に対応します",
-    "btn_open": "🎫 チケットを開く",
-    "btn_close": "🔒 クローズ",
-    "panel_not_text": "⚠️ テキストチャンネル内で実行してください。",
-    "open_not_text": "⚠️ このチャンネルではチケットを作成できません。",
-    "duplicate": "⚠️ すでに開いているチケットがあります → {channel}\n終わったら **🔒 クローズ** で閉じてください。",
-    "create_failed": "⚠️ チャンネル作成に失敗しました: {err}",
-    "welcome": "🎫 **チケット #{n:04d}**\n開設者: {opener}\n対応スタッフ: {staff}\n\n🎉 個別チャットを開いてくださってありがとうございます！\nこれから弊社が全力であなたのビジネスを応援します💪\n欲しいもの・気になったことを、お気軽にメッセージしてください📝\n\n完了したら下の **🔒 クローズ** ボタンを押してください。",
-    "created": "✅ チケットを作成しました → {channel}",
-    "close_notice": "🔒 {user} がチケットをクローズしました。5秒後にチャンネルを削除します。",
-    "close_not_ticket": "⚠️ このチャンネルはチケットではありません。",
-    "close_cmd_not_ticket": "⚠️ このコマンドはチケットチャンネル内で実行してください。"
+    "panel_title": "🎫 Support Ticket",
+    "panel_desc": "If you spot a card you'd like in {card_game}, please **open a ticket here to place your order**. We'll also help with shipping inquiries and any other questions.",
+    "panel_desc_no_cardgame": "Click the button below to open a **private channel** with our staff. Place your card-game orders, ask about shipping, or anything else.",
+    "panel_bullets": "・💰 Card-game orders / stock & price\n・📦 Shipping inquiries\n・❓ Other questions",
+    "panel_footer": "Staff will reply individually",
+    "btn_open": "🎫 Open ticket",
+    "btn_close": "🔒 Close ticket",
+    "panel_not_text": "⚠️ Please run this in a text channel.",
+    "open_not_text": "⚠️ Tickets cannot be created from this channel.",
+    "duplicate": "⚠️ You already have an open ticket → {channel}\nPlease use **🔒 Close ticket** when you're done.",
+    "create_failed": "⚠️ Failed to create channel: {err}",
+    "welcome": "🎫 **Ticket #{n:04d}**\nOpener: {opener}\nStaff: {staff}\n\n🎉 Thanks for opening this private chat with us!\nWe're here to support your business with everything we've got💪\nFeel free to message us about anything you'd like or are curious about📝\n\nWhen you're done, press the **🔒 Close ticket** button below.",
+    "created": "✅ Ticket created → {channel}",
+    "close_notice": "🔒 {user} closed this ticket. Deleting channel in 5 seconds.",
+    "close_not_ticket": "⚠️ This is not a ticket channel.",
+    "close_cmd_not_ticket": "⚠️ Run this command inside a ticket channel."
   }
 }
