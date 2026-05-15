@@ -76,7 +76,7 @@ class GiveawayEnterView(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.button(
-        label="🎉 参加 / Enter",
+        label="🎉 Enter",
         style=discord.ButtonStyle.success,
         custom_id="giveaway:enter",
     )
@@ -102,7 +102,7 @@ class GiveawayEnterView(discord.ui.View):
             if isinstance(member, discord.Member):
                 if not any(r.id == req_role_id for r in member.roles):
                     await interaction.response.send_message(
-                        f"⚠️ 参加には <@&{req_role_id}> ロールが必要です。",
+                        f"⚠️ You need the <@&{req_role_id}> role to enter.",
                         ephemeral=True,
                     )
                     return
@@ -113,14 +113,14 @@ class GiveawayEnterView(discord.ui.View):
             entries.remove(interaction.user.id)
             _save_all(all_data)
             await interaction.response.send_message(
-                f"❌ 参加を取り消しました。/ Entry cancelled. (現在 {len(entries)} 名)",
+                f"❌ Entry cancelled. ({len(entries)} entries now)",
                 ephemeral=True,
             )
         else:
             entries.append(interaction.user.id)
             _save_all(all_data)
             await interaction.response.send_message(
-                f"✅ 参加を受け付けました！/ Entry recorded! (現在 {len(entries)} 名)",
+                f"✅ Entry recorded! ({len(entries)} entries now)",
                 ephemeral=True,
             )
 
@@ -130,25 +130,25 @@ def _build_embed(gw: dict, ended: bool = False) -> discord.Embed:
     color = 0x57F287 if not ended else 0x4E5058
     title = f"🎉 GIVEAWAY: {gw['prize']}"
     if ended:
-        title = f"🏁 [終了] {title}"
+        title = f"🏁 [Ended] {title}"
     desc_lines = [
-        f"**🎁 賞品 / Prize**: {gw['prize']}",
-        f"**👥 当選数 / Winners**: {gw['winner_count']}",
-        f"**⏱ 終了 / Ends**: <t:{int(ends_at.timestamp())}:R> (<t:{int(ends_at.timestamp())}:F>)",
-        f"**🎯 ホスト / Host**: <@{gw['host_id']}>",
-        f"**👤 参加者 / Entries**: {len(gw.get('entries', []))}",
+        f"**🎁 Prize**: {gw['prize']}",
+        f"**👥 Winners**: {gw['winner_count']}",
+        f"**⏱ Ends**: <t:{int(ends_at.timestamp())}:R> (<t:{int(ends_at.timestamp())}:F>)",
+        f"**🎯 Host**: <@{gw['host_id']}>",
+        f"**👤 Entries**: {len(gw.get('entries', []))}",
     ]
     if gw.get("required_role_id"):
-        desc_lines.append(f"**🔒 必要ロール / Required**: <@&{gw['required_role_id']}>")
+        desc_lines.append(f"**🔒 Required role**: <@&{gw['required_role_id']}>")
     if ended:
         winners = gw.get("winners", [])
         if winners:
             desc_lines.append("")
-            desc_lines.append(f"**🏆 当選者 / Winners**: {', '.join(f'<@{w}>' for w in winners)}")
+            desc_lines.append(f"**🏆 Winners**: {', '.join(f'<@{w}>' for w in winners)}")
         else:
-            desc_lines.append("\n_参加者なし / No entries_")
+            desc_lines.append("\n_No entries._")
     else:
-        desc_lines.append("\n下のボタンを押して参加！ / Click the button below to enter!")
+        desc_lines.append("\nClick the button below to enter!")
 
     embed = discord.Embed(title=title, description="\n".join(desc_lines), color=color)
     image_url = gw.get("image_url")
@@ -217,7 +217,7 @@ class GiveawayCog(commands.Cog):
                 view = discord.ui.View()
                 btn = discord.ui.Button(
                     style=discord.ButtonStyle.secondary,
-                    label="🏁 終了 / Ended",
+                    label="🏁 Ended",
                     disabled=True,
                     custom_id="giveaway:ended",
                 )
@@ -227,11 +227,11 @@ class GiveawayCog(commands.Cog):
                 if winners:
                     mention_str = ", ".join(f"<@{w}>" for w in winners)
                     await ch.send(
-                        f"🎊 おめでとう！/ Congratulations {mention_str}!\n"
-                        f"🎁 **{gw['prize']}** に当選しました！ホストの <@{gw['host_id']}> から連絡があります。"
+                        f"🎊 Congratulations {mention_str}!\n"
+                        f"🎁 You won **{gw['prize']}** — the host <@{gw['host_id']}> will reach out shortly."
                     )
                 else:
-                    await ch.send("⚠️ 参加者がいなかったため当選者なしです。 / No entries, no winners.")
+                    await ch.send("⚠️ No entries — no winners this time.")
             except discord.HTTPException:
                 log.exception("end_giveaway: edit/send failed")
 
@@ -240,18 +240,18 @@ class GiveawayCog(commands.Cog):
     # ============== Slash commands ==============
     giveaway_group = app_commands.Group(
         name="giveaway",
-        description="Giveaway / Raffle 抽選ツール",
+        description="Giveaway / Raffle tool",
         default_permissions=discord.Permissions(administrator=True),
     )
 
-    @giveaway_group.command(name="create", description="新しいGiveawayを開始")
+    @giveaway_group.command(name="create", description="Start a new giveaway")
     @app_commands.describe(
-        prize="賞品名",
-        duration="期間 (例: 1d, 2h30m, 30s)",
-        winners="当選数 (デフォルト 1)",
-        required_role="参加に必要なロール (任意)",
-        image="賞品画像をアップロード (任意)",
-        image_url="画像URLでも指定可 (任意)",
+        prize="Prize name",
+        duration="Duration (e.g. 1d, 2h30m, 30s)",
+        winners="Number of winners (default 1)",
+        required_role="Role required to enter (optional)",
+        image="Prize image to upload (optional)",
+        image_url="Image URL instead of upload (optional)",
     )
     async def create(
         self,
@@ -266,18 +266,18 @@ class GiveawayCog(commands.Cog):
         secs = parse_duration(duration)
         if secs is None:
             await interaction.response.send_message(
-                "⚠️ duration の書式は `1d`, `2h30m`, `90s` などです。",
+                "⚠️ Invalid duration. Use `1d`, `2h30m`, `90s`, etc.",
                 ephemeral=True,
             )
             return
         if winners < 1 or winners > 50:
             await interaction.response.send_message(
-                "⚠️ winners は 1〜50 で指定してください。", ephemeral=True
+                "⚠️ `winners` must be between 1 and 50.", ephemeral=True
             )
             return
         if not isinstance(interaction.channel, discord.TextChannel):
             await interaction.response.send_message(
-                "⚠️ テキストチャンネル内で実行してください。", ephemeral=True
+                "⚠️ Please run this in a text channel.", ephemeral=True
             )
             return
 
@@ -286,7 +286,7 @@ class GiveawayCog(commands.Cog):
         if image is not None:
             if not (image.content_type or "").startswith("image/"):
                 await interaction.response.send_message(
-                    "⚠️ アップロードされたファイルは画像ではありません。", ephemeral=True
+                    "⚠️ The uploaded file is not an image.", ephemeral=True
                 )
                 return
             resolved_image_url = image.url
@@ -317,28 +317,28 @@ class GiveawayCog(commands.Cog):
 
         log.info("giveaway %s created: prize=%r winners=%d duration=%ds", msg.id, prize, winners, secs)
 
-    @giveaway_group.command(name="end", description="Giveawayを早期終了 (リプライまたはmessage_id指定)")
-    @app_commands.describe(message_id="対象の Giveaway メッセージID")
+    @giveaway_group.command(name="end", description="End a giveaway early")
+    @app_commands.describe(message_id="Giveaway message ID")
     async def end(self, interaction: discord.Interaction, message_id: str) -> None:
         if not message_id.isdigit():
-            await interaction.response.send_message("⚠️ message_id is invalid", ephemeral=True)
+            await interaction.response.send_message("⚠️ Invalid message_id.", ephemeral=True)
             return
         all_data = _load_all()
         gw = all_data.get(message_id)
         if not gw:
-            await interaction.response.send_message("⚠️ そのIDのGiveawayが見つかりません", ephemeral=True)
+            await interaction.response.send_message("⚠️ No giveaway found with that ID.", ephemeral=True)
             return
         if gw.get("ended"):
-            await interaction.response.send_message("⚠️ 既に終了しています", ephemeral=True)
+            await interaction.response.send_message("⚠️ This giveaway has already ended.", ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
         winners = await self._end_giveaway(int(message_id), gw, manual=True)
         await interaction.followup.send(
-            f"✅ 終了しました。当選者: {len(winners)} 名", ephemeral=True
+            f"✅ Ended. {len(winners)} winner(s) picked.", ephemeral=True
         )
 
-    @giveaway_group.command(name="reroll", description="終了したGiveawayの当選者を再抽選")
-    @app_commands.describe(message_id="対象の Giveaway メッセージID", winners="再抽選人数 (任意)")
+    @giveaway_group.command(name="reroll", description="Reroll winners for a finished giveaway")
+    @app_commands.describe(message_id="Giveaway message ID", winners="How many to reroll (optional)")
     async def reroll(
         self,
         interaction: discord.Interaction,
@@ -346,21 +346,21 @@ class GiveawayCog(commands.Cog):
         winners: Optional[int] = None,
     ) -> None:
         if not message_id.isdigit():
-            await interaction.response.send_message("⚠️ message_id is invalid", ephemeral=True)
+            await interaction.response.send_message("⚠️ Invalid message_id.", ephemeral=True)
             return
         all_data = _load_all()
         gw = all_data.get(message_id)
         if not gw:
-            await interaction.response.send_message("⚠️ そのIDのGiveawayが見つかりません", ephemeral=True)
+            await interaction.response.send_message("⚠️ No giveaway found with that ID.", ephemeral=True)
             return
         if not gw.get("ended"):
             await interaction.response.send_message(
-                "⚠️ まだ終了していません。先に /giveaway end してください", ephemeral=True
+                "⚠️ This giveaway is still running. End it first with `/giveaway end`.", ephemeral=True
             )
             return
         entries = gw.get("entries", [])
         if not entries:
-            await interaction.response.send_message("⚠️ 参加者なし", ephemeral=True)
+            await interaction.response.send_message("⚠️ No entries to reroll.", ephemeral=True)
             return
         n = min(winners or gw.get("winner_count", 1), len(entries))
         new_winners = random.sample(entries, n)
@@ -370,29 +370,29 @@ class GiveawayCog(commands.Cog):
         ch = self.bot.get_channel(gw["channel_id"])
         if isinstance(ch, (discord.TextChannel, discord.Thread)):
             await ch.send(
-                f"🔁 **REROLL**: 🎁 **{gw['prize']}** の当選者を再抽選しました\n"
+                f"🔁 **REROLL**: new winners for 🎁 **{gw['prize']}**\n"
                 f"🏆 {', '.join(f'<@{w}>' for w in new_winners)}"
             )
         await interaction.response.send_message(
-            f"✅ {len(new_winners)} 名再抽選しました", ephemeral=True
+            f"✅ Rerolled {len(new_winners)} winner(s).", ephemeral=True
         )
 
-    @giveaway_group.command(name="list", description="進行中のGiveaway一覧")
+    @giveaway_group.command(name="list", description="List active giveaways")
     async def list_active(self, interaction: discord.Interaction) -> None:
         all_data = _load_all()
         actives = [(mid, gw) for mid, gw in all_data.items() if not gw.get("ended")]
         if not actives:
-            await interaction.response.send_message("進行中のGiveawayはありません", ephemeral=True)
+            await interaction.response.send_message("No active giveaways.", ephemeral=True)
             return
-        lines = ["📋 **進行中のGiveaway**"]
+        lines = ["📋 **Active giveaways**"]
         now = datetime.now(timezone.utc)
         for mid, gw in actives:
             try:
                 ends = _parse_iso(gw["ends_at"])
                 remain = int((ends - now).total_seconds())
                 lines.append(
-                    f"・🎁 {gw['prize']} (id `{mid}`) — {len(gw.get('entries',[]))}人参加 — "
-                    f"残 {fmt_duration(max(remain,0))}"
+                    f"・🎁 {gw['prize']} (id `{mid}`) — {len(gw.get('entries',[]))} entries — "
+                    f"{fmt_duration(max(remain,0))} left"
                 )
             except Exception:
                 continue
