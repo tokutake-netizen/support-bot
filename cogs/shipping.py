@@ -701,8 +701,11 @@ class ShippingCog(commands.Cog):
         self.products = load_products()
         self.sheets = SheetsClient()
 
-    @app_commands.command(name="shipping", description="送料を計算 / Calculate shipping")
+    @app_commands.command(name="shipping", description="Calculate shipping")
     async def shipping(self, interaction: discord.Interaction) -> None:
+        from services.channel_guard import ensure_channel_allowed
+        if not await ensure_channel_allowed(interaction, "shipping"):
+            return
         lang = get_ui_lang(str(interaction.locale), feature="shipping")
         view = ShippingView(self, self.registry, self.products, self.sheets, lang=lang)
         await interaction.response.send_message(**view.render(), ephemeral=True)

@@ -147,6 +147,9 @@ class InviteTrackerCog(commands.Cog):
 
     @invite_group.command(name="list", description="List current invites with use counts (admin)")
     async def list_invites(self, interaction: discord.Interaction) -> None:
+        from services.channel_guard import ensure_channel_allowed
+        if not await ensure_channel_allowed(interaction, "invite"):
+            return
         if not (
             isinstance(interaction.user, discord.Member)
             and interaction.user.guild_permissions.administrator
@@ -200,6 +203,9 @@ class InviteTrackerCog(commands.Cog):
         max_uses: int = 0,
         max_age_hours: int = 0,
     ) -> None:
+        from services.channel_guard import ensure_channel_allowed
+        if not await ensure_channel_allowed(interaction, "invite"):
+            return
         member = interaction.user
         if not isinstance(member, discord.Member):
             await interaction.response.send_message("⚠️ Guild-only command.", ephemeral=True)

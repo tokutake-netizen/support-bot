@@ -263,6 +263,9 @@ class GiveawayCog(commands.Cog):
         image: Optional[discord.Attachment] = None,
         image_url: Optional[str] = None,
     ) -> None:
+        from services.channel_guard import ensure_channel_allowed
+        if not await ensure_channel_allowed(interaction, "giveaway"):
+            return
         secs = parse_duration(duration)
         if secs is None:
             await interaction.response.send_message(
@@ -320,6 +323,9 @@ class GiveawayCog(commands.Cog):
     @giveaway_group.command(name="end", description="End a giveaway early")
     @app_commands.describe(message_id="Giveaway message ID")
     async def end(self, interaction: discord.Interaction, message_id: str) -> None:
+        from services.channel_guard import ensure_channel_allowed
+        if not await ensure_channel_allowed(interaction, "giveaway"):
+            return
         if not message_id.isdigit():
             await interaction.response.send_message("⚠️ Invalid message_id.", ephemeral=True)
             return
@@ -345,6 +351,9 @@ class GiveawayCog(commands.Cog):
         message_id: str,
         winners: Optional[int] = None,
     ) -> None:
+        from services.channel_guard import ensure_channel_allowed
+        if not await ensure_channel_allowed(interaction, "giveaway"):
+            return
         if not message_id.isdigit():
             await interaction.response.send_message("⚠️ Invalid message_id.", ephemeral=True)
             return
@@ -379,6 +388,9 @@ class GiveawayCog(commands.Cog):
 
     @giveaway_group.command(name="list", description="List active giveaways")
     async def list_active(self, interaction: discord.Interaction) -> None:
+        from services.channel_guard import ensure_channel_allowed
+        if not await ensure_channel_allowed(interaction, "giveaway"):
+            return
         all_data = _load_all()
         actives = [(mid, gw) for mid, gw in all_data.items() if not gw.get("ended")]
         if not actives:
