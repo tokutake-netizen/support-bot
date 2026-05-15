@@ -24,7 +24,17 @@ from discord import app_commands
 from discord.ext import commands
 
 from services import storage
-from services.i18n import get_ui_lang, normalize_locale
+from services.i18n import get_ui_lang, t
+
+
+def _ticket_lang(locale: Optional[str] = None) -> str:
+    return get_ui_lang(locale, feature="ticket")
+
+
+def _card_game_channel_ref() -> str:
+    """Return a clickable channel mention for CARD_GAME_CHANNEL_ID, or a #card-game fallback."""
+    cid = os.getenv("CARD_GAME_CHANNEL_ID", "").strip()
+    return f"<#{cid}>" if cid.isdigit() else "#card-game"
 
 log = logging.getLogger(__name__)
 
@@ -131,21 +141,20 @@ class TicketCloseView(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.button(
-        label="🔒 クローズ / Close ticket",
+        label="🔒 Close ticket",
         style=discord.ButtonStyle.danger,
         custom_id="ticket:close",
     )
     async def close(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        lang = _ticket_lang(str(interaction.locale))
         channel = interaction.channel
         if not isinstance(channel, discord.TextChannel) or not _is_ticket_channel(channel):
             await interaction.response.send_message(
-                "⚠️ This is not a ticket channel.", ephemeral=True
+                t("ticket.close_not_ticket", lang), ephemeral=True
             )
             return
         await interaction.response.send_message(
-            f"🔒 {interaction.user.mention} がチケットをクローズしました。"
-            f" 5秒後にチャンネルを削除します。\n"
-            f"_Ticket closed by {interaction.user.mention}. Deleting in 5 seconds._"
+            t("ticket.close_notice", lang, user=interaction.user.mention)
         )
         await asyncio.sleep(5)
         _clear_owner_by_channel(channel.id)
@@ -162,17 +171,18 @@ class TicketOpenView(discord.ui.View):
         super().__init__(timeout=None)
 
     @discord.ui.button(
-        label="🎫 チケットを開く / Open ticket",
+        label="🎫 Open ticket",
         style=discord.ButtonStyle.primary,
         custom_id="ticket:open",
     )
     async def open(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.defer(ephemeral=True, thinking=True)
+        lang = _ticket_lang(str(interaction.locale))
         panel_channel = interaction.channel
         guild = interaction.guild
         if not isinstance(panel_channel, discord.TextChannel) or guild is None:
             await interaction.followup.send(
-                "⚠️ このチャンネルではチケットを作成できません。", ephemeral=True
+                t("ticket.open_not_text", lang), ephemeral=True
             )
             return
 
@@ -180,9 +190,7 @@ class TicketOpenView(discord.ui.View):
         existing = _get_existing_ticket_channel(guild, interaction.user.id)
         if existing is not None:
             await interaction.followup.send(
-                f"⚠️ あなたはすでに開いているチケットがあります → {existing.mention}\n"
-                f"_You already have an open ticket → {existing.mention}_\n"
-                f"終わった後は「🔒 クローズ」でクローズしてください。",
+                t("ticket.duplicate", lang, channel=existing.mention),
                 ephemeral=True,
             )
             return
@@ -238,27 +246,17 @@ class TicketOpenView(discord.ui.View):
         except discord.HTTPException as e:
             log.exception("channel creation failed")
             await interaction.followup.send(
-                f"⚠️ チャンネル作成に失敗しました: {e}", ephemeral=True
+                t("ticket.create_failed", lang, err=str(e)), ephemeral=True
             )
             return
 
-        lang = get_ui_lang(str(interaction.locale), feature="ticket")
-        if lang == "en":
-            welcome = (
-                f"🎫 **Ticket #{n:04d}**\n"
-                f"Opener: {interaction.user.mention}\n"
-                f"Staff: {_staff_mention()}\n\n"
-                f"Please describe what you need help with. A staff member will reply soon.\n"
-                f"When you're done, press **🔒 Close ticket** below."
-            )
-        else:
-            welcome = (
-                f"🎫 **チケット #{n:04d}**\n"
-                f"開設者: {interaction.user.mention}\n"
-                f"対応スタッフ: {_staff_mention()}\n\n"
-                f"ご用件をこちらにお書きください。スタッフが順次対応します。\n"
-                f"完了したら下の「🔒 クローズ」ボタンを押してください。"
-            )
+        welcome = t(
+            "ticket.welcome",
+            lang,
+            n=n,
+            opener=interaction.user.mention,
+            staff=_staff_mention(),
+        )
 
         try:
             await new_channel.send(welcome, view=TicketCloseView())
@@ -269,8 +267,7 @@ class TicketOpenView(discord.ui.View):
         _set_owner(interaction.user.id, new_channel.id)
 
         await interaction.followup.send(
-            f"✅ チケットを作成しました → {new_channel.mention}\n"
-            f"_Ticket created → {new_channel.mention}_",
+            t("ticket.created", lang, channel=new_channel.mention),
             ephemeral=True,
         )
 
@@ -293,46 +290,45 @@ class TicketCog(commands.Cog):
 
     ticket_group = app_commands.Group(
         name="ticket",
-        description="チケットツール / Ticket tool",
+        description="Ticket tool",
         default_permissions=discord.Permissions(administrator=True),
     )
 
-    @ticket_group.command(name="panel", description="このチャンネルにチケット起票パネルを設置")
+    @ticket_group.command(name="panel", description="Post the ticket panel in this channel")
     async def panel(self, interaction: discord.Interaction) -> None:
+        lang = _ticket_lang(str(interaction.locale))
         if not isinstance(interaction.channel, discord.TextChannel):
             await interaction.response.send_message(
-                "⚠️ テキストチャンネル内で実行してください。", ephemeral=True
+                t("ticket.panel_not_text", lang), ephemeral=True
             )
             return
 
+        card_game_ref = _card_game_channel_ref()
+        if os.getenv("CARD_GAME_CHANNEL_ID", "").strip().isdigit():
+            desc = t("ticket.panel_desc", lang, card_game=card_game_ref)
+        else:
+            desc = t("ticket.panel_desc_no_cardgame", lang)
+        bullets = t("ticket.panel_bullets", lang)
+
         embed = discord.Embed(
-            title="🎫 サポートチケット / Support Ticket",
-            description=(
-                "下のボタンを押すと、あなた専用の個別チャット（プライベートスレッド）が"
-                "作成されます。商品の質問・配送相談などお気軽にどうぞ。\n\n"
-                "Press the button below to open a **private thread** with our staff. "
-                "Use it for product questions, shipping inquiries, or anything else.\n\n"
-                "—\n"
-                "・💰 商品の在庫・価格 / Product stock & price\n"
-                "・📦 配送・送料 / Shipping inquiries\n"
-                "・❓ その他の質問 / Other questions"
-            ),
+            title=t("ticket.panel_title", lang),
+            description=f"{desc}\n\n—\n{bullets}",
             color=0x5865F2,
         )
-        embed.set_footer(text="運営が個別に対応します / Staff will reply individually")
+        embed.set_footer(text=t("ticket.panel_footer", lang))
         await interaction.response.send_message(embed=embed, view=TicketOpenView())
 
-    @ticket_group.command(name="close", description="このチケットをクローズ（チャンネル削除）")
+    @ticket_group.command(name="close", description="Close this ticket (delete channel)")
     async def close_cmd(self, interaction: discord.Interaction) -> None:
+        lang = _ticket_lang(str(interaction.locale))
         channel = interaction.channel
         if not isinstance(channel, discord.TextChannel) or not _is_ticket_channel(channel):
             await interaction.response.send_message(
-                "⚠️ このコマンドはチケットチャンネル内で実行してください。", ephemeral=True
+                t("ticket.close_cmd_not_ticket", lang), ephemeral=True
             )
             return
         await interaction.response.send_message(
-            f"🔒 {interaction.user.mention} がチケットをクローズしました。"
-            f" 5秒後にチャンネルを削除します。"
+            t("ticket.close_notice", lang, user=interaction.user.mention)
         )
         await asyncio.sleep(5)
         _clear_owner_by_channel(channel.id)

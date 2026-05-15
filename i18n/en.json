@@ -67,5 +67,23 @@
     "panel_off": "🛑 Intent detection disabled in <#{ch}>.",
     "panel_status": "📋 **Intent detection**: {state}\nTarget channel: <#{ch}>",
     "ai_note": "* AI-detected. Please ignore if mistaken."
+  },
+  "ticket": {
+    "panel_title": "🎫 Support Ticket",
+    "panel_desc": "If you spot a card you'd like in {card_game}, please **open a ticket here to place your order**. We'll also help with shipping inquiries and any other questions.",
+    "panel_desc_no_cardgame": "Click the button below to open a **private channel** with our staff. Place your card-game orders, ask about shipping, or anything else.",
+    "panel_bullets": "・💰 Card-game orders / stock & price\n・📦 Shipping inquiries\n・❓ Other questions",
+    "panel_footer": "Staff will reply individually",
+    "btn_open": "🎫 Open ticket",
+    "btn_close": "🔒 Close ticket",
+    "panel_not_text": "⚠️ Please run this in a text channel.",
+    "open_not_text": "⚠️ Tickets cannot be created from this channel.",
+    "duplicate": "⚠️ You already have an open ticket → {channel}\nPlease use **🔒 Close ticket** when you're done.",
+    "create_failed": "⚠️ Failed to create channel: {err}",
+    "welcome": "🎫 **Ticket #{n:04d}**\nOpener: {opener}\nStaff: {staff}\n\n🎉 Thanks for opening this private chat with us!\nWe're here to support your business with everything we've got💪\nFeel free to message us about anything you'd like or are curious about📝\n\nWhen you're done, press the **🔒 Close ticket** button below.",
+    "created": "✅ Ticket created → {channel}",
+    "close_notice": "🔒 {user} closed this ticket. Deleting channel in 5 seconds.",
+    "close_not_ticket": "⚠️ This is not a ticket channel.",
+    "close_cmd_not_ticket": "⚠️ Run this command inside a ticket channel."
   }
 }
