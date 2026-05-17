@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}{{ guild_name }} のオンボーディング — Support Bot{% endblock %}
+
+{% macro channel_select(name, channels_grouped, current="", multiple=false, placeholder="(選択)") %}
+  {% if current is string %}{% set sel = [current] %}{% else %}{% set sel = current %}{% endif %}
+  <select name="{{ name }}"{% if multiple %} multiple size="4"{% endif %}>
+    {% if not multiple %}<option value="">{{ placeholder }}</option>{% endif %}
+    {% for cat, chs in channels_grouped %}
+      {% if cat %}<optgroup label="📂 {{ cat.name }}">{% endif %}
+      {% for c in chs %}
+        <option value="{{ c.id }}"{% if c.id in sel %} selected{% endif %}># {{ c.name }}</option>
+      {% endfor %}
+      {% if cat %}</optgroup>{% endif %}
+    {% endfor %}
+  </select>
+{% endmacro %}
+
+{% macro role_select(name, roles, current=[], multiple=true) %}
+  <select name="{{ name }}"{% if multiple %} multiple size="4"{% endif %}>
+    {% if not multiple %}<option value="">(選択)</option>{% endif %}
+    {% for r in roles %}
+      <option value="{{ r.id }}"{% if r.id in current %} selected{% endif %}{% if r.color %} style="color:#{{ '%06x' | format(r.color) }}"{% endif %}>● {{ r.name }}</option>
+    {% endfor %}
+  </select>
+{% endmacro %}
+
+{% block body %}
+<div class="wrap">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span>Support Bot</div>
+    <nav class="nav">
+      <a href="/dashboard">📋 サーバー一覧</a>
+      <a href="#" class="active">⚙️ {{ guild_name }}</a>
+      <div style="margin-left:24px;padding-left:8px;border-left:2px solid var(--line);margin-top:6px">
+        <a href="/guild/{{ guild_id }}/setup">設定</a>
+        <a href="/guild/{{ guild_id }}/status">稼働状況・ログ</a>
+        <a href="/guild/{{ guild_id }}/giveaway">🎉 Giveaway</a>
+        <a href="/guild/{{ guild_id }}/onboarding" class="active">🚪 オンボーディング</a>
+      </div>
+      <div class="section-label">アカウント</div>
+      <a href="#" style="color:var(--muted)">👤 {{ session.username }}</a>
+      <a href="/logout" style="color:var(--muted)">🚪 ログアウト</a>
+    </nav>
+  </aside>
+  <main class="main">
+    <h1>🚪 オンボーディング</h1>
+    <p class="subtitle">新規メンバーの「初回入室体験」を Discord に組み込みます: ルール表示 → アンケート(1問) → 回答に応じてロール自動付与＆チャンネル公開。</p>
+
+    {% if request.query_params.get("saved") %}
+      <div class="flash ok">✓ オンボーディング設定を保存しました。Discord 側にも即時反映されています。</div>
+    {% endif %}
+
+    {% if not discord_ok %}
+      <div class="callout">⚠️ Discord 連携が未完了です。先に <a href="/guild/{{ guild_id }}/setup">設定ページ</a> で BOT トークンを保存してください。</div>
+    {% elif not is_community %}
+      <div class="callout">
+        ⚠️ このサーバーは Discord の <b>「コミュニティ機能」が無効</b>です。オンボーディングは Community サーバーでのみ使えます。<br>
+        Discord でサーバーを開く → サーバー設定 → 概要 → 「コミュニティを有効化」 で先に有効化してください(必要要件: 安全な DM・確認済みメール)。
+      </div>
+    {% endif %}
+
+    <form method="post" action="/guild/{{ guild_id }}/onboarding/save">
+
+      <h2>📜 ルール設定</h2>
+      <p class="section-desc">「ルール」と書かれたチャンネルを指定すると、Discord の入室画面で「ルールに同意」が表示されるようになります。</p>
+      <div class="card">
+        <div class="field">
+          <label>ルール掲示チャンネル</label>
+          {{ channel_select("rules_channel_id", channels_grouped, current=rules_channel_id, placeholder="(設定しない)") }}
+          <div class="hint">通常は <code>#rule-guide</code> や <code>#rules</code>。このチャンネルに事前にルール本文を投稿しておいてください。</div>
+        </div>
+      </div>
+
+      <h2>🚪 オンボーディング</h2>
+      <p class="section-desc">有効にすると、新規メンバーは入室直後に Discord 純正のオンボーディング画面を通ります。下の質問を一問だけ表示し、選んだ回答に応じてロールを自動付与できます。</p>
+      <div class="card">
+        <div class="feature">
+          <div>
+            <div class="name">オンボーディングを有効化</div>
+            <div class="desc">無効の場合は質問もルール同意も出ません(通常の入室)</div>
+          </div>
+          <label class="switch" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" name="enabled" value="1"{% if onboarding_enabled %} checked{% endif %} style="width:auto;height:auto">
+            <span>有効化</span>
+          </label>
+        </div>
+        <div class="field">
+          <label>既定で見えるチャンネル (default channels)</label>
+          {{ channel_select("default_channel_ids", channels_grouped, current=default_channel_ids, multiple=true) }}
+          <div class="hint">入室直後に「常に見える」チャンネル。welcome / お知らせ系を入れる想定。</div>
+        </div>
+      </div>
+
+      <h2>❓ アンケート(1 問)</h2>
+      <p class="section-desc">最大 {{ MAX_OPTIONS }} 個の選択肢。空欄の選択肢はスキップされます。それぞれに <b>付与するロール</b> と <b>公開するチャンネル</b> を紐づけられます。</p>
+      <div class="card">
+        <div class="field">
+          <label>質問タイトル</label>
+          <input type="text" name="prompt_title" value="{{ prompt_title }}" placeholder="例: What brings you here? / 何のために参加されましたか?">
+          <div class="hint">入室時のオンボ画面で表示されます。短く分かりやすく。</div>
+        </div>
+
+        <h3 style="color:#fff;font-size:13px;margin:18px 0 10px">選択肢</h3>
+        <div class="help-box">
+          <div class="h"><span class="ico">💡</span>ヒント</div>
+          絵文字は <code>🛒</code> のように貼り付け、またはサーバーの絵文字ID <code>&lt;:name:1234&gt;</code> 形式でも OK。ロール/チャンネルは複数選択可。
+        </div>
+
+        {% for i in range(MAX_OPTIONS) %}
+        {% set opt = options[i] %}
+        <details {% if opt.title %}open{% endif %} style="border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:10px">
+          <summary><b>選択肢 #{{ i + 1 }}</b>{% if opt.title %} — {{ opt.title }}{% else %} <span style="color:var(--muted)">(未入力)</span>{% endif %}</summary>
+          <div style="margin-top:10px">
+            <div class="row">
+              <div class="field">
+                <label>絵文字</label>
+                <input type="text" name="opt_emoji_{{ i }}" value="{{ opt.emoji }}" placeholder="🛒">
+              </div>
+              <div class="field">
+                <label>タイトル(回答の表示文)</label>
+                <input type="text" name="opt_title_{{ i }}" value="{{ opt.title }}" placeholder="例: I want to buy cards">
+              </div>
+            </div>
+            <div class="field">
+              <label>説明 (任意)</label>
+              <input type="text" name="opt_desc_{{ i }}" value="{{ opt.description }}" placeholder="例: 購入・取引に興味があります">
+            </div>
+            <div class="row">
+              <div class="field">
+                <label>付与するロール</label>
+                {{ role_select("opt_role_ids_" ~ i, roles, current=opt.role_ids, multiple=true) }}
+              </div>
+              <div class="field">
+                <label>公開するチャンネル</label>
+                {{ channel_select("opt_channel_ids_" ~ i, channels_grouped, current=opt.channel_ids, multiple=true) }}
+              </div>
+            </div>
+          </div>
+        </details>
+        {% endfor %}
+      </div>
+
+      <div class="sticky-save">
+        <button type="submit" class="btn green">💾 保存して Discord に反映</button>
+        <a href="/guild/{{ guild_id }}/setup" class="btn outline">設定に戻る</a>
+        <span style="margin-left:auto;color:var(--muted);font-size:12px">
+          オンボーディング: {% if onboarding_enabled %}<span style="color:var(--green)">● 有効</span>{% else %}<span style="color:var(--muted)">○ 無効</span>{% endif %}
+        </span>
+      </div>
+    </form>
+  </main>
+</div>
+{% endblock %}

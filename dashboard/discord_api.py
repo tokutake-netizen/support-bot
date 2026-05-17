@@ -7,6 +7,7 @@ has guild-level scopes but no channel listing.
 """
 from __future__ import annotations
 
+import json
 from typing import Optional
 
 import httpx
@@ -39,6 +40,71 @@ class DiscordREST:
                 f"{DISCORD_API}/guilds/{guild_id}/roles", headers=self._headers()
             )
             return r.json() if r.status_code == 200 else []
+
+    async def create_message(
+        self,
+        channel_id: int | str,
+        payload: dict,
+        image_bytes: Optional[bytes] = None,
+        image_filename: Optional[str] = None,
+    ) -> dict:
+        """POST a message to a channel. Optionally attach an image file.
+
+        When ``image_bytes`` is provided, the message is sent as multipart
+        with ``payload_json`` and the file attached as ``files[0]``. The
+        embed in payload should reference the attachment via
+        ``embed.image.url = "attachment://<filename>"`` if it wants to
+        display the upload inline.
+        """
+        url = f"{DISCORD_API}/channels/{channel_id}/messages"
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            if image_bytes:
+                files = {
+                    "files[0]": (image_filename or "image.png", image_bytes, "application/octet-stream")
+                }
+                data = {"payload_json": json.dumps(payload)}
+                r = await client.post(
+                    url, headers=self._headers(), files=files, data=data
+                )
+            else:
+                hdr = {**self._headers(), "Content-Type": "application/json"}
+                r = await client.post(url, headers=hdr, json=payload)
+            r.raise_for_status()
+            return r.json()
+
+    async def patch_message(
+        self, channel_id: int | str, message_id: int | str, payload: dict
+    ) -> dict:
+        url = f"{DISCORD_API}/channels/{channel_id}/messages/{message_id}"
+        hdr = {**self._headers(), "Content-Type": "application/json"}
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.patch(url, headers=hdr, json=payload)
+            r.raise_for_status()
+            return r.json()
+
+    # ---------- guild settings ----------
+
+    async def patch_guild(self, guild_id: int | str, payload: dict) -> dict:
+        url = f"{DISCORD_API}/guilds/{guild_id}"
+        hdr = {**self._headers(), "Content-Type": "application/json"}
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.patch(url, headers=hdr, json=payload)
+            r.raise_for_status()
+            return r.json()
+
+    async def get_onboarding(self, guild_id: int | str) -> Optional[dict]:
+        url = f"{DISCORD_API}/guilds/{guild_id}/onboarding"
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.get(url, headers=self._headers())
+            return r.json() if r.status_code == 200 else None
+
+    async def put_onboarding(self, guild_id: int | str, payload: dict) -> dict:
+        url = f"{DISCORD_API}/guilds/{guild_id}/onboarding"
+        hdr = {**self._headers(), "Content-Type": "application/json"}
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.put(url, headers=hdr, json=payload)
+            r.raise_for_status()
+            return r.json()
 
 
 # Discord channel types we care about

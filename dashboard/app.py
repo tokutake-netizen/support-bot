@@ -31,7 +31,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from itsdangerous import BadSignature, URLSafeSerializer
 
-from . import auth, bot_manager, config_store
+import random
+from datetime import datetime, timezone
+
+from . import auth, bot_manager, config_store, giveaway_helpers as gh
 from .discord_api import DiscordREST, assignable_roles, channels_grouped
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s :: %(message)s")
@@ -365,3 +368,368 @@ async def guild_log(
     sess = require_session(session)
     require_admin_for_guild(sess, guild_id)
     return Response(bot_manager.tail_log(guild_id, lines=lines), media_type="text/plain")
+
+
+# -------------------------- giveaway routes --------------------------
+
+def _split_giveaways(data: dict[str, dict]) -> tuple[list[tuple[str, dict]], list[tuple[str, dict]]]:
+    active = [(mid, gw) for mid, gw in data.items() if not gw.get("ended")]
+    ended = [(mid, gw) for mid, gw in data.items() if gw.get("ended")]
+    # sort active by ends_at asc, ended by ends_at desc
+    active.sort(key=lambda x: x[1].get("ends_at", ""))
+    ended.sort(key=lambda x: x[1].get("ends_at", ""), reverse=True)
+    return active, ended
+
+
+def _guild_name_from_session(sess: dict, guild_id: str) -> str:
+    return next(
+        (g["name"] for g in sess["guilds"] if str(g["id"]) == str(guild_id)),
+        guild_id,
+    )
+
+
+@app.get("/guild/{guild_id}/giveaway", response_class=HTMLResponse)
+async def giveaway_page(
+    request: Request,
+    guild_id: str,
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    bot_token = _bot_token_for(guild_id)
+
+    channels_groups: list = []
+    roles: list = []
+    if bot_token:
+        rest = DiscordREST(bot_token)
+        chs = await rest.list_channels(guild_id)
+        channels_groups = channels_grouped(chs)
+        rls = await rest.list_roles(guild_id)
+        roles = assignable_roles(rls)
+
+    data = gh.load_giveaways(guild_id)
+    active, ended = _split_giveaways(data)
+
+    # Pre-compute friendly time-remaining for the template
+    now = datetime.now(timezone.utc)
+    for mid, gw in active:
+        try:
+            ends_at = datetime.fromisoformat(gw["ends_at"])
+            gw["_remaining"] = gh.fmt_duration(max(0, int((ends_at - now).total_seconds())))
+        except Exception:
+            gw["_remaining"] = "?"
+
+    return templates.TemplateResponse(
+        "giveaway.html",
+        {
+            "request": request,
+            "session": sess,
+            "guild_id": guild_id,
+            "guild_name": _guild_name_from_session(sess, guild_id),
+            "channels_grouped": channels_groups,
+            "roles": roles,
+            "active": active,
+            "ended": ended,
+            "discord_ok": bool(bot_token and channels_groups),
+        },
+    )
+
+
+@app.post("/guild/{guild_id}/giveaway/create")
+async def giveaway_create(
+    request: Request,
+    guild_id: str,
+    session: Optional[str] = Cookie(None),
+    prize: str = Form(...),
+    duration: str = Form(...),
+    winners: int = Form(1),
+    channel_id: str = Form(...),
+    required_role_id: Optional[str] = Form(None),
+    image_url: Optional[str] = Form(None),
+    note: Optional[str] = Form(None),
+    image: Optional[UploadFile] = File(None),
+):
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+
+    secs = gh.parse_duration(duration)
+    if secs is None:
+        raise HTTPException(status_code=400, detail="invalid duration; use 30s / 5m / 1h / 1d2h")
+    if winners < 1 or winners > 50:
+        raise HTTPException(status_code=400, detail="winners must be 1–50")
+
+    bot_token = _bot_token_for(guild_id)
+    if not bot_token:
+        raise HTTPException(status_code=400, detail="BOT token not configured for this guild")
+
+    # Resolve image: uploaded file wins over URL field
+    image_bytes: Optional[bytes] = None
+    image_filename: Optional[str] = None
+    resolved_image_url: Optional[str] = None
+    if image is not None and image.filename:
+        image_bytes = await image.read()
+        if image_bytes:
+            image_filename = image.filename
+            resolved_image_url = f"attachment://{image_filename}"
+    elif image_url:
+        resolved_image_url = image_url.strip() or None
+
+    gw = {
+        "channel_id": int(channel_id),
+        "guild_id": int(guild_id),
+        "prize": prize,
+        "winner_count": winners,
+        "ends_at": gh.future_iso(secs),
+        "host_id": int(sess["user_id"]),
+        "required_role_id": int(required_role_id) if required_role_id and required_role_id.isdigit() else None,
+        "image_url": resolved_image_url,
+        "note": (note or "").strip() or None,
+        "entries": [],
+        "ended": False,
+        "winners": [],
+    }
+
+    rest = DiscordREST(bot_token)
+    payload = {
+        "embeds": [gh.build_giveaway_embed(gw)],
+        "components": [gh.enter_button_component()],
+    }
+    try:
+        msg = await rest.create_message(
+            channel_id,
+            payload,
+            image_bytes=image_bytes,
+            image_filename=image_filename,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Discord create_message failed: {e}")
+
+    # If we uploaded a file, swap the placeholder attachment URL for the
+    # actual CDN URL Discord returned. That way reload/end re-render works.
+    if image_bytes and msg.get("attachments"):
+        att = msg["attachments"][0]
+        gw["image_url"] = att.get("url")
+
+    gh.add_giveaway(guild_id, msg["id"], gw)
+    return RedirectResponse(f"/guild/{guild_id}/giveaway?created={msg['id']}", status_code=303)
+
+
+@app.post("/guild/{guild_id}/giveaway/{message_id}/end")
+async def giveaway_end(
+    guild_id: str,
+    message_id: str,
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+
+    data = gh.load_giveaways(guild_id)
+    gw = data.get(str(message_id))
+    if not gw:
+        raise HTTPException(status_code=404, detail="giveaway not found")
+    if gw.get("ended"):
+        return RedirectResponse(f"/guild/{guild_id}/giveaway?ended={message_id}", status_code=303)
+
+    # Pick winners now (mirror cogs/giveaway.py _end_giveaway)
+    entries: list[int] = gw.get("entries", [])
+    n = min(max(1, int(gw.get("winner_count", 1))), len(entries)) if entries else 0
+    chosen = random.sample(entries, n) if n else []
+    gw["ended"] = True
+    gw["winners"] = chosen
+    data[str(message_id)] = gw
+    gh.save_giveaways(guild_id, data)
+
+    bot_token = _bot_token_for(guild_id)
+    if bot_token:
+        rest = DiscordREST(bot_token)
+        try:
+            await rest.patch_message(
+                gw["channel_id"],
+                message_id,
+                {
+                    "embeds": [gh.build_giveaway_embed(gw, ended=True)],
+                    "components": [gh.enter_button_component(disabled=True)],
+                },
+            )
+        except Exception as e:
+            log.warning("could not patch ended giveaway %s: %s", message_id, e)
+        # Post winner announcement
+        try:
+            if chosen:
+                mentions = " ".join(f"<@{w}>" for w in chosen)
+                await rest.create_message(
+                    gw["channel_id"],
+                    {"content": f"🎊 Congratulations {mentions}!\n🎁 You won **{gw['prize']}** — the host <@{gw['host_id']}> will reach out shortly."},
+                )
+            else:
+                await rest.create_message(
+                    gw["channel_id"], {"content": "⚠️ No entries — no winners this time."}
+                )
+        except Exception:
+            log.exception("winner announcement failed")
+
+    return RedirectResponse(f"/guild/{guild_id}/giveaway?ended={message_id}", status_code=303)
+
+
+# -------------------------- onboarding routes --------------------------
+
+ONBOARDING_MAX_OPTIONS = 8
+
+
+def _parse_emoji(text: str) -> Optional[dict]:
+    """Convert a single emoji string (unicode or <:name:id>) into Discord's emoji shape."""
+    s = (text or "").strip()
+    if not s:
+        return None
+    if s.startswith("<") and s.endswith(">") and ":" in s:
+        try:
+            inner = s.strip("<>")
+            parts = inner.split(":")
+            if len(parts) == 3:
+                animated = parts[0] == "a"
+                return {"id": parts[2], "name": parts[1], "animated": animated}
+        except Exception:
+            pass
+    return {"name": s, "id": None}
+
+
+@app.get("/guild/{guild_id}/onboarding", response_class=HTMLResponse)
+async def onboarding_page(
+    request: Request,
+    guild_id: str,
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    bot_token = _bot_token_for(guild_id)
+
+    guild_info = None
+    onboarding = None
+    channels_groups: list = []
+    roles: list = []
+    if bot_token:
+        rest = DiscordREST(bot_token)
+        guild_info = await rest.get_guild(guild_id)
+        onboarding = await rest.get_onboarding(guild_id)
+        chs = await rest.list_channels(guild_id)
+        channels_groups = channels_grouped(chs)
+        rls = await rest.list_roles(guild_id)
+        roles = assignable_roles(rls)
+
+    prompt_title = ""
+    options: list[dict] = []
+    if onboarding and onboarding.get("prompts"):
+        first = onboarding["prompts"][0]
+        prompt_title = first.get("title", "")
+        for opt in first.get("options", []):
+            emoji = opt.get("emoji") or {}
+            emoji_str = ""
+            if emoji.get("id"):
+                ap = "a" if emoji.get("animated") else ""
+                emoji_str = f"<{ap}:{emoji.get('name','')}:{emoji['id']}>"
+            elif emoji.get("name"):
+                emoji_str = emoji["name"]
+            options.append({
+                "emoji": emoji_str,
+                "title": opt.get("title", ""),
+                "description": opt.get("description", "") or "",
+                "role_ids": [str(x) for x in opt.get("role_ids", [])],
+                "channel_ids": [str(x) for x in opt.get("channel_ids", [])],
+            })
+    while len(options) < ONBOARDING_MAX_OPTIONS:
+        options.append({"emoji": "", "title": "", "description": "", "role_ids": [], "channel_ids": []})
+
+    is_community = bool(guild_info and "COMMUNITY" in (guild_info.get("features") or []))
+
+    return templates.TemplateResponse(
+        "onboarding.html",
+        {
+            "request": request,
+            "session": sess,
+            "guild_id": guild_id,
+            "guild_name": _guild_name_from_session(sess, guild_id),
+            "channels_grouped": channels_groups,
+            "roles": roles,
+            "discord_ok": bool(bot_token and channels_groups),
+            "is_community": is_community,
+            "rules_channel_id": str((guild_info or {}).get("rules_channel_id") or ""),
+            "onboarding_enabled": bool(onboarding and onboarding.get("enabled")),
+            "default_channel_ids": [str(x) for x in (onboarding or {}).get("default_channel_ids", [])],
+            "prompt_title": prompt_title,
+            "options": options,
+            "MAX_OPTIONS": ONBOARDING_MAX_OPTIONS,
+        },
+    )
+
+
+@app.post("/guild/{guild_id}/onboarding/save")
+async def onboarding_save(
+    request: Request,
+    guild_id: str,
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    bot_token = _bot_token_for(guild_id)
+    if not bot_token:
+        raise HTTPException(status_code=400, detail="BOT token not configured")
+
+    form = await request.form()
+    rest = DiscordREST(bot_token)
+
+    rules_ch = form.get("rules_channel_id") or ""
+    try:
+        await rest.patch_guild(
+            guild_id, {"rules_channel_id": int(rules_ch) if rules_ch else None}
+        )
+    except Exception as e:
+        log.warning("patch_guild rules_channel_id failed: %s", e)
+
+    enabled = form.get("enabled") == "1"
+    prompt_title = (form.get("prompt_title") or "").strip()
+    default_channel_ids = [v for v in form.getlist("default_channel_ids") if v]
+
+    options: list[dict] = []
+    for i in range(ONBOARDING_MAX_OPTIONS):
+        title = (form.get(f"opt_title_{i}") or "").strip()
+        if not title:
+            continue
+        emoji_text = form.get(f"opt_emoji_{i}") or ""
+        desc = (form.get(f"opt_desc_{i}") or "").strip()
+        role_ids = [v for v in form.getlist(f"opt_role_ids_{i}") if v]
+        channel_ids = [v for v in form.getlist(f"opt_channel_ids_{i}") if v]
+        emoji = _parse_emoji(emoji_text)
+        options.append({
+            "title": title,
+            "description": desc or None,
+            "emoji": emoji,
+            "role_ids": role_ids,
+            "channel_ids": channel_ids,
+        })
+
+    prompts: list[dict] = []
+    if prompt_title and options:
+        prompts.append({
+            "id": "0",
+            "type": 0,
+            "title": prompt_title,
+            "options": options,
+            "single_select": True,
+            "required": True,
+            "in_onboarding": True,
+        })
+
+    payload = {
+        "prompts": prompts,
+        "default_channel_ids": default_channel_ids,
+        "enabled": enabled,
+        "mode": 0,
+    }
+
+    try:
+        await rest.put_onboarding(guild_id, payload)
+    except Exception as e:
+        log.exception("put_onboarding failed")
+        raise HTTPException(status_code=502, detail=f"Discord put_onboarding failed: {e}")
+
+    return RedirectResponse(f"/guild/{guild_id}/onboarding?saved=1", status_code=303)
