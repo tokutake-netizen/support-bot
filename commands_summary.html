@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Support Bot — コマンドまとめ</title>
+<style>
+  :root {
+    --bg: #1e1f22;
+    --bg2: #2b2d31;
+    --bg3: #313338;
+    --bg-card: #232428;
+    --text: #dbdee1;
+    --muted: #949ba4;
+    --accent: #5865f2;
+    --green: #23a55a;
+    --red: #f23f43;
+    --yellow: #f0b232;
+    --pink: #eb459e;
+    --cyan: #00a8fc;
+    --orange: #f37b1d;
+    --border: #3f4147;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "gg sans", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+    font-size: 14px;
+    padding: 32px 24px 64px;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding-bottom: 16px;
+    border-bottom: 2px solid var(--accent);
+    margin-bottom: 24px;
+  }
+  header h1 { font-size: 26px; color: #fff; margin: 0; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  header .meta { margin-left: auto; color: var(--muted); font-size: 12px; }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.6;
+  }
+  .badge.admin { background: rgba(242,63,67,.15); color: var(--red); border: 1px solid rgba(242,63,67,.4); }
+  .badge.all   { background: rgba(35,165,90,.15); color: var(--green); border: 1px solid rgba(35,165,90,.4); }
+  .badge.auto  { background: rgba(0,168,252,.15); color: var(--cyan); border: 1px solid rgba(0,168,252,.4); }
+  .badge.tag   { background: var(--bg3); color: var(--muted); border: 1px solid var(--border); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 16px;
+  }
+
+  .group {
+    background: var(--bg-card);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .group-head {
+    padding: 14px 16px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .group-head .icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .group-head .icon.translate { background: rgba(0,168,252,.15);  color: var(--cyan);   }
+  .group-head .icon.suggest   { background: rgba(235,69,158,.15); color: var(--pink);   }
+  .group-head .icon.shipping  { background: rgba(243,123,29,.15); color: var(--orange); }
+  .group-head .icon.ticket    { background: rgba(240,178,50,.15); color: var(--yellow); }
+  .group-head .icon.welcome   { background: rgba(35,165,90,.15);  color: var(--green);  }
+  .group-head .icon.giveaway  { background: rgba(88,101,242,.15); color: var(--accent); }
+  .group-head .icon.misc      { background: rgba(148,155,164,.15);color: var(--muted);  }
+  .group-head .title { font-size: 16px; color: #fff; font-weight: 700; }
+  .group-head .title small { display: block; color: var(--muted); font-weight: 400; font-size: 11px; margin-top: 2px; }
+
+  .group-body { padding: 12px 16px 16px; }
+  .group-body p.lead { margin: 0 0 10px; color: var(--muted); font-size: 12.5px; }
+
+  .cmd {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 8px;
+    align-items: center;
+    padding: 8px 0;
+    border-top: 1px dashed var(--border);
+  }
+  .cmd:first-of-type { border-top: 0; padding-top: 4px; }
+  .cmd code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    color: #fff;
+    background: var(--bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    word-break: break-word;
+  }
+  .cmd .desc { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+
+  .note {
+    margin-top: 12px;
+    padding: 8px 10px;
+    background: var(--bg);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--text);
+  }
+  .note b { color: #fff; }
+  .note.warn  { border-left-color: var(--yellow); }
+  .note.auto  { border-left-color: var(--cyan); }
+
+  .common {
+    margin-top: 32px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 22px;
+  }
+  .common h2 { font-size: 18px; margin: 0 0 12px; color: #fff; }
+  .common ul { margin: 0; padding-left: 20px; }
+  .common li { margin: 4px 0; }
+  .common li b { color: #fff; }
+
+  footer {
+    margin-top: 24px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  @media (max-width: 600px) {
+    body { padding: 20px 14px 48px; font-size: 13.5px; }
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Support Bot — コマンドまとめ</h1>
+  <span class="sub">全 7 グループ・25 コマンド</span>
+  <span class="meta">2026-05-16</span>
+</header>
+
+<div class="legend">
+  <span class="badge admin">Admin のみ</span>
+  <span class="badge all">全員実行可</span>
+  <span class="badge auto">自動動作あり</span>
+  <span class="badge tag">ephemeral = 自分のみ表示</span>
+</div>
+
+<div class="grid">
+
+  <!-- A. 翻訳 -->
+  <section class="group">
+    <div class="group-head">
+      <span class="icon translate">🌐</span>
+      <div class="title">A. 翻訳 <small>/translate ・ 英⇄日 自動翻訳</small></div>
+    </div>
+    <div class="group-body">
+      <p class="lead">DeepL Free / Anthropic Claude を切替可能。登録チャンネルで自動翻訳。</p>
+
+      <div class="cmd"><code>/translate on</code><span class="badge admin">Admin</span>
+        <span class="desc">このチャンネルで自動翻訳を有効化</span></div>
+      <div class="cmd"><code>/translate off</code><span class="badge admin">Admin</span>
+        <span class="desc">このチャンネルの自動翻訳を停止</span></div>
+      <div class="cmd"><code>/translate mode &lt;direction&gt;</code><span class="badge admin">Admin</span>
+        <span class="desc">方向変更：<code>both</code> / <code>en2ja</code> / <code>ja2en</code></span></div>
+      <div class="cmd"><code>/translate status</code><span class="badge admin">Admin</span>
+        <span class="desc">有効ch一覧・プロバイダ・月使用量</span></div>
+      <div class="cmd"><code>/translate text &lt;text&gt; [direction]</code><span class="badge admin">Admin</span>
+        <span class="desc">任意の文字列を即時翻訳して ephemeral 返信</span></div>
+
+      <div class="note auto"><b>自動動作：</b>英文→🇯🇵、日本文→🇺🇸 を reply。URL／絵文字のみ／2文字未満／bot reply はスキップ。信頼度 <code>TRANSLATE_MIN_CONFIDENCE</code> 未満は無視（既定 0.85）。</div>
+    </div>
+  </section>
+
+  <!-- B. 意図判定 -->
+  <section class="group">
+    <div class="group-head">
+      <span class="icon suggest">🧭</span>
+      <div class="title">B. 意図判定 <small>/suggest ・ free-talk を Claude で分類</small></div>
+    </div>
+    <div class="group-body">
+      <p class="lead">商品問合せ／配送相談を検知し、誘導文を reply（アドバイス止まり）。</p>
+
+      <div class="cmd"><code>/suggest on</code><span class="badge admin">Admin</span>
+        <span class="desc">意図判定を有効化</span></div>
+      <div class="cmd"><code>/suggest off</code><span class="badge admin">Admin</span>
+        <span class="desc">意図判定を停止</span></div>
+      <div class="cmd"><code>/suggest status</code><span class="badge admin">Admin</span>
+        <span class="desc">現在の有効状態を確認</span></div>
+
+      <div class="note auto"><b>自動動作：</b>ラベル <code>product_inquiry</code> / <code>shipping_inquiry</code> / <code>general_chat</code> / <code>other</code>。信頼度 ≥ <code>SUGGEST_MIN_CONFIDENCE</code>（既定 0.70）のみ反応。商品問合せ→ <code>#ticket</code>、配送相談→ <code>/shipping</code> ＋ <code>#shipping-guide</code> 誘導。同一メッセージへの reply は1回限り。</div>
+    </div>
+  </section>
+
+  <!-- C. 送料計算 -->
+  <section class="group">
+    <div class="group-head">
+      <span class="icon shipping">📦</span>
+      <div class="title">C. 送料計算 <small>/shipping ・ /shippingadmin</small></div>
+    </div>
+    <div class="group-body">
+      <p class="lead">商品×数量×宛先国 をドロップダウン選択 → Google Sheets から料金取得。</p>
+
+      <div class="cmd"><code>/shipping</code><span class="badge all">全員</span>
+        <span class="desc">送料計算パネルを起動（ephemeral）</span></div>
+      <div class="cmd"><code>/shippingadmin reload</code><span class="badge admin">Admin</span>
+        <span class="desc">商品マスタ／スプシキャッシュを再読込</span></div>
+
+      <div class="note"><b>パネル：</b>🎁商品 / 🔢数量 / 🏳️宛先（リージョン→国 or 🔍検索） → 📥送信 → 🧮送料を計算 → 📤公開 / 🔁やり直す / 🌐JP-EN 切替。</div>
+      <div class="note warn"><b>計算：</b>合計重量＋梱包1kg → 0.5kg刻みで切上 → 20kg超は自動分割発送。「比較表US基準」の <code>安い方</code> 列で DHL / FedEx 自動選択。</div>
+    </div>
+  </section>
+
+  <!-- D. チケット -->
+  <section class="group">
+    <div class="group-head">
+      <span class="icon ticket">🎫</span>
+      <div class="title">D. チケット <small>/ticket ・ Mee6 風サポート起票</small></div>
+    </div>
+    <div class="group-body">
+      <p class="lead">ボタンクリックで個別チャンネル作成。1ユーザー1チケットまで。</p>
+
+      <div class="cmd"><code>/ticket panel</code><span class="badge admin">Admin</span>
+        <span class="desc">このチャンネルにチケット起票パネルを設置</span></div>
+      <div class="cmd"><code>/ticket close</code><span class="badge admin">Admin</span>
+        <span class="desc">このチケットチャンネルを閉じる（5秒後削除）</span></div>
+
+      <div class="note"><b>動作：</b>「🎫 チケットを開く」→ <code>Created Tickets</code> 配下に <code>0001-username</code> 形式で作成。開設者＋運営ロール（<code>TICKET_STAFF_ROLE_IDS</code>）のみ閲覧可。🔒クローズボタンで 5 秒後に自動削除。</div>
+    </div>
+  </section>
+
+  <!-- E. Welcome -->
+  <section class="group">
+    <div class="group-head">
+      <span class="icon welcome">👋</span>
+      <div class="title">E. Welcome <small>/welcome ・ 新規メンバー自動ウェルカム</small></div>
+    </div>
+    <div class="group-body">
+      <p class="lead">入室時に Embed を投稿。バナー・色・本文は <code>.env</code> でカスタマイズ。</p>
+
+      <div class="cmd"><code>/welcome test</code><span class="badge admin">Admin</span>
+        <span class="desc">自分にプレビュー表示（ephemeral）</span></div>
+      <div class="cmd"><code>/welcome status</code><span class="badge admin">Admin</span>
+        <span class="desc">現在の設定を確認</span></div>
+      <div class="cmd"><code>/welcome setbanner [image] [url]</code><span class="badge admin">Admin</span>
+        <span class="desc">バナー画像を設定（引数なし＝クリア）</span></div>
+
+      <div class="note auto"><b>自動動作：</b>新規メンバー入室で <code>WELCOME_CHANNEL_ID</code> へ Embed 投稿。<code>WELCOME_AUTOROLE_IDS</code> でロール自動付与。プレースホルダ <code>{user_mention}</code> <code>{guild_name}</code> <code>{member_count}</code> <code>{rules}</code> 等を本文で使用可。</div>
+    </div>
+  </section>
+
+  <!-- F. Giveaway -->
+  <section class="group">
+    <div class="group-head">
+      <span class="icon giveaway">🎉</span>
+      <div class="title">F. Giveaway <small>/giveaway ・ 時間指定の抽選</small></div>
+    </div>
+    <div class="group-body">
+      <p class="lead">参加ボタン式。期限切れで自動抽選＆発表。再抽選・早期終了も対応。</p>
+
+      <div class="cmd"><code>/giveaway create prize duration [winners] [required_role] [image]</code><span class="badge admin">Admin</span>
+        <span class="desc">新規 Giveaway 開始</span></div>
+      <div class="cmd"><code>/giveaway end &lt;message_id&gt;</code><span class="badge admin">Admin</span>
+        <span class="desc">早期終了して即座に当選者発表</span></div>
+      <div class="cmd"><code>/giveaway reroll &lt;message_id&gt; [winners]</code><span class="badge admin">Admin</span>
+        <span class="desc">終了済み抽選の再抽選</span></div>
+      <div class="cmd"><code>/giveaway list</code><span class="badge admin">Admin</span>
+        <span class="desc">進行中 Giveaway の一覧</span></div>
+
+      <div class="note"><b>期間フォーマット：</b><code>30s</code> / <code>5m</code> / <code>1h</code> / <code>1d</code> / <code>1d2h30m</code>（組み合わせ可）。</div>
+      <div class="note auto"><b>参加者：</b>「🎉 参加 / Enter」ボタンを押すだけ。再度押すと取消（トグル）。残量・残り時間は逐次更新。</div>
+    </div>
+  </section>
+
+  <!-- G. その他/共通 -->
+  <section class="group">
+    <div class="group-head">
+      <span class="icon misc">⚙️</span>
+      <div class="title">G. 共通仕様 <small>権限・応答形式・エラー表示・ログ</small></div>
+    </div>
+    <div class="group-body">
+      <p class="lead">グループを横断する仕様。トラブル時はまずここを確認。</p>
+
+      <div class="note"><b>権限：</b><span class="badge admin">Admin</span> = <code>Administrator</code> 権限保持者のみ。非Adminが打つと Discord 側で弾かれ bot には届かない。<code>/shipping</code> のみ全員実行可。</div>
+      <div class="note"><b>Ephemeral：</b>管理コマンドは「あなたにのみ表示」。公開は 📤公開する ボタンや <code>/giveaway create</code> 等の明示的な公開コマンド経由のみ。</div>
+      <div class="note warn"><b>エラーマーク：</b>⚠️ リアクション = 翻訳 API 失敗（<code>support_bot.log</code> 参照）。❌ メッセージ = 入力エラー（重量超過・該当データなし等）。</div>
+      <div class="note"><b>ログ：</b>すべての操作・エラーは <code>deployments/&lt;server&gt;/support_bot.log</code> に記録。</div>
+    </div>
+  </section>
+
+</div>
+
+<footer>Support Bot Commands Summary — <code>support_bot/commands_summary.html</code></footer>
+
+</div>
+</body>
+</html>

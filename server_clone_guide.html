@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Discord サーバークローン — セットアップガイド</title>
+<style>
+  :root {
+    --bg: #1e1f22;
+    --bg2: #2b2d31;
+    --bg3: #313338;
+    --bg-card: #232428;
+    --text: #dbdee1;
+    --muted: #949ba4;
+    --accent: #5865f2;
+    --green: #23a55a;
+    --red: #f23f43;
+    --yellow: #f0b232;
+    --pink: #eb459e;
+    --cyan: #00a8fc;
+    --orange: #f37b1d;
+    --border: #3f4147;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "gg sans", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+    font-size: 14.5px;
+    padding: 32px 24px 80px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+
+  header {
+    padding-bottom: 16px;
+    border-bottom: 2px solid var(--accent);
+    margin-bottom: 28px;
+  }
+  header h1 { font-size: 26px; color: #fff; margin: 0 0 4px; }
+  header .sub { color: var(--muted); font-size: 13px; }
+
+  h2 {
+    font-size: 20px;
+    color: #fff;
+    margin: 36px 0 12px;
+    padding: 8px 0 8px 14px;
+    border-left: 4px solid var(--accent);
+    background: linear-gradient(90deg, rgba(88,101,242,.12), transparent);
+  }
+  h3 { font-size: 16px; color: #fff; margin: 22px 0 8px; }
+  p, li { margin: 6px 0; }
+  ol, ul { padding-left: 22px; }
+
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12.8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    color: #fff;
+    word-break: break-word;
+  }
+  pre {
+    background: #0f1012;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12.8px;
+    color: #e8eaed;
+    line-height: 1.55;
+  }
+  pre code { background: transparent; border: 0; padding: 0; color: inherit; font-size: inherit; }
+
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 14px 0;
+  }
+  .card.warn { border-left: 4px solid var(--yellow); }
+  .card.danger { border-left: 4px solid var(--red); }
+  .card.ok { border-left: 4px solid var(--green); }
+  .card.info { border-left: 4px solid var(--cyan); }
+  .card b { color: #fff; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 20px;
+    font-size: 13.5px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th {
+    background: var(--bg2);
+    color: #fff;
+    font-weight: 700;
+    font-size: 12.5px;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+  }
+  td code { white-space: nowrap; }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    margin-right: 6px;
+  }
+  .badge.required { background: rgba(242,63,67,.18); color: var(--red); border: 1px solid rgba(242,63,67,.4); }
+  .badge.opt      { background: rgba(148,155,164,.15); color: var(--muted); border: 1px solid var(--border); }
+  .badge.step     { background: var(--accent); color: #fff; }
+
+  .step-list { counter-reset: step; padding-left: 0; list-style: none; }
+  .step-list > li {
+    position: relative;
+    padding-left: 44px;
+    margin: 16px 0;
+  }
+  .step-list > li::before {
+    counter-increment: step;
+    content: counter(step);
+    position: absolute;
+    left: 0; top: 0;
+    width: 30px; height: 30px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  .kbd {
+    font-family: ui-monospace, monospace;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 12px;
+    color: #fff;
+  }
+
+  hr { border: 0; border-top: 1px solid var(--border); margin: 28px 0; }
+
+  .toc {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 20px;
+    margin-bottom: 28px;
+  }
+  .toc ol { padding-left: 22px; margin: 4px 0; }
+  .toc a { color: var(--cyan); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Discord サーバークローン — セットアップガイド</h1>
+  <div class="sub">support_bot 機能（翻訳・意図判定・送料計算・チケット・Welcome・Giveaway）込みで、サーバー構造を別サーバーへ複製する手順</div>
+</header>
+
+<nav class="toc">
+  <b>このページの内容</b>
+  <ol>
+    <li><a href="#overview">全体像（どのトークン・APIが、どこに必要か）</a></li>
+    <li><a href="#bot">① Discord Bot を作る（クローン用）</a></li>
+    <li><a href="#invite">② 両方のサーバーに bot を入れる</a></li>
+    <li><a href="#env">③ <code>.env</code> に値を書き込む（記入場所一覧）</a></li>
+    <li><a href="#run">④ 実行手順</a></li>
+    <li><a href="#after">⑤ クローン後：support_bot を新サーバーで動かす</a></li>
+    <li><a href="#troubleshoot">⑥ うまくいかない時</a></li>
+  </ol>
+</nav>
+
+<!-- ============== 1. Overview ============== -->
+<h2 id="overview">① 全体像 — どのトークン・APIが、どこに必要か</h2>
+
+<p>クローン作業と、クローン先で support_bot を動かすために必要なものを一枚にまとめます。</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:24%">何</th>
+      <th style="width:20%">どこで取る</th>
+      <th>記入場所（ファイル / 変数名）</th>
+      <th style="width:14%">用途</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><span class="badge required">必須</span><b>Discord Bot Token</b></td>
+      <td><a href="https://discord.com/developers/applications" style="color:var(--cyan)">discord.com/developers</a> → Bot タブ</td>
+      <td><code>support_bot/scripts/.env</code> の <code>DISCORD_TOKEN_CLONE=</code></td>
+      <td>クローン実行</td>
+    </tr>
+    <tr>
+      <td><span class="badge required">必須</span><b>Source / Target Guild ID</b></td>
+      <td>Discord アプリ：開発者モードON → サーバー名右クリック → IDをコピー</td>
+      <td>同 <code>.env</code> の <code>SOURCE_GUILD_ID=</code> / <code>TARGET_GUILD_ID=</code></td>
+      <td>どこからどこへ複製するか</td>
+    </tr>
+    <tr>
+      <td><span class="badge required">必須</span><b>support_bot 用 Bot Token</b></td>
+      <td>同上（同じ bot を使い回しても、別 bot を作っても可）</td>
+      <td><code>support_bot/deployments/&lt;新サーバー名&gt;/.env</code> の <code>DISCORD_TOKEN_SUPPORT=</code></td>
+      <td>新サーバーで bot を動かす</td>
+    </tr>
+    <tr>
+      <td><span class="badge opt">機能別</span><b>DeepL API Key</b></td>
+      <td><a href="https://www.deepl.com/pro-api" style="color:var(--cyan)">deepl.com/pro-api</a> → アカウント → Auth Key</td>
+      <td><code>deployments/&lt;新サーバー名&gt;/.env</code> の <code>DEEPL_API_KEY=</code></td>
+      <td>翻訳（DeepL 使用時）</td>
+    </tr>
+    <tr>
+      <td><span class="badge opt">機能別</span><b>Anthropic API Key</b></td>
+      <td><a href="https://console.anthropic.com/" style="color:var(--cyan)">console.anthropic.com</a> → API Keys</td>
+      <td>同 <code>.env</code> の <code>ANTHROPIC_API_KEY=</code></td>
+      <td>意図判定 / 翻訳フォールバック</td>
+    </tr>
+    <tr>
+      <td><span class="badge opt">機能別</span><b>Google サービスアカウント JSON</b></td>
+      <td><a href="https://console.cloud.google.com/" style="color:var(--cyan)">console.cloud.google.com</a> → IAM → サービスアカウント → キー作成（JSON）</td>
+      <td>JSON を <code>deployments/&lt;新サーバー名&gt;/credentials/service_account.json</code> に配置。<code>.env</code> の <code>GOOGLE_SERVICE_ACCOUNT_JSON=</code> でパス指定</td>
+      <td>送料計算（Sheets 読込）</td>
+    </tr>
+    <tr>
+      <td><span class="badge opt">機能別</span><b>Google Sheet ID</b></td>
+      <td>シートURL <code>/d/<u>ここ</u>/edit</code> の部分</td>
+      <td>同 <code>.env</code> の <code>SHIPPING_SHEET_ID=</code></td>
+      <td>送料計算</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="card info">
+  <b>ポイント：</b>クローン用 bot と support_bot 用 bot は、<b>同じ bot を兼用してもOK</b>です。同じ bot を source / target 両方に入れて、クローン後はそのまま target で稼働させればトークン1本で済みます。
+</div>
+
+<!-- ============== 2. Bot ============== -->
+<h2 id="bot">② Discord Bot を作る（クローン用）</h2>
+
+<ol class="step-list">
+  <li>
+    <b><a href="https://discord.com/developers/applications" style="color:var(--cyan)">Discord Developer Portal</a></b> を開く。
+  </li>
+  <li>
+    右上 <span class="kbd">New Application</span> → 名前を入れて作成（例：<code>Server Clone Bot</code>）。
+  </li>
+  <li>
+    左メニュー <b>Bot</b> → <span class="kbd">Reset Token</span> → 表示されたトークンをコピー。<br>
+    <span class="badge required">必須</span>このトークンを <code>DISCORD_TOKEN_CLONE</code> に入れます。
+  </li>
+  <li>
+    <b>Privileged Gateway Intents</b>：構造コピーのみなら<b>全部OFFで動作します</b>（オン要件なし）。
+  </li>
+  <li>
+    左メニュー <b>OAuth2 → URL Generator</b>：
+    <ul>
+      <li><b>SCOPES</b>: <code>bot</code> ✅</li>
+      <li><b>BOT PERMISSIONS</b>: <code>Administrator</code> ✅（最も簡単）<br>
+      最小権限で運用したい場合は <code>Manage Channels</code> + <code>Manage Roles</code> + <code>Manage Server</code> + <code>View Channels</code></li>
+    </ul>
+    画面下に出る URL をコピー。
+  </li>
+</ol>
+
+<!-- ============== 3. Invite ============== -->
+<h2 id="invite">③ 両方のサーバーに bot を入れる</h2>
+
+<ol class="step-list">
+  <li>
+    手順②で生成した URL を、まず <b>コピー元サーバー</b>で開く → サーバー選択 → 認証。
+  </li>
+  <li>
+    同じ URL をもう一度開き、今度は <b>コピー先サーバー</b>を選んで認証。
+  </li>
+  <li>
+    コピー先サーバーで、bot のロールを <b>サーバー設定 → ロール</b> から <b>一番上</b>に移動させる。<br>
+    <span class="badge required">必須</span>これをしないと、bot より上位の @everyone やロールのパーミッションを操作できず、複製が部分的に失敗します。
+  </li>
+  <li>
+    Discord アプリで <b>設定 → 詳細設定 → 開発者モード</b> をON。サーバー名を右クリック → <span class="kbd">サーバーIDをコピー</span>。<br>
+    source / target 両方のIDをメモ。
+  </li>
+</ol>
+
+<div class="card warn">
+  <b>注意：</b>コピー先サーバーは原則「空の新サーバー」を推奨。既存サーバーに重ねるなら <code>--wipe-target</code> オプション（次章）で既存チャンネル/ロールを<b>全削除</b>してから複製する形になります。<b>戻せません</b>。
+</div>
+
+<!-- ============== 4. ENV ============== -->
+<h2 id="env">④ <code>.env</code> に値を書き込む（記入場所一覧）</h2>
+
+<p>テンプレを <code>.env</code> としてコピーして埋めます：</p>
+
+<pre><code>cd ~/Desktop/ClaudeCode/Discordbot/support_bot
+cp scripts/.env.clone.example scripts/.env</code></pre>
+
+<p><code>scripts/.env</code> の中身：</p>
+
+<pre><code># 必須3項目
+DISCORD_TOKEN_CLONE=MTAxxx...（手順②でコピーした bot トークン）
+SOURCE_GUILD_ID=123456789012345678
+TARGET_GUILD_ID=987654321098765432
+
+# オプション
+CLONE_ROLES=1   # 1=ロールも複製 / 0=target 既存ロールに名前マッチさせる
+CLONE_ICON=0    # 1=アイコン・バナーも複製 / 0=しない</code></pre>
+
+<div class="card info">
+  <b>探索順：</b><code>scripts/.env</code> → <code>support_bot/.env</code> → 親ディレクトリ <code>.env</code> の順に読み込まれます。既存の bot 用 <code>.env</code> に直接書いてもOK。
+</div>
+
+<!-- ============== 5. Run ============== -->
+<h2 id="run">⑤ 実行手順</h2>
+
+<ol class="step-list">
+  <li>
+    <b>初回は必ず dry-run</b>（何が作られるかだけ表示、変更なし）：
+    <pre><code>cd ~/Desktop/ClaudeCode/Discordbot/support_bot
+python scripts/clone_server.py --dry-run</code></pre>
+    出力例：
+    <pre><code>=== Clone Plan ===
+source: My Source Server (123...)
+target: My New Server (987...)
+dry_run=True wipe=False
+
+[1/3] Cloning roles ...
+  [dry] @everyone perms &lt;- 1071698660929
+  [dry] create role: Admin (color=#5865F2, hoist=True)
+  [dry] create role: VIP (color=#EB459E, hoist=True)
+  ...
+[2/3] Cloning categories and channels ...
+  [dry] category: ENTRANCE (overrides=0)
+  [dry] TextChannel: rule-guide (under: ENTRANCE)
+  ...</code></pre>
+  </li>
+  <li>
+    内容OKなら本実行：
+    <pre><code>python scripts/clone_server.py</code></pre>
+  </li>
+  <li>
+    既存の target を一度キレイにしてから複製したい場合：
+    <pre><code>python scripts/clone_server.py --wipe-target</code></pre>
+    <span class="badge required">確認</span>実行時に <code>yes</code> 入力が必要。target の既存チャンネル/ロールが全削除されます。
+  </li>
+</ol>
+
+<div class="card ok">
+  <b>クローンされるもの：</b>
+  <ul>
+    <li>ロール（色／hoist／mentionable／パーミッション、@everyone はパーミッションのみ上書き）</li>
+    <li>カテゴリ</li>
+    <li>テキスト・ボイス・フォーラム・ステージ チャンネル（topic, slowmode, NSFW, bitrate, user_limit）</li>
+    <li>チャンネル単位の権限オーバーライド（ロール基準）</li>
+    <li>任意：サーバーアイコン・バナー（<code>CLONE_ICON=1</code>）</li>
+  </ul>
+</div>
+
+<div class="card danger">
+  <b>クローンされないもの（Discord API の制約）：</b>
+  <ul>
+    <li>過去のメッセージ／メンバー／メンバーのロール割り当て</li>
+    <li>Webhook、連携アプリ、スレッド本文</li>
+    <li>managed ロール（bot 自身のロール等は target 側で自動付与）</li>
+    <li>メンバー個別の権限オーバーライド（target にそのユーザーがいる保証がないため）</li>
+  </ul>
+</div>
+
+<!-- ============== 6. After ============== -->
+<h2 id="after">⑥ クローン後：support_bot を新サーバーで動かす</h2>
+
+<p>構造をコピーしただけでは bot は新サーバーで何もしません。<b>新サーバー専用の deployment</b> を作って各IDを書き直す必要があります。</p>
+
+<ol class="step-list">
+  <li>
+    <b>deployment ディレクトリを作成：</b>
+    <pre><code>cd ~/Desktop/ClaudeCode/Discordbot/support_bot
+cp -r deployments/template deployments/&lt;新サーバー名&gt;</code></pre>
+  </li>
+  <li>
+    <b>新サーバーで開発者モードON</b> → 必要なチャンネル/カテゴリ/ロールを右クリックでIDコピー → <code>deployments/&lt;新サーバー名&gt;/.env</code> に貼る。
+  </li>
+  <li>
+    <b>記入が必要なID（最低限）：</b>
+    <table>
+      <thead><tr><th>変数</th><th>何のID</th></tr></thead>
+      <tbody>
+        <tr><td><code>GUILD_ID</code></td><td>新サーバー本体</td></tr>
+        <tr><td><code>MODERATOR_CHANNEL_ID</code></td><td><code>#moderator-only</code></td></tr>
+        <tr><td><code>COMMUNITY_CHANNEL_ID</code></td><td><code>#free-talk</code>（意図判定の監視先）</td></tr>
+        <tr><td><code>PRODUCT_INQUIRY_CHANNEL_ID</code></td><td><code>#ticket</code></td></tr>
+        <tr><td><code>SHIPPING_GUIDE_CHANNEL_ID</code></td><td><code>#shipping-guide</code></td></tr>
+        <tr><td><code>TRANSLATE_CHANNEL_IDS</code></td><td>自動翻訳対象（<code>free-talk, questions, card-game, delivery-room, welcome</code> 等カンマ区切り）</td></tr>
+        <tr><td><code>TICKET_CATEGORY_IDS</code></td><td><code>Created / Claimed / Closed Tickets</code> カテゴリ（カンマ区切り）</td></tr>
+        <tr><td><code>TICKET_CATEGORY_ID</code></td><td>新規チケット作成先カテゴリ</td></tr>
+        <tr><td><code>TICKET_STAFF_ROLE_IDS</code></td><td>運営ロール（カンマ区切り）</td></tr>
+        <tr><td><code>WELCOME_CHANNEL_ID</code></td><td><code>#welcome</code></td></tr>
+        <tr><td><code>WELCOME_AUTOROLE_IDS</code></td><td>入室時に自動付与するロール</td></tr>
+        <tr><td><code>CARD_GAME_CHANNEL_ID</code></td><td><code>#card-game</code></td></tr>
+      </tbody>
+    </table>
+  </li>
+  <li>
+    <b>API キー類を埋める：</b><code>DISCORD_TOKEN_SUPPORT</code> / <code>DEEPL_API_KEY</code> / <code>ANTHROPIC_API_KEY</code> / <code>SHIPPING_SHEET_ID</code>。
+  </li>
+  <li>
+    <b>Google サービスアカウント JSON</b> を <code>deployments/&lt;新サーバー名&gt;/credentials/service_account.json</code> に配置。シートの「共有」でこのサービスアカウントのメールアドレスに閲覧権限を付与。
+  </li>
+  <li>
+    <b>bot 起動：</b>
+    <pre><code>DEPLOYMENT=&lt;新サーバー名&gt; python main.py</code></pre>
+    （または <code>run.sh</code> 内の deployment 名を書き換え）
+  </li>
+</ol>
+
+<div class="card info">
+  <b>memo：</b><code>deployments/test/.env</code> を見れば、テスト環境で実際に何が埋まっているか参考になります。コピー＆置換するのが早いです。
+</div>
+
+<!-- ============== 7. Trouble ============== -->
+<h2 id="troubleshoot">⑦ うまくいかない時</h2>
+
+<table>
+  <thead><tr><th>症状</th><th>原因 / 対処</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>ERROR: bot が source/target サーバーに参加していません</code></td>
+      <td>手順③の招待がどちらか抜けている。両方のIDを再確認。</td>
+    </tr>
+    <tr>
+      <td><code>! forbidden creating role: XXX</code></td>
+      <td>bot のロールが target の対象ロールより下にある。bot ロールをロール一覧の一番上に。</td>
+    </tr>
+    <tr>
+      <td><code>! @everyone perms update forbidden</code></td>
+      <td>bot に <code>Manage Server</code> 権限が無い。招待時に Administrator か該当権限を付与。</td>
+    </tr>
+    <tr>
+      <td>カテゴリは出来たがチャンネルが入っていない</td>
+      <td>カテゴリ作成と並行でAPIがレートリミット中。再実行 or 少数ずつ流すと安定。</td>
+    </tr>
+    <tr>
+      <td>クローン後、bot がスラッシュコマンドを認識しない</td>
+      <td>support_bot を起動 → 数分待つ。Discord 側のコマンド同期に時間がかかる。<code>main.py</code> 初回起動時に同期される設計。</td>
+    </tr>
+    <tr>
+      <td>送料計算が「シートが読めません」</td>
+      <td>サービスアカウントのメールにシート閲覧権限が付与されていない。シートを開いて「共有」→ アドレス追加 →「閲覧者」。</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr>
+
+<p style="color:var(--muted); font-size:12.5px; text-align:center;">
+  <code>support_bot/scripts/clone_server.py</code> &nbsp;・&nbsp; <code>support_bot/scripts/.env.clone.example</code> &nbsp;・&nbsp; このページ
+</p>
+
+</div>
+</body>
+</html>
