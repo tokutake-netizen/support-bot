@@ -45,6 +45,72 @@
       </div>
     </div>
 
+    {% if request.query_params.get("queued") %}
+      <div class="flash ok">✓ コマンドをキューに追加しました(`{{ request.query_params.get("queued") }}`) — BOT が数秒以内に実行します。</div>
+    {% endif %}
+
+    <h2>🛠️ クイックアクション <span class="help">BOT に対する指示をキュー経由で実行</span></h2>
+    <p class="section-desc">Discord で <code>/digest now</code> 等を打つ代わりに、ここからボタン 1 つで実行できます。リクエストは 5 秒以内に処理されます(完了は下の履歴に出ます)。</p>
+    <div class="card">
+      <div class="row">
+        <div>
+          <h3>🎫 チケットパネル設置</h3>
+          <form method="post" action="/guild/{{ guild_id }}/cmd" style="display:flex;gap:8px;align-items:flex-start">
+            <input type="hidden" name="action" value="ticket_panel">
+            <select name="channel_id" required style="flex:1">
+              <option value="">(投稿先 ch を選択)</option>
+              {% for cat, chs in channels_grouped %}
+                {% if cat %}<optgroup label="📂 {{ cat.name }}">{% endif %}
+                {% for c in chs %}
+                  <option value="{{ c.id }}"># {{ c.name }}</option>
+                {% endfor %}
+                {% if cat %}</optgroup>{% endif %}
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn">設置</button>
+          </form>
+        </div>
+        <div>
+          <h3>📊 ダイジェスト / 📦 バックアップ</h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <form method="post" action="/guild/{{ guild_id }}/cmd"><input type="hidden" name="action" value="digest_preview"><button class="btn outline">📋 ダイジェストプレビュー</button></form>
+            <form method="post" action="/guild/{{ guild_id }}/cmd"><input type="hidden" name="action" value="digest_now"><button class="btn">📊 今すぐ投稿</button></form>
+            <form method="post" action="/guild/{{ guild_id }}/cmd"><input type="hidden" name="action" value="backup_now"><button class="btn outline">📦 バックアップ実行</button></form>
+            <form method="post" action="/guild/{{ guild_id }}/cmd"><input type="hidden" name="action" value="tree_sync"><button class="btn outline">🔄 Slash 同期</button></form>
+          </div>
+        </div>
+      </div>
+
+      <h3 style="margin-top:18px">💻 コマンドターミナル</h3>
+      <p class="hint" style="margin-top:0">許可されたアクションだけ実行可能(リモートシェル化を防ぐため)。利用可能: {% for a in allowed_actions %}<code>{{ a }}</code>{% if not loop.last %} / {% endif %}{% endfor %}</p>
+      <form method="post" action="/guild/{{ guild_id }}/cmd" style="display:flex;gap:8px">
+        <input type="text" name="action" placeholder="digest_now / backup_now / tree_sync / ..." style="flex:1;font-family:Menlo,Consolas,monospace">
+        <input type="text" name="channel_id" placeholder="(channel_id — ticket_panel のときのみ)" style="width:200px">
+        <button type="submit" class="btn">▶ 実行</button>
+      </form>
+    </div>
+
+    {% if recent_cmds %}
+    <h2>📜 直近のコマンド履歴</h2>
+    <div class="card">
+      {% for r in recent_cmds %}
+      <div class="feature">
+        <div>
+          <div class="name">
+            {% if r.status == "done" %}✅{% elif r.status == "error" %}❌{% elif r.status == "claimed" %}⏳{% else %}🕓{% endif %}
+            <code>{{ r.action }}</code>
+            {% if r.params %} <span style="color:var(--muted);font-size:12px">{{ r.params | tojson }}</span>{% endif %}
+          </div>
+          <div class="desc">
+            {% if r.result %}{{ r.result }}{% else %}<span style="color:var(--muted)">({{ r.status }})</span>{% endif %}
+          </div>
+        </div>
+        <span class="badge">{{ "%.0fs"|format((r.finished_at or r.ts) - r.ts) if r.finished_at else "—" }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
     <h2>📡 ログ (直近 200 行) <a href="/guild/{{ guild_id }}/log.txt?lines=2000" target="_blank" style="font-size:12px;font-weight:400;margin-left:auto">全文ダウンロード</a></h2>
     <div class="card" style="padding:0;border:none">
       <pre class="log" id="log">{{ log_tail }}</pre>

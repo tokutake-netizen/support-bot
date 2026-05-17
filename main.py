@@ -23,7 +23,10 @@ if not _env_dir.exists():
     print(f"env-dir does not exist: {_env_dir}", file=sys.stderr)
     sys.exit(1)
 os.chdir(_env_dir)  # so relative paths (data/, credentials/) resolve here
-load_dotenv(dotenv_path=_env_dir / ".env")
+# override=True so per-guild .env wins over service-level env. Without this,
+# Railway's service-level DISCORD_TOKEN_SUPPORT (legacy from the old worker
+# setup) silently overrides what the dashboard saved per guild.
+load_dotenv(dotenv_path=_env_dir / ".env", override=True)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -72,8 +75,8 @@ async def main() -> None:
         for ext in (
             "cogs.translator", "cogs.suggester", "cogs.shipping",
             "cogs.ticket", "cogs.welcome", "cogs.giveaway",
-            "cogs.invite_tracker", "cogs.auction", "cogs.faq", "cogs.safety",
-            "cogs.digest", "cogs.backup", "cogs.health", "cogs.help",
+            "cogs.invite_tracker", "cogs.auction", "cogs.events", "cogs.faq", "cogs.safety",
+            "cogs.digest", "cogs.backup", "cogs.health", "cogs.command_queue", "cogs.help",
         ):
             try:
                 await bot.load_extension(ext)

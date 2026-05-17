@@ -28,8 +28,18 @@
     <div class="grid">
       {% for g in guilds %}
       <a class="guild-card" href="/guild/{{ g.id }}/setup">
-        <div class="name">{{ g.name }}</div>
-        <div class="meta">guild_id: {{ g.id }}</div>
+        <div class="guild-card-head">
+          {% if g.icon %}
+            <img class="guild-icon" src="https://cdn.discordapp.com/icons/{{ g.id }}/{{ g.icon }}.png?size=128" alt="">
+          {% else %}
+            {% set initials = (g.name | trim)[:2] | upper if g.name else "?" %}
+            <div class="guild-icon placeholder">{{ initials }}</div>
+          {% endif %}
+          <div class="guild-card-meta">
+            <div class="name">{{ g.name }}</div>
+            <div class="meta">id: {{ g.id }}</div>
+          </div>
+        </div>
         {% if g.bot_running %}
           <span class="badge running">● 稼働中</span>
         {% elif g.configured %}

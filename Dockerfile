@@ -13,6 +13,8 @@ COPY services ./services
 COPY dashboard ./dashboard
 COPY i18n ./i18n
 COPY scripts ./scripts
+# Shared bot data (products master etc.) — required by cogs.shipping
+COPY data ./data
 # Seed default deployments scaffolding (template) so the dashboard has the .env.example.
 COPY deployments ./deployments
 

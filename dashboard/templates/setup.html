@@ -69,6 +69,13 @@
     {% if request.query_params.get("saved") %}
       <div class="flash ok">✓ 設定を保存しました。BOT は数秒で再起動して反映されます。</div>
     {% endif %}
+    {% if request.query_params.get("auth") == "ok" %}
+      <div class="flash ok">✅ <b>Discord 認証成功</b> — BOT トークンが有効で、対象サーバーにアクセスできました。</div>
+    {% elif request.query_params.get("auth") == "invalid_token" %}
+      <div class="flash warn">⚠️ <b>Discord 認証失敗</b> — BOT トークンが無効か、形式エラーの可能性。Reset Token して貼り直してください。</div>
+    {% elif request.query_params.get("auth") == "not_in_guild" %}
+      <div class="flash warn">⚠️ BOT トークンは有効ですが、このサーバーに <b>BOT が招待されていません</b>。Discord Developer Portal → OAuth2 → URL Generator で `bot` + `applications.commands` を選択 → 生成 URL からサーバーに招待してください。</div>
+    {% endif %}
 
     {% if not discord_ok %}
       <div class="callout">

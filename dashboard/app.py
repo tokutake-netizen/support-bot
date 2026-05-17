@@ -37,6 +37,11 @@ from datetime import datetime, timezone
 from . import auth, bot_manager, config_store, giveaway_helpers as gh
 from .discord_api import DiscordREST, assignable_roles, channels_grouped
 
+# Reach into the bot-side cmd_queue helper too.
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from services import cmd_queue  # noqa: E402
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s :: %(message)s")
 log = logging.getLogger("dashboard")
 
@@ -158,8 +163,9 @@ async def oauth_callback(
     # session cookie past the 4 KB browser limit when the user belongs to
     # many servers, causing the cookie to be silently dropped and the login
     # to loop back through /oauth/start. id+name only for the same reason.
+    # Keep icon hash (small) so the dashboard can render server avatars.
     guilds = [
-        {"id": g["id"], "name": g["name"]}
+        {"id": g["id"], "name": g["name"], "icon": g.get("icon")}
         for g in raw_guilds if auth.is_admin(g)
     ]
     sess = {
@@ -291,8 +297,32 @@ async def guild_save(
             updates["SHIPPING_SHEET_ID"] = sid
 
     config_store.write_env(guild_id, updates)
+
+    # Verify Discord auth right after save so the user gets immediate feedback.
+    # We call /guilds/{id} with the bot token; success means the token is valid AND
+    # the bot is already in this guild.
+    auth_status = "unknown"
+    bot_token = (
+        updates.get("DISCORD_TOKEN_SUPPORT")
+        or _bot_token_for(guild_id)
+    )
+    if bot_token:
+        rest = DiscordREST(bot_token)
+        try:
+            guild_info = await rest.get_guild(guild_id)
+            if guild_info:
+                auth_status = "ok"
+            else:
+                # Token works (no httpx error) but the bot can't see this guild.
+                auth_status = "not_in_guild"
+        except Exception as e:
+            log.warning("post-save Discord auth check failed: %s", e)
+            auth_status = "invalid_token"
+
     bot_manager.restart(guild_id)
-    return RedirectResponse(f"/guild/{guild_id}/setup?saved=1", status_code=303)
+    return RedirectResponse(
+        f"/guild/{guild_id}/setup?saved=1&auth={auth_status}", status_code=303
+    )
 
 
 @app.post("/guild/{guild_id}/credential")
@@ -350,6 +380,14 @@ async def guild_status_page(
 ):
     sess = require_session(session)
     require_admin_for_guild(sess, guild_id)
+    bot_token = _bot_token_for(guild_id)
+    channels_groups: list = []
+    if bot_token:
+        rest = DiscordREST(bot_token)
+        chs = await rest.list_channels(guild_id)
+        channels_groups = channels_grouped(chs)
+    base_dir = config_store.deployment_dir(guild_id)
+    recent_cmds = cmd_queue.recent(limit=15, base_dir=base_dir)
     return templates.TemplateResponse(
         "status.html",
         {
@@ -362,6 +400,9 @@ async def guild_status_page(
             ),
             "status": bot_manager.status(guild_id),
             "log_tail": bot_manager.tail_log(guild_id, lines=200),
+            "channels_grouped": channels_groups,
+            "recent_cmds": recent_cmds,
+            "allowed_actions": sorted(cmd_queue.ALLOWED_ACTIONS),
         },
     )
 
@@ -375,6 +416,46 @@ async def guild_log(
     sess = require_session(session)
     require_admin_for_guild(sess, guild_id)
     return Response(bot_manager.tail_log(guild_id, lines=lines), media_type="text/plain")
+
+
+# -------------------------- command queue --------------------------
+
+@app.post("/guild/{guild_id}/cmd")
+async def guild_cmd(
+    request: Request,
+    guild_id: str,
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    form = await request.form()
+    action = (form.get("action") or "").strip()
+    if not action:
+        raise HTTPException(status_code=400, detail="action required")
+    params: dict = {}
+    for k in ("channel_id",):  # forwarded params
+        v = form.get(k)
+        if v:
+            params[k] = v
+    base_dir = config_store.deployment_dir(guild_id)
+    try:
+        cmd_queue.enqueue(action, params, base_dir=base_dir)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return RedirectResponse(
+        f"/guild/{guild_id}/status?queued={action}", status_code=303
+    )
+
+
+@app.get("/guild/{guild_id}/cmd/history.json")
+async def guild_cmd_history(
+    guild_id: str,
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    base_dir = config_store.deployment_dir(guild_id)
+    return JSONResponse(cmd_queue.recent(limit=20, base_dir=base_dir))
 
 
 # -------------------------- giveaway routes --------------------------
