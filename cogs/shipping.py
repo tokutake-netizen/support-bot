@@ -390,11 +390,32 @@ class CalculateButton(discord.ui.Button):
         self._view = view_ref
 
     async def callback(self, interaction: discord.Interaction) -> None:
-        await interaction.response.defer()
-        result_msg = await self._view.compute_and_render()
-        await interaction.followup.edit_message(
-            message_id=self._view.message.id, **result_msg
-        )
+        try:
+            await interaction.response.defer()
+        except discord.HTTPException as e:
+            # 40060 = another bot instance already ack'd this interaction.
+            # Nothing we can do; surfacing the noise just confuses the user.
+            log.warning("calculate: defer failed (%s)", e)
+            return
+        try:
+            result_msg = await self._view.compute_and_render()
+        except Exception:
+            log.exception("calculate: compute_and_render raised")
+            lang = self._view.state.lang
+            await interaction.followup.send(
+                f"❌ {t('shipping.err_no_match', lang)}",
+                ephemeral=True,
+            )
+            return
+        try:
+            await interaction.followup.edit_message(
+                message_id=self._view.message.id, **result_msg
+            )
+        except discord.HTTPException:
+            log.exception("calculate: followup.edit_message failed")
+            await interaction.followup.send(
+                result_msg.get("content", "❌"), ephemeral=True
+            )
 
 
 class ResetButton(discord.ui.Button):

@@ -10,10 +10,13 @@ disallowed, an ephemeral message naming the permitted channels is sent.
 """
 from __future__ import annotations
 
+import logging
 import os
 from typing import Iterable
 
 import discord
+
+log = logging.getLogger(__name__)
 
 
 def _parse_ids(env_name: str) -> list[int]:
@@ -29,6 +32,26 @@ def _format_mentions(ch_ids: Iterable[int], cat_ids: Iterable[int]) -> str:
     parts = [f"<#{i}>" for i in ch_ids]
     parts += [f"<#{i}> (category)" for i in cat_ids]
     return ", ".join(parts) if parts else "(no channels configured)"
+
+
+async def _safe_send(interaction: discord.Interaction, msg: str) -> None:
+    """Best-effort ephemeral reply that survives ack races.
+
+    Discord sometimes redelivers interaction events; the first delivery may
+    have already acknowledged the interaction by the time our second
+    response.send_message attempt fires. Fall back through every available
+    channel (followup, raw HTTP) and swallow the last-resort failure.
+    """
+    try:
+        if not interaction.response.is_done():
+            await interaction.response.send_message(msg, ephemeral=True)
+            return
+    except (discord.InteractionResponded, discord.HTTPException) as e:
+        log.debug("channel_guard: response.send_message failed (%s); falling back to followup", e)
+    try:
+        await interaction.followup.send(msg, ephemeral=True)
+    except discord.HTTPException as e:
+        log.warning("channel_guard: could not deliver block notice to user (%s)", e)
 
 
 async def ensure_channel_allowed(interaction: discord.Interaction, key: str) -> bool:
@@ -57,9 +80,15 @@ async def ensure_channel_allowed(interaction: discord.Interaction, key: str) -> 
         # Unknown channel type (e.g. DM) — don't block.
         return True
 
+    log.info(
+        "channel_guard blocked /%s in channel_id=%s category_id=%s "
+        "(allowed ch_ids=%s cat_ids=%s)",
+        key.lower(),
+        getattr(channel, "id", None),
+        getattr(channel, "category_id", None),
+        ch_ids,
+        cat_ids,
+    )
     msg = f"⚠️ `/{key.lower()}` is only available in: {_format_mentions(ch_ids, cat_ids)}"
-    try:
-        await interaction.response.send_message(msg, ephemeral=True)
-    except discord.InteractionResponded:
-        await interaction.followup.send(msg, ephemeral=True)
+    await _safe_send(interaction, msg)
     return False

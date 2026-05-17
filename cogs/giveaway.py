@@ -53,6 +53,35 @@ def fmt_duration(secs: int) -> str:
     return " ".join(parts)
 
 
+def _giveaway_manager_role_ids() -> list[int]:
+    raw = os.getenv("GIVEAWAY_MANAGER_ROLE_IDS", "")
+    out: list[int] = []
+    for tok in raw.split(","):
+        t = tok.strip()
+        if t.isdigit():
+            out.append(int(t))
+    return out
+
+
+async def _ensure_manager(interaction: discord.Interaction) -> bool:
+    """Allow admin or any member holding a GIVEAWAY_MANAGER_ROLE_IDS role."""
+    member = interaction.user
+    if not isinstance(member, discord.Member):
+        await interaction.response.send_message("⚠️ Guild-only command.", ephemeral=True)
+        return False
+    allowed = _giveaway_manager_role_ids()
+    is_admin = member.guild_permissions.administrator
+    has_role = any(r.id in allowed for r in member.roles) if allowed else False
+    if not (is_admin or has_role):
+        await interaction.response.send_message(
+            "⚠️ You don't have permission to manage giveaways. "
+            "Ask an admin to grant you the giveaway-manager role.",
+            ephemeral=True,
+        )
+        return False
+    return True
+
+
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -241,7 +270,6 @@ class GiveawayCog(commands.Cog):
     giveaway_group = app_commands.Group(
         name="giveaway",
         description="Giveaway / Raffle tool",
-        default_permissions=discord.Permissions(administrator=True),
     )
 
     @giveaway_group.command(name="create", description="Start a new giveaway")
@@ -265,6 +293,8 @@ class GiveawayCog(commands.Cog):
     ) -> None:
         from services.channel_guard import ensure_channel_allowed
         if not await ensure_channel_allowed(interaction, "giveaway"):
+            return
+        if not await _ensure_manager(interaction):
             return
         secs = parse_duration(duration)
         if secs is None:
@@ -326,6 +356,8 @@ class GiveawayCog(commands.Cog):
         from services.channel_guard import ensure_channel_allowed
         if not await ensure_channel_allowed(interaction, "giveaway"):
             return
+        if not await _ensure_manager(interaction):
+            return
         if not message_id.isdigit():
             await interaction.response.send_message("⚠️ Invalid message_id.", ephemeral=True)
             return
@@ -353,6 +385,8 @@ class GiveawayCog(commands.Cog):
     ) -> None:
         from services.channel_guard import ensure_channel_allowed
         if not await ensure_channel_allowed(interaction, "giveaway"):
+            return
+        if not await _ensure_manager(interaction):
             return
         if not message_id.isdigit():
             await interaction.response.send_message("⚠️ Invalid message_id.", ephemeral=True)
@@ -390,6 +424,8 @@ class GiveawayCog(commands.Cog):
     async def list_active(self, interaction: discord.Interaction) -> None:
         from services.channel_guard import ensure_channel_allowed
         if not await ensure_channel_allowed(interaction, "giveaway"):
+            return
+        if not await _ensure_manager(interaction):
             return
         all_data = _load_all()
         actives = [(mid, gw) for mid, gw in all_data.items() if not gw.get("ended")]
