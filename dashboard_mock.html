@@ -898,12 +898,36 @@ Click the button below to enter!</div>
             <div class="hint">落札ごとに当選者×Host×Staff のみ閲覧可能な private channel が自動生成されます。</div>
           </div>
         </div>
+        <h3 style="color:#fff;font-size:13px;margin:20px 0 10px">🛠️ /auction create の既定値</h3>
+        <p class="section-desc">ここの値は <code>/auction create</code> で省略された引数のデフォルトになります。出品ごとに上書き可能。</p>
+        <div class="row">
+          <div class="field">
+            <label>最低落札価格 (reserve_price) の既定 (JPY)</label>
+            <input type="number" value="0" min="0" step="100">
+            <div class="hint">最高入札がこの額に満たない場合は <b>落札なし</b>。`0` = 設定なし(常に落札)。embed に「🔒 Reserve: ¥X」が公開表示されます。</div>
+          </div>
+          <div class="field">
+            <label>最低入札増分 (min_increment) の既定 (JPY)</label>
+            <input type="number" value="100" min="1" step="100">
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>アンチスナイプ判定秒数 (anti_snipe_window)</label>
+            <input type="number" value="300" min="0" step="30">
+            <div class="hint">終了 N 秒前以内に入札があれば延長を発動 (既定 300秒 = 5分)</div>
+          </div>
+          <div class="field">
+            <label>アンチスナイプ延長秒数 (anti_snipe_extend)</label>
+            <input type="number" value="30" min="0" step="10">
+          </div>
+        </div>
         <div class="help-box">
           <div class="h"><span class="ico">💡</span>入札ルール</div>
-          ・次の入札は <b>現最高値の +5% 以上</b> かつ <b>min_increment(既定 100 円)以上の上乗せ</b> の両方を満たす必要あり<br>
-          ・終了 60 秒前以内の入札は <b>アンチスナイプ自動 +60 秒延長</b><br>
-          ・通貨は JPY 固定。決済は bot 側で行わない(host が deal channel で個別調整)<br>
-          ・落札者には DM 通知(DM 閉じている場合はスキップ)
+          ・次の入札は <b>現最高値 ×1.05 以上</b> かつ <b>min_increment 以上の上乗せ</b> の両方を満たす必要あり<br>
+          ・終了 anti_snipe_window 秒以内の入札は自動で anti_snipe_extend 秒延長(繰り返し可)<br>
+          ・<b>reserve 未達で終了</b>した場合: deal channel は作成されず、落札者 DM もなし(host が再出品 or 個別交渉)<br>
+          ・通貨は JPY 固定。決済は bot 側で行わない(host が deal channel で個別調整)
         </div>
       </div>
       </div><!-- /tab-auction -->

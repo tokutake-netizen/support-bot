@@ -194,16 +194,26 @@ def _build_embed(auction: dict) -> discord.Embed:
         next_req = _current_price(auction)
         fields.append(("📈 Next bid >=", _fmt_money(next_req), True))
 
+    reserve = int(auction.get("reserve_price", 0) or 0)
     if ended and not cancelled:
         winner_id = auction.get("winner")
         winning_bid = auction.get("winning_bid", 0)
         if winner_id:
             fields.append(("🏆 Winner", f"<@{winner_id}> — {_fmt_money(int(winning_bid), currency)}", False))
+        elif auction.get("reserve_not_met"):
+            fields.append((
+                "🏆 Result",
+                f"_Reserve not met. Top bid: {_fmt_money(int(winning_bid), currency)} "
+                f"(reserve: {_fmt_money(reserve, currency)})._",
+                False,
+            ))
         else:
             fields.append(("🏆 Winner", "_No bids — no winner._", False))
     elif not cancelled:
         ts = int(ends_at.timestamp())
         fields.append(("⏱ Ends", f"<t:{ts}:R> (<t:{ts}:F>)", False))
+        if reserve:
+            fields.append(("🔒 Reserve", _fmt_money(reserve, currency), True))
 
     fields.append(("🎯 Host", f"<@{auction['host_id']}>", True))
 
@@ -295,8 +305,8 @@ class BidModal(discord.ui.Modal, title="Place Bid"):
 
         # Anti-snipe: extend ends_at if within threshold
         ends_at = _parse_iso(auction["ends_at"])
-        threshold = int(auction.get("anti_snipe_threshold", 60))
-        extension = int(auction.get("anti_snipe_seconds", 60))
+        threshold = int(auction.get("anti_snipe_threshold", 300))
+        extension = int(auction.get("anti_snipe_seconds", 30))
         remaining = (ends_at - _now_utc()).total_seconds()
         extended = False
         if 0 < remaining <= threshold:
@@ -432,9 +442,17 @@ class AuctionCog(commands.Cog):
 
     async def _end_auction(self, key: str, auction: dict, manual: bool = False) -> Optional[dict]:
         hi = _highest_bid(auction)
+        reserve = int(auction.get("reserve_price", 0) or 0)
+        reserve_met = (not reserve) or (hi is not None and int(hi["amount"]) >= reserve)
         auction["ended"] = True
-        auction["winner"] = hi["user_id"] if hi else None
-        auction["winning_bid"] = int(hi["amount"]) if hi else 0
+        if hi and reserve_met:
+            auction["winner"] = hi["user_id"]
+            auction["winning_bid"] = int(hi["amount"])
+            auction["reserve_not_met"] = False
+        else:
+            auction["winner"] = None
+            auction["winning_bid"] = int(hi["amount"]) if hi else 0
+            auction["reserve_not_met"] = bool(hi and reserve and not reserve_met)
         all_data = _load_all()
         all_data[key] = auction
         _save_all(all_data)
@@ -457,7 +475,7 @@ class AuctionCog(commands.Cog):
             except discord.HTTPException:
                 log.exception("auction end: edit message failed")
             try:
-                if hi:
+                if hi and reserve_met:
                     bidders = len(set(b["user_id"] for b in auction.get("bids", [])))
                     bid_count = len(auction.get("bids", []))
                     win_embed = discord.Embed(
@@ -482,19 +500,33 @@ class AuctionCog(commands.Cog):
                              "the host will reach out shortly to coordinate payment & shipping."
                     )
                     if auction.get("image_filename") or auction.get("image_url"):
-                        # 落札 Embed にもサムネ表示（あれば）
                         if auction.get("image_url"):
                             win_embed.set_thumbnail(url=auction["image_url"])
                     await ch.send(
                         content=f"🎊✨ <@{hi['user_id']}> ✨🎊",
                         embed=win_embed,
                     )
+                elif hi and not reserve_met:
+                    # Top bid existed but did not clear the reserve.
+                    unsold_embed = discord.Embed(
+                        title="🏁  Auction closed — reserve not met",
+                        description=(
+                            f"📦 **Item**: {auction.get('title')}\n"
+                            f"💰 **Top bid**: {_fmt_money(int(hi['amount']))}\n"
+                            f"🔒 **Reserve**: {_fmt_money(int(reserve))}\n\n"
+                            f"_Top bid was below the reserve price, so this auction "
+                            f"closes without a winner. The host <@{auction['host_id']}> "
+                            f"may relist or contact the top bidder separately._"
+                        ),
+                        color=0x4E5058,
+                    )
+                    await ch.send(embed=unsold_embed)
                 else:
                     await ch.send("⚠️ No bids — auction closed without a winner.")
             except discord.HTTPException:
                 log.exception("auction end: announce failed")
 
-        if hi:
+        if hi and reserve_met:
             await self._open_deal_channel(auction, hi)
         return hi
 
@@ -600,9 +632,10 @@ class AuctionCog(commands.Cog):
         description="Item description (optional)",
         image="Item image to attach (optional, recommended over image_url)",
         image_url="Item image URL (optional fallback if no attachment)",
-        min_increment="Absolute minimum yen increment (default 100). The 5% rule applies on top.",
-        anti_snipe_window="Seconds before end that trigger extension (default 300 = 5min)",
-        anti_snipe_extend="Seconds added on snipe (default 30)",
+        reserve_price="Reserve / 最低落札価格 — auction unsold if top bid is below this (default: none)",
+        min_increment="Absolute minimum yen increment (default from server settings)",
+        anti_snipe_window="Seconds before end that trigger extension (default from server settings)",
+        anti_snipe_extend="Seconds added on snipe (default from server settings)",
     )
     async def create(
         self,
@@ -613,15 +646,33 @@ class AuctionCog(commands.Cog):
         description: Optional[str] = None,
         image: Optional[discord.Attachment] = None,
         image_url: Optional[str] = None,
-        min_increment: int = 100,
-        anti_snipe_window: int = 300,
-        anti_snipe_extend: int = 30,
+        reserve_price: Optional[int] = None,
+        min_increment: Optional[int] = None,
+        anti_snipe_window: Optional[int] = None,
+        anti_snipe_extend: Optional[int] = None,
     ) -> None:
         from services.channel_guard import ensure_channel_allowed
         if not await ensure_channel_allowed(interaction, "auction"):
             return
         if not await _ensure_manager(interaction):
             return
+
+        # Resolve optional params against server-wide env defaults.
+        def _env_int(key: str, fallback: int) -> int:
+            raw = (os.getenv(key) or "").strip()
+            try:
+                return int(raw) if raw else fallback
+            except ValueError:
+                return fallback
+
+        if min_increment is None:
+            min_increment = _env_int("AUCTION_DEFAULT_MIN_INCREMENT", 100)
+        if anti_snipe_window is None:
+            anti_snipe_window = _env_int("AUCTION_DEFAULT_ANTI_SNIPE_WINDOW", 300)
+        if anti_snipe_extend is None:
+            anti_snipe_extend = _env_int("AUCTION_DEFAULT_ANTI_SNIPE_EXTEND", 30)
+        if reserve_price is None:
+            reserve_price = _env_int("AUCTION_DEFAULT_RESERVE_PRICE", 0)
 
         secs = parse_duration(duration)
         if secs is None or secs < 60:
@@ -639,6 +690,17 @@ class AuctionCog(commands.Cog):
         if anti_snipe_window < 0 or anti_snipe_extend < 0:
             await interaction.response.send_message(
                 "⚠️ anti-snipe values must be >= 0.", ephemeral=True
+            )
+            return
+        if reserve_price < 0:
+            await interaction.response.send_message(
+                "⚠️ `reserve_price` must be >= 0 (0 = no reserve).", ephemeral=True
+            )
+            return
+        if reserve_price and reserve_price < starting_bid:
+            await interaction.response.send_message(
+                "⚠️ `reserve_price` must be >= `starting_bid` (or 0 to disable).",
+                ephemeral=True,
             )
             return
 
@@ -679,6 +741,7 @@ class AuctionCog(commands.Cog):
             "host_id": interaction.user.id,
             "starting_bid": int(starting_bid),
             "min_increment": int(min_increment),
+            "reserve_price": int(reserve_price),
             "currency": "JPY",
             "ends_at": ends_at.isoformat(),
             "anti_snipe_threshold": int(anti_snipe_window),

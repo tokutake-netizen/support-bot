@@ -203,9 +203,12 @@ WELCOME_DESCRIPTION=        # 本文テンプレ
 | `description` | 空 | 商品説明 |
 | `image` | — | 画像添付 |
 | `image_url` | — | URL指定（添付の代替） |
-| `min_increment` | `100` | 絶対最小増分（円）。5%ルールと両立 |
-| `anti_snipe_window` | `60` | 終了X秒前なら延長発動 |
-| `anti_snipe_extend` | `60` | スナイプ時に追加する秒数 |
+| `reserve_price` | env `AUCTION_DEFAULT_RESERVE_PRICE` (既定 0) | 最低落札価格。最高入札がこの額に満たない場合は **落札なし** |
+| `min_increment` | env `AUCTION_DEFAULT_MIN_INCREMENT` (既定 100) | 絶対最小増分（円）。5%ルールと両立 |
+| `anti_snipe_window` | env `AUCTION_DEFAULT_ANTI_SNIPE_WINDOW` (既定 300) | 終了X秒前なら延長発動（既定5分） |
+| `anti_snipe_extend` | env `AUCTION_DEFAULT_ANTI_SNIPE_EXTEND` (既定 30) | スナイプ時に追加する秒数 |
+
+省略可能な引数は、サーバー側で設定した既定値(`.env` または管理ダッシュボードの Auction タブ)が自動で使われる。
 
 **通貨**：JPY 固定。
 
@@ -217,9 +220,11 @@ WELCOME_DESCRIPTION=        # 本文テンプレ
   - 例: 現最高値 ¥10,000 / `min_increment=100` → 次の必要額は `max(10100, ceil(10000×1.05)) = 10,500`
   - 例: 現最高値 ¥500 / `min_increment=100` → `max(600, 525) = 600`（小額時は min_increment が支配的）
   - 初回入札のみ `starting_bid` 以上であれば OK
-- アンチスナイプ：終了 `anti_snipe_window` 秒以内に入札があったら ends_at に `anti_snipe_extend` 秒追加
+- **アンチスナイプ（既定）**：終了 **5分以内** の入札で ends_at に **+30秒** 追加（繰り返し延長可、`anti_snipe_window` / `anti_snipe_extend` で調整可）
+- **最低落札価格 (reserve)**: 設定すると embed に `🔒 Reserve: ¥X` が公開表示される。終了時に最高入札がこの額未満なら「reserve not met」で **落札なし**(deal channel 作成も DM もスキップ、host が再出品 or 個別交渉)
 - ボタン `📜 Bid history` で履歴 ephemeral 表示
-- 期限切れで自動終了 → Embed をグレーアウト＋勝者発表
+- 期限切れで自動終了 → Embed をグレーアウト＋祝祭 Embed（🎉 おめでとう / Congratulations）を発表
+- 画像は **添付（image 引数）** を推奨。添付は永続化される（image_url は URL の期限切れリスクあり）
 - 落札時、**`TICKET_CATEGORY_ID`（または `AUCTION_TICKET_CATEGORY_ID`）配下に落札者×Host×Staff のみが見える private channel を自動作成**（minimal-intervention 原則の明示的な例外。決済・発送をここで個別調整）
 - 落札者にDM通知（best-effort、DM閉じている場合はスキップ）
 

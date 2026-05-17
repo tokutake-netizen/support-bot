@@ -131,13 +131,19 @@
 - 状態遷移: `pending → live → ending → ended`
   - `live`: 入札受付中
   - `ending`: 最後の `anti_snipe_threshold` 秒間。この間の bid は `anti_snipe_seconds` だけ終了時刻を延長(スナイプ対策)
-  - `ended`: 落札確定
-- 落札時に自動で「deal channel」(prive な落札者+運営チャンネル)を作成
+  - `ended`: 落札確定 or reserve 未到達で unsold
+- **最低落札価格 (reserve_price)**: 最高入札がこの額未満なら落札せず終了。`0` = 設定なし(常に落札)。embed に `🔒 Reserve: ¥X` が公開表示される
+- 落札時に自動で「deal channel」(private な落札者+運営チャンネル)を作成。reserve 未到達時は作成されない
   - 配置先: `AUCTION_TICKET_CATEGORY_ID`(未設定なら `TICKET_CATEGORY_ID`)
 - 永続化: `data/auctions.json` (bot 再起動後も persistent view で button が機能)
 - 決済機能なし — host が手動で請求対応
 - 実行可能ロール: admin または `AUCTION_MANAGER_ROLE_IDS`
 - 実行可能 ch: `ALLOW_CH_AUCTION` / `ALLOW_CAT_AUCTION` で制限可
+- **server-wide 既定値**(`/auction create` の省略時に使用、ダッシュボードの Auction タブから編集可):
+  - `AUCTION_DEFAULT_RESERVE_PRICE` (既定 `0` = 設定なし)
+  - `AUCTION_DEFAULT_MIN_INCREMENT` (既定 `100`)
+  - `AUCTION_DEFAULT_ANTI_SNIPE_WINDOW` (既定 `300`)
+  - `AUCTION_DEFAULT_ANTI_SNIPE_EXTEND` (既定 `30`)
 
 ---
 
@@ -279,7 +285,7 @@ dashboard/
 `DIGEST_CHANNEL_ID`, `BACKUP_CHANNEL_ID`
 
 ### I. Auction
-`AUCTION_MANAGER_ROLE_IDS`, `AUCTION_TICKET_CATEGORY_ID`
+`AUCTION_MANAGER_ROLE_IDS`, `AUCTION_TICKET_CATEGORY_ID`, `AUCTION_DEFAULT_RESERVE_PRICE`, `AUCTION_DEFAULT_MIN_INCREMENT`, `AUCTION_DEFAULT_ANTI_SNIPE_WINDOW`, `AUCTION_DEFAULT_ANTI_SNIPE_EXTEND`
 
 ### Channel Guard
 `ALLOW_CH_SHIPPING`, `ALLOW_CAT_SHIPPING`, `ALLOW_CH_GIVEAWAY`, `ALLOW_CH_INVITE`, `ALLOW_CH_AUCTION`, `ALLOW_CAT_AUCTION`

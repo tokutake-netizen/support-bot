@@ -419,10 +419,37 @@
             <div class="hint">未設定なら <code>TICKET_CATEGORY_ID</code> を使用。落札ごとに private channel が作成されます。</div>
           </div>
         </div>
+        <h3 style="color:#fff;font-size:13px;margin:20px 0 10px">🛠️ /auction create の既定値</h3>
+        <p class="section-desc">ここで設定した値は <code>/auction create</code> の引数を省略したときに使われます。各オークションで個別指定すれば上書き可能です。</p>
+        <div class="row">
+          <div class="field">
+            <label>最低落札価格 (reserve_price) の既定</label>
+            <input type="number" name="AUCTION_DEFAULT_RESERVE_PRICE" value="{{ env.get('AUCTION_DEFAULT_RESERVE_PRICE','0') }}" min="0" step="100">
+            <div class="hint">最高入札がこの額に満たない場合は <b>落札なし</b>。`0` = 最低落札価格なし(常に落札)。</div>
+          </div>
+          <div class="field">
+            <label>最低入札増分 (min_increment) の既定 (JPY)</label>
+            <input type="number" name="AUCTION_DEFAULT_MIN_INCREMENT" value="{{ env.get('AUCTION_DEFAULT_MIN_INCREMENT','100') }}" min="1" step="100">
+            <div class="hint">5% ルールと両立。両方の高い方が次の必要額になります。</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>アンチスナイプ判定秒数 (anti_snipe_window)</label>
+            <input type="number" name="AUCTION_DEFAULT_ANTI_SNIPE_WINDOW" value="{{ env.get('AUCTION_DEFAULT_ANTI_SNIPE_WINDOW','300') }}" min="0" step="30">
+            <div class="hint">終了 N 秒前以内に入札があれば延長を発動 (既定: 300秒 = 5分)</div>
+          </div>
+          <div class="field">
+            <label>アンチスナイプ延長秒数 (anti_snipe_extend)</label>
+            <input type="number" name="AUCTION_DEFAULT_ANTI_SNIPE_EXTEND" value="{{ env.get('AUCTION_DEFAULT_ANTI_SNIPE_EXTEND','30') }}" min="0" step="10">
+            <div class="hint">スナイプ時に追加される秒数 (既定: 30秒)</div>
+          </div>
+        </div>
         <div class="help-box">
-          <div class="h"><span class="ico">💡</span>入札ルール (コード側の仕様)</div>
-          ・次の入札は <b>現最高値の +5% 以上</b> かつ <b>min_increment(既定 100 円)以上の上乗せ</b> の両方を満たす必要あり<br>
-          ・終了 60 秒前以内の入札はアンチスナイプで自動 +60 秒延長<br>
+          <div class="h"><span class="ico">💡</span>入札ルール</div>
+          ・次の入札は <b>現最高値 ×1.05 以上</b> かつ <b>min_increment 以上の上乗せ</b> の両方を満たす必要あり<br>
+          ・例: 現最高値 ¥10,000 / min_increment=100 → 次の必要額は <code>max(10100, ceil(10000×1.05)) = 10,500</code><br>
+          ・終了 anti_snipe_window 秒以内の入札は自動で anti_snipe_extend 秒延長(繰り返し可)<br>
           ・通貨は JPY 固定。決済は bot 側で行わない(host が deal channel で個別調整)
         </div>
       </div>
