@@ -83,3 +83,11 @@ details summary:hover{color:#fff}
 .flash.warn{background:rgba(240,178,50,.15);color:#fcd34d;border:1px solid rgba(240,178,50,.3)}
 .callout{padding:14px;background:rgba(240,178,50,.06);border:1px solid rgba(240,178,50,.3);border-radius:8px;margin-bottom:16px;color:#fcd34d;font-size:13px;line-height:1.65}
 optgroup{font-weight:600;color:var(--muted)}
+
+/* Tabs (used on setup page) */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:20px;flex-wrap:wrap;position:sticky;top:0;background:var(--bg);z-index:10;padding-top:8px}
+.tab{padding:10px 14px;color:var(--muted);text-decoration:none;border-bottom:2px solid transparent;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
+.tab:hover{color:#fff;text-decoration:none}
+.tab.active{color:#fff;border-bottom-color:var(--accent)}
+.tab-panel{display:none}
+.tab-panel.active{display:block}

@@ -192,7 +192,7 @@
 | `/login` | Discord OAuth ボタン |
 | `/oauth/callback` | Discord OAuth コールバック処理 |
 | `/dashboard` | admin として参加しているギルド一覧 |
-| `/guild/<id>/setup` | 全機能の設定(チャンネル/ロール/メッセージ編集) |
+| `/guild/<id>/setup` | 全機能の設定 — タブで `API` / `翻訳` / `チケット` / `Welcome` / `意図判定` / `送料` / `Giveaway` / `Auction` / `招待` を切替 |
 | `/guild/<id>/status` | BOT 稼働状況、live log、▶起動/↻再起動/■停止 |
 | `/guild/<id>/giveaway` | 抽選作成フォーム + 進行中/過去一覧 |
 | `/guild/<id>/onboarding` | Discord ネイティブ onboarding 編集(ルール ch・設問最大 5 問×各 8 選択肢・各選択肢に role/channel 紐付け) |

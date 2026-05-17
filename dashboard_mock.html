@@ -127,6 +127,12 @@
   .step.done .step-label,.step.current .step-label{color:#fff}
   .step-arrow{color:var(--line);margin:0 4px}
   .sticky-save{position:sticky;bottom:0;background:var(--bg);padding:16px 0;border-top:1px solid var(--line);margin-top:32px;display:flex;gap:8px;align-items:center}
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:20px;flex-wrap:wrap;position:sticky;top:0;background:var(--bg);z-index:10;padding-top:8px}
+  .tab{padding:10px 14px;color:var(--muted);text-decoration:none;border-bottom:2px solid transparent;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
+  .tab:hover{color:#fff}
+  .tab.active{color:#fff;border-bottom-color:var(--accent)}
+  .tab-panel{display:none}
+  .tab-panel.active{display:block}
 </style>
 </head>
 <body>
@@ -243,6 +249,19 @@
         <div class="step"><div class="step-num">4</div><div class="step-label">本番運用</div></div>
       </div>
 
+      <nav class="tabs" data-tabnav>
+        <a href="#" class="tab active" data-tab="api">🔑 API</a>
+        <a href="#" class="tab" data-tab="translation">🌐 翻訳</a>
+        <a href="#" class="tab" data-tab="ticket">🎫 チケット</a>
+        <a href="#" class="tab" data-tab="welcome">🎊 Welcome</a>
+        <a href="#" class="tab" data-tab="suggester">🤖 意図判定</a>
+        <a href="#" class="tab" data-tab="shipping">📦 送料</a>
+        <a href="#" class="tab" data-tab="giveaway">🎉 Giveaway</a>
+        <a href="#" class="tab" data-tab="auction">🏛️ Auction</a>
+        <a href="#" class="tab" data-tab="invite">🚪 招待</a>
+      </nav>
+
+      <div class="tab-panel active" data-panel="api">
       <!-- ===== API KEYS ===== -->
       <h2>🔑 API キー <span class="help">トークン類は暗号化して保存されます</span></h2>
       <p class="section-desc">BOT が Discord や翻訳・AI と通信するために必要な認証情報です。一度設定すれば変更しない限り保存され続けます。</p>
@@ -281,6 +300,9 @@
         </div>
       </div>
 
+      </div><!-- /tab-api -->
+
+      <div class="tab-panel" data-panel="translation">
       <!-- ===== TRANSLATION ===== -->
       <h2>🌐 自動翻訳 <span class="help">英語圏のお客様向けに即時対応</span></h2>
       <p class="section-desc">指定したチャンネルでの英語・日本語の発言を BOT が自動翻訳して返信します。お客様(英語ネイティブ)と運営(日本人)の橋渡し用。翻訳プロバイダは DeepL を推奨(品質が高く Free 枠で十分)。</p>
@@ -334,6 +356,9 @@
         </div>
       </div>
 
+      </div><!-- /tab-translation -->
+
+      <div class="tab-panel" data-panel="ticket">
       <!-- ===== TICKETS ===== -->
       <h2>🎫 チケット (個別チャット) <span class="help">お客様 1 人 1 チケット制</span></h2>
       <p class="section-desc">お客様が「Open ticket」ボタンを押すと、自分専用のプライベートチャンネルが自動作成されます。商品の注文、配送相談、その他の問い合わせを 1:1 で対応するための仕組みです。</p>
@@ -459,6 +484,9 @@ When you're done, press the <b>🔒 Close ticket</b> button below.</div>
         </details>
       </div>
 
+      </div><!-- /tab-ticket -->
+
+      <div class="tab-panel" data-panel="welcome">
       <!-- ===== WELCOME ===== -->
       <h2>🎊 Welcome メッセージ <span class="help">新規入室時の自動投稿</span></h2>
       <p class="section-desc">新しい人がサーバーに入った瞬間に、welcome チャンネルへ歓迎メッセージを自動投稿します。招待元(どの Instagram から来たか等)も自動で表示されます。</p>
@@ -541,6 +569,9 @@ When you're done, press the <b>🔒 Close ticket</b> button below.</div>
         </details>
       </div>
 
+      </div><!-- /tab-welcome -->
+
+      <div class="tab-panel" data-panel="suggester">
       <!-- ===== SUGGESTER ===== -->
       <h2>🤖 自動アドバイス (意図判定) <span class="help">AI が発言の意図を察知</span></h2>
       <p class="section-desc">指定したチャンネル(例: <code>#free-talk</code>)で「カードについて聞きたい」「送料はいくら？」といった発言を AI が検知して、対応するチャンネルへの誘導テキストを自動で reply します。</p>
@@ -590,6 +621,9 @@ When you're done, press the <b>🔒 Close ticket</b> button below.</div>
         </details>
       </div>
 
+      </div><!-- /tab-suggester -->
+
+      <div class="tab-panel" data-panel="shipping">
       <!-- ===== SHIPPING ===== -->
       <h2>📦 送料計算 <span class="help">商品 × 数量 × 宛先国 → 自動で安い配送業者を選択</span></h2>
       <p class="section-desc">お客様が <code>/shipping</code> を実行すると、カート形式の入力パネルが起動。Google Sheets の「比較表US基準」シートから DHL / FedEx の料金を比較して安い方を自動選択します。20kg 超は自動で分割発送計算。</p>
@@ -648,6 +682,9 @@ When you're done, press the <b>🔒 Close ticket</b> button below.</div>
         </div>
       </div>
 
+      </div><!-- /tab-shipping -->
+
+      <div class="tab-panel" data-panel="giveaway">
       <!-- ===== GIVEAWAY ===== -->
       <h2>🎉 Giveaway (抽選) <span class="help">画像・賞品・期間を入力 → ボタン1つで投稿</span></h2>
       <p class="section-desc">参加ボタン付きの抽選メッセージを、Discord に直接コマンドを打たずにこのダッシュボードから作成・投稿できます。期間終了時に BOT が自動で当選者を抽選・発表します。</p>
@@ -819,6 +856,59 @@ Click the button below to enter!</div>
         </div>
       </div>
 
+      </div><!-- /tab-giveaway -->
+
+      <div class="tab-panel" data-panel="auction">
+      <!-- ===== AUCTION ===== -->
+      <h2>🏛️ Auction (入札式オークション) <span class="help">アンチスナイプ自動延長付き</span></h2>
+      <p class="section-desc">入札ボタン式の非同期オークション。Forum または Text Channel どちらでも投稿可。落札時は当選者×Host×Staff 専用の "deal channel" が自動作成されます(決済はそこで個別調整)。</p>
+      <div class="card">
+        <div class="row">
+          <div class="field">
+            <label>オークションを実施できるチャンネル</label>
+            <select multiple size="3">
+              <option selected>#auctions</option>
+              <option>#raffle</option>
+            </select>
+            <div class="hint">Forum 推奨。空欄なら任意 ch で実行可。</div>
+          </div>
+          <div class="field">
+            <label>許可するカテゴリ全体</label>
+            <select multiple size="3">
+              <option>📂 STOREFRONT</option>
+            </select>
+            <div class="hint">配下の ch 全部で許可するならカテゴリ単位で指定。</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>オークションを管理できるロール</label>
+            <select multiple size="3">
+              <option selected style="color:#eb459e">● Auction Manager</option>
+              <option style="color:#5865f2">● Staff</option>
+            </select>
+            <div class="hint">これらの保有者は admin 権限なしで /auction を運用可。空欄なら admin 限定。</div>
+          </div>
+          <div class="field">
+            <label>落札後の "deal channel" 配置先カテゴリ</label>
+            <select>
+              <option selected>📂 Created Tickets (フォールバック)</option>
+              <option>📂 Auctions Deals</option>
+            </select>
+            <div class="hint">落札ごとに当選者×Host×Staff のみ閲覧可能な private channel が自動生成されます。</div>
+          </div>
+        </div>
+        <div class="help-box">
+          <div class="h"><span class="ico">💡</span>入札ルール</div>
+          ・次の入札は <b>現最高値の +5% 以上</b> かつ <b>min_increment(既定 100 円)以上の上乗せ</b> の両方を満たす必要あり<br>
+          ・終了 60 秒前以内の入札は <b>アンチスナイプ自動 +60 秒延長</b><br>
+          ・通貨は JPY 固定。決済は bot 側で行わない(host が deal channel で個別調整)<br>
+          ・落札者には DM 通知(DM 閉じている場合はスキップ)
+        </div>
+      </div>
+      </div><!-- /tab-auction -->
+
+      <div class="tab-panel" data-panel="invite">
       <!-- ===== INVITE ===== -->
       <h2>🚪 招待トラッキング <span class="help">どの Instagram から来たか自動判別</span></h2>
       <p class="section-desc">複数の Instagram アカウントそれぞれに別々の招待リンクを貼っておくと、新規参加者がどの招待コードで入ってきたかを自動でログに記録できます。Welcome メッセージにも招待元を表示。</p>
@@ -849,6 +939,7 @@ Click the button below to enter!</div>
           <div class="hint">ここに入れたロールの人は、admin じゃなくても自分で招待リンクを発行できます。</div>
         </div>
       </div>
+      </div><!-- /tab-invite -->
 
       <!-- 保存バー -->
       <div class="sticky-save">
@@ -1288,6 +1379,16 @@ Click the button below to enter!</div>
     if(e.target.classList.contains('toggle')){
       e.target.classList.toggle('on');
     }
+  });
+  // Tab switching (setup screen)
+  document.querySelectorAll('.tab').forEach(t=>{
+    t.addEventListener('click', e=>{
+      e.preventDefault();
+      const nav = t.closest('[data-tabnav]') || t.parentElement;
+      const root = nav.parentElement;
+      nav.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active', x===t));
+      root.querySelectorAll('[data-panel]').forEach(p=>p.classList.toggle('active', p.dataset.panel===t.dataset.tab));
+    });
   });
 </script>
 </body>

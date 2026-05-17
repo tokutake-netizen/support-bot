@@ -79,6 +79,19 @@
 
     <form method="post" action="/guild/{{ guild_id }}/save" enctype="multipart/form-data">
 
+      <nav class="tabs">
+        <a href="#tab-api" class="tab" data-tab="api">🔑 API</a>
+        <a href="#tab-translation" class="tab" data-tab="translation">🌐 翻訳</a>
+        <a href="#tab-ticket" class="tab" data-tab="ticket">🎫 チケット</a>
+        <a href="#tab-welcome" class="tab" data-tab="welcome">🎊 Welcome</a>
+        <a href="#tab-suggester" class="tab" data-tab="suggester">🤖 意図判定</a>
+        <a href="#tab-shipping" class="tab" data-tab="shipping">📦 送料</a>
+        <a href="#tab-giveaway" class="tab" data-tab="giveaway">🎉 Giveaway</a>
+        <a href="#tab-auction" class="tab" data-tab="auction">🏛️ Auction</a>
+        <a href="#tab-invite" class="tab" data-tab="invite">🚪 招待</a>
+      </nav>
+
+      <div class="tab-panel" id="tab-api">
       {# ============ API KEYS ============ #}
       <h2>🔑 API キー <span class="help">トークン類は暗号化されたフォームでサーバー側に保存されます</span></h2>
       <div class="card">
@@ -125,8 +138,11 @@
         </div>
       </div>
 
+      </div>{# /tab-api #}
+
       {% if discord_ok %}
 
+      <div class="tab-panel" id="tab-translation">
       {# ============ TRANSLATION ============ #}
       <h2>🌐 自動翻訳</h2>
       <p class="section-desc">指定したチャンネルでの英語・日本語の発言を BOT が自動翻訳して返信します。</p>
@@ -164,6 +180,9 @@
         </div>
       </div>
 
+      </div>{# /tab-translation #}
+
+      <div class="tab-panel" id="tab-ticket">
       {# ============ TICKETS ============ #}
       <h2>🎫 チケット (個別チャット)</h2>
       <p class="section-desc">お客様が「Open ticket」ボタンを押すと、自分専用のプライベートチャンネルが自動作成されます。</p>
@@ -196,6 +215,9 @@
         </div>
       </div>
 
+      </div>{# /tab-ticket #}
+
+      <div class="tab-panel" id="tab-welcome">
       {# ============ WELCOME ============ #}
       <h2>🎊 Welcome メッセージ</h2>
       <p class="section-desc">新しい人がサーバーに入った瞬間に、welcome チャンネルへ歓迎メッセージを自動投稿。招待元も同時に表示されます。</p>
@@ -252,6 +274,9 @@
         </div>
       </div>
 
+      </div>{# /tab-welcome #}
+
+      <div class="tab-panel" id="tab-suggester">
       {# ============ SUGGESTER ============ #}
       <h2>🤖 自動アドバイス (意図判定)</h2>
       <p class="section-desc">指定 ch での発言を AI が分類して、商品問合せ/配送相談には誘導文を自動 reply します。</p>
@@ -301,6 +326,9 @@
         </details>
       </div>
 
+      </div>{# /tab-suggester #}
+
+      <div class="tab-panel" id="tab-shipping">
       {# ============ SHIPPING ============ #}
       <h2>📦 送料計算</h2>
       <p class="section-desc">お客様が <code>/shipping</code> で送料を確認できます。Google Sheets「比較表US基準」から DHL/FedEx の安い方を自動選択。</p>
@@ -340,6 +368,9 @@
         </div>
       </div>
 
+      </div>{# /tab-shipping #}
+
+      <div class="tab-panel" id="tab-giveaway">
       {# ============ GIVEAWAY ============ #}
       <h2>🎉 Giveaway (抽選)</h2>
       <p class="section-desc">時間指定の参加ボタン式抽選。</p>
@@ -357,6 +388,47 @@
         </div>
       </div>
 
+      </div>{# /tab-giveaway #}
+
+      <div class="tab-panel" id="tab-auction">
+      {# ============ AUCTION ============ #}
+      <h2>🏛️ Auction (入札式オークション)</h2>
+      <p class="section-desc">入札ボタン式の非同期オークション。Forum または Text Channel どちらでも投稿可能。落札時は当選者×Host×Staff 専用の "deal channel" が自動作成されます(決済は手動)。</p>
+      <div class="card">
+        <div class="row">
+          <div class="field">
+            <label>オークションを実施できるチャンネル</label>
+            {{ channel_select("ALLOW_CH_AUCTION", env, channels_grouped, multiple=true) }}
+            <div class="hint">空欄なら任意 ch で実行可。Forum 推奨。</div>
+          </div>
+          <div class="field">
+            <label>許可するカテゴリ全体</label>
+            {{ category_select("ALLOW_CAT_AUCTION", env, channels_grouped, multiple=true) }}
+            <div class="hint">配下の ch 全部で許可するならカテゴリ単位で。</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>オークションを管理できるロール</label>
+            {{ role_select("AUCTION_MANAGER_ROLE_IDS", env, roles, multiple=true) }}
+            <div class="hint">これらの保有者は admin 権限なしで /auction を運用可。空欄なら admin 限定。</div>
+          </div>
+          <div class="field">
+            <label>落札後の "deal channel" 配置先カテゴリ</label>
+            {{ category_select("AUCTION_TICKET_CATEGORY_ID", env, channels_grouped, placeholder="(チケットカテゴリにフォールバック)") }}
+            <div class="hint">未設定なら <code>TICKET_CATEGORY_ID</code> を使用。落札ごとに private channel が作成されます。</div>
+          </div>
+        </div>
+        <div class="help-box">
+          <div class="h"><span class="ico">💡</span>入札ルール (コード側の仕様)</div>
+          ・次の入札は <b>現最高値の +5% 以上</b> かつ <b>min_increment(既定 100 円)以上の上乗せ</b> の両方を満たす必要あり<br>
+          ・終了 60 秒前以内の入札はアンチスナイプで自動 +60 秒延長<br>
+          ・通貨は JPY 固定。決済は bot 側で行わない(host が deal channel で個別調整)
+        </div>
+      </div>
+      </div>{# /tab-auction #}
+
+      <div class="tab-panel" id="tab-invite">
       {# ============ INVITE ============ #}
       <h2>🚪 招待トラッキング</h2>
       <p class="section-desc">入室時にどの招待コードで来たかを自動判定し、Welcome embed と運営ログに記録します。</p>
@@ -381,6 +453,7 @@
           {{ channel_select("MODERATOR_CHANNEL_ID", env, channels_grouped) }}
         </div>
       </div>
+      </div>{# /tab-invite #}
 
       {% endif %}{# discord_ok #}
 
@@ -394,4 +467,19 @@
     </form>
   </main>
 </div>
+<script>
+(function(){
+  function activate(id){
+    document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('active', t.dataset.tab === id); });
+    document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.toggle('active', p.id === 'tab-' + id); });
+    history.replaceState(null, '', '#tab-' + id);
+  }
+  document.querySelectorAll('.tab').forEach(function(t){
+    t.addEventListener('click', function(e){ e.preventDefault(); activate(t.dataset.tab); });
+  });
+  var initial = (location.hash || '').replace(/^#tab-/, '') || 'api';
+  if(!document.getElementById('tab-' + initial)) initial = 'api';
+  activate(initial);
+})();
+</script>
 {% endblock %}

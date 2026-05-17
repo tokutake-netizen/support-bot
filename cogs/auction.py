@@ -210,13 +210,20 @@ def _build_embed(auction: dict) -> discord.Embed:
     embed = discord.Embed(title=title, description=desc or None, color=color)
     for name, value, inline in fields:
         embed.add_field(name=name, value=value, inline=inline)
-    if auction.get("image_url"):
+    # 画像優先順位:
+    #   1. 添付ファイル (image_filename) → attachment:// 参照で permanent
+    #   2. URL指定 (image_url)
+    if auction.get("image_filename"):
+        embed.set_image(url=f"attachment://{auction['image_filename']}")
+    elif auction.get("image_url"):
         embed.set_image(url=auction["image_url"])
     if not ended and not cancelled:
         pct = int(BID_INCREMENT_PCT * 100)
+        window = int(auction.get("anti_snipe_threshold", 300))
+        ext = int(auction.get("anti_snipe_seconds", 30))
         embed.set_footer(
             text=f"Click 💰 Place Bid. Each bid must be at least +{pct}% over the current high. "
-                 f"Anti-snipe: bidding near the end extends the timer."
+                 f"Anti-snipe: bid in last {window // 60}min extends timer by +{ext}s."
         )
     return embed
 
@@ -451,10 +458,36 @@ class AuctionCog(commands.Cog):
                 log.exception("auction end: edit message failed")
             try:
                 if hi:
+                    bidders = len(set(b["user_id"] for b in auction.get("bids", [])))
+                    bid_count = len(auction.get("bids", []))
+                    win_embed = discord.Embed(
+                        title="🎉  おめでとうございます！  /  Congratulations!  🎉",
+                        description=(
+                            f"🏆 **Winner**: <@{hi['user_id']}>\n"
+                            f"💰 **Winning bid**: {_fmt_money(int(hi['amount']))}\n"
+                            f"📦 **Item**: {auction.get('title')}"
+                        ),
+                        color=0xF1C40F,
+                    )
+                    win_embed.add_field(
+                        name="📊 Stats",
+                        value=f"{bid_count} bids from {bidders} bidders",
+                        inline=True,
+                    )
+                    win_embed.add_field(
+                        name="🎯 Host", value=f"<@{auction['host_id']}>", inline=True,
+                    )
+                    win_embed.set_footer(
+                        text="🎊 A private deal channel is being created — "
+                             "the host will reach out shortly to coordinate payment & shipping."
+                    )
+                    if auction.get("image_filename") or auction.get("image_url"):
+                        # 落札 Embed にもサムネ表示（あれば）
+                        if auction.get("image_url"):
+                            win_embed.set_thumbnail(url=auction["image_url"])
                     await ch.send(
-                        f"🏆 **WINNER**: <@{hi['user_id']}> with "
-                        f"{_fmt_money(int(hi['amount']), auction.get('currency','JPY'))}!\n"
-                        f"<@{auction['host_id']}> opening a private deal channel..."
+                        content=f"🎊✨ <@{hi['user_id']}> ✨🎊",
+                        embed=win_embed,
                     )
                 else:
                     await ch.send("⚠️ No bids — auction closed without a winner.")
@@ -565,11 +598,11 @@ class AuctionCog(commands.Cog):
         starting_bid="Starting price (whole number, no decimals)",
         duration="Duration (e.g. 1d, 12h, 6h30m)",
         description="Item description (optional)",
-        image="Item image to attach (optional)",
-        image_url="Item image URL (optional, if no attachment)",
+        image="Item image to attach (optional, recommended over image_url)",
+        image_url="Item image URL (optional fallback if no attachment)",
         min_increment="Absolute minimum yen increment (default 100). The 5% rule applies on top.",
-        anti_snipe_window="Seconds before end that trigger extension (default 60)",
-        anti_snipe_extend="Seconds added on snipe (default 60)",
+        anti_snipe_window="Seconds before end that trigger extension (default 300 = 5min)",
+        anti_snipe_extend="Seconds added on snipe (default 30)",
     )
     async def create(
         self,
@@ -581,8 +614,8 @@ class AuctionCog(commands.Cog):
         image: Optional[discord.Attachment] = None,
         image_url: Optional[str] = None,
         min_increment: int = 100,
-        anti_snipe_window: int = 60,
-        anti_snipe_extend: int = 60,
+        anti_snipe_window: int = 300,
+        anti_snipe_extend: int = 30,
     ) -> None:
         from services.channel_guard import ensure_channel_allowed
         if not await ensure_channel_allowed(interaction, "auction"):
@@ -609,15 +642,28 @@ class AuctionCog(commands.Cog):
             )
             return
 
-        # Resolve image
+        # Resolve image.
+        # Attached files are preferred over URLs because slash-command attachment URLs
+        # are signed/transient and break after a short time. We re-upload the file as
+        # the auction message's own attachment and reference it via attachment://.
         resolved_image_url: Optional[str] = None
+        image_file: Optional[discord.File] = None
+        image_filename: Optional[str] = None
         if image is not None:
             if not (image.content_type or "").startswith("image/"):
                 await interaction.response.send_message(
                     "⚠️ The uploaded file is not an image.", ephemeral=True
                 )
                 return
-            resolved_image_url = image.url
+            try:
+                image_file = await image.to_file()
+            except discord.HTTPException:
+                log.exception("auction create: image.to_file failed")
+                await interaction.response.send_message(
+                    "⚠️ Could not read the uploaded image.", ephemeral=True
+                )
+                return
+            image_filename = image.filename
         elif image_url:
             resolved_image_url = image_url.strip()
 
@@ -629,6 +675,7 @@ class AuctionCog(commands.Cog):
             "title": title,
             "description": description or "",
             "image_url": resolved_image_url,
+            "image_filename": image_filename,
             "host_id": interaction.user.id,
             "starting_bid": int(starting_bid),
             "min_increment": int(min_increment),
@@ -651,12 +698,15 @@ class AuctionCog(commands.Cog):
         try:
             if isinstance(target, discord.ForumChannel):
                 # Create a thread inside the forum
-                thread_with_message = await target.create_thread(
-                    name=title[:95],
-                    embed=embed,
-                    view=view,
-                    reason="auction.py: create",
-                )
+                forum_kwargs: dict = {
+                    "name": title[:95],
+                    "embed": embed,
+                    "view": view,
+                    "reason": "auction.py: create",
+                }
+                if image_file is not None:
+                    forum_kwargs["file"] = image_file
+                thread_with_message = await target.create_thread(**forum_kwargs)
                 msg = thread_with_message.message
                 auction["channel_id"] = target.id
                 auction["thread_id"] = thread_with_message.thread.id
@@ -665,7 +715,10 @@ class AuctionCog(commands.Cog):
                     ephemeral=True,
                 )
             elif isinstance(target, (discord.TextChannel, discord.Thread)):
-                await interaction.response.send_message(embed=embed, view=view)
+                send_kwargs: dict = {"embed": embed, "view": view}
+                if image_file is not None:
+                    send_kwargs["file"] = image_file
+                await interaction.response.send_message(**send_kwargs)
                 msg = await interaction.original_response()
                 auction["channel_id"] = target.id
                 if isinstance(target, discord.Thread):
@@ -677,7 +730,10 @@ class AuctionCog(commands.Cog):
                 return
         except discord.HTTPException:
             log.exception("auction create: post failed")
-            await interaction.followup.send("⚠️ Failed to post auction.", ephemeral=True)
+            try:
+                await interaction.followup.send("⚠️ Failed to post auction.", ephemeral=True)
+            except discord.HTTPException:
+                pass
             return
 
         if msg is None:

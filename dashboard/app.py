@@ -261,10 +261,13 @@ async def guild_save(
         "WELCOME_AUTOROLE_IDS",
         "INVITE_CREATOR_ROLE_IDS",
         "GIVEAWAY_MANAGER_ROLE_IDS",
+        "AUCTION_MANAGER_ROLE_IDS",
         "ALLOW_CH_SHIPPING",
         "ALLOW_CAT_SHIPPING",
         "ALLOW_CH_GIVEAWAY",
         "ALLOW_CH_INVITE",
+        "ALLOW_CH_AUCTION",
+        "ALLOW_CAT_AUCTION",
     }
     updates: dict[str, str] = {}
     for k in form.keys():
