@@ -177,6 +177,58 @@ WELCOME_DESCRIPTION=        # 本文テンプレ
 
 ---
 
+## G. オークション `/auction`
+
+ボタン入札式の非同期オークション。Forum Channel または Text Channel に対応、アンチスナイプ自動延長付き。
+
+| コマンド | 説明 | 権限 |
+|---------|------|------|
+| `/auction create title duration starting_bid [...]` | 新規オークション開始 | Admin / Manager |
+| `/auction end <message_id>` | 早期終了して落札者確定 | Host / Admin |
+| `/auction cancel <message_id>` | キャンセル（落札者なし） | Host / Admin |
+| `/auction list` | 進行中オークション一覧 | 全員 |
+| `/auction history <message_id>` | 入札履歴の表示（ephemeral） | 全員 |
+
+**`/auction create` パラメータ**
+
+| 引数 | 既定値 | 説明 |
+|------|------|------|
+| `title` | — | 商品名（例: `PSA 10 Charizard 1st Ed.`） |
+| `starting_bid` | — | 開始価格（整数） |
+| `duration` | — | `12h` / `1d` / `6h30m` 等 |
+| `description` | 空 | 商品説明 |
+| `image` | — | 画像添付 |
+| `image_url` | — | URL指定（添付の代替） |
+| `min_increment` | `100` | 最小入札増分 |
+| `currency` | `JPY` | 通貨コード |
+| `anti_snipe_window` | `60` | 終了X秒前なら延長発動 |
+| `anti_snipe_extend` | `60` | スナイプ時に追加する秒数 |
+
+**動作**
+- Forum Channel で実行 → スレッド自動作成＆オークション Embed 投稿
+- Text Channel で実行 → そのチャンネルに Embed 投稿
+- ボタン `💰 Place Bid` → モーダルで金額入力。Host は自分のオークションに入札不可
+- アンチスナイプ：終了 `anti_snipe_window` 秒以内に入札があったら ends_at に `anti_snipe_extend` 秒追加
+- ボタン `📜 Bid history` で履歴 ephemeral 表示
+- 期限切れで自動終了 → Embed をグレーアウト＋勝者発表
+- 落札時、**`TICKET_CATEGORY_ID`（または `AUCTION_TICKET_CATEGORY_ID`）配下に落札者×Host×Staff のみが見える private channel を自動作成**（minimal-intervention 原則の明示的な例外。決済・発送をここで個別調整）
+- 落札者にDM通知（best-effort、DM閉じている場合はスキップ）
+
+**重要な注意**
+- 決済処理は bot 側で行わない。落札後のやり取りは deal channel で人間が手動調整
+- 入札データは `deployments/<server>/data/auctions.json` に永続化（bot 再起動でも継続）
+- 古物営業法・特定商取引法の遵守は運営側責任。中古再販ならライセンス確認
+
+**例**
+```
+/auction create title:PSA 10 リザードン 1st ED. starting_bid:50000 duration:1d
+/auction create title:Pokemon Box Sealed starting_bid:8000 duration:6h min_increment:500 currency:JPY image:[添付]
+/auction list
+/auction end message_id:1502...
+```
+
+---
+
 ## 共通事項
 
 ### 権限

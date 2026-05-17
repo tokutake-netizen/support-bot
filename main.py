@@ -72,7 +72,7 @@ async def main() -> None:
         for ext in (
             "cogs.translator", "cogs.suggester", "cogs.shipping",
             "cogs.ticket", "cogs.welcome", "cogs.giveaway",
-            "cogs.invite_tracker", "cogs.digest", "cogs.backup",
+            "cogs.invite_tracker", "cogs.auction", "cogs.digest", "cogs.backup",
             "cogs.health", "cogs.help",
         ):
             try:

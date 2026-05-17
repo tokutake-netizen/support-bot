@@ -136,6 +136,8 @@
   <a href="#login" onclick="show('login')">ログイン</a>
   <a href="#dashboard" onclick="show('dashboard')">ダッシュボード</a>
   <a href="#setup" onclick="show('setup')">セットアップ</a>
+  <a href="#onboarding" onclick="show('onboarding')">オンボーディング</a>
+  <a href="#monitoring" onclick="show('monitoring')">監視/ダイジェスト</a>
   <a href="#status" onclick="show('status')">ステータス</a>
 </div>
 
@@ -948,6 +950,250 @@ Click the button below to enter!</div>
           </div>
           <span class="badge info">設定変更</span>
         </div>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- ============ ONBOARDING ============ -->
+<section id="onboarding" class="screen">
+  <div class="wrap">
+    <aside class="sidebar">
+      <div class="brand"><span class="dot"></span>Support Bot</div>
+      <nav class="nav">
+        <a href="#" onclick="show('dashboard');return false;">📋 サーバー一覧</a>
+        <a href="#" class="active">⚙️ 👀🤓</a>
+        <div style="margin-left:24px;padding-left:8px;border-left:2px solid var(--line);margin-top:6px">
+          <a href="#" onclick="show('setup');return false;">設定</a>
+          <a href="#" onclick="show('status');return false;">稼働状況・ログ</a>
+          <a href="#">🎉 Giveaway</a>
+          <a href="#" class="active">🚪 オンボーディング</a>
+          <a href="#" onclick="show('monitoring');return false;">📊 監視/ダイジェスト</a>
+        </div>
+      </nav>
+    </aside>
+    <main class="main">
+      <h1>🚪 オンボーディング</h1>
+      <p class="subtitle">新規メンバーの「初回入室体験」を Discord に組み込みます: ルール表示 → アンケート(1問) → 回答に応じてロール自動付与＆チャンネル公開。Discord ネイティブの Onboarding API を直接操作します。</p>
+
+      <h2>📜 ルール設定</h2>
+      <p class="section-desc">「ルール」と書かれたチャンネルを指定すると、入室画面で「ルールに同意」ステップが表示されます。</p>
+      <div class="card">
+        <div class="field">
+          <label>ルール掲示チャンネル</label>
+          <select><option selected>#rule-guide</option><option>#rules</option><option>(設定しない)</option></select>
+          <div class="hint">このチャンネルに事前にルール本文を投稿しておいてください。</div>
+        </div>
+      </div>
+
+      <h2>🚪 オンボーディング</h2>
+      <div class="card">
+        <div class="feature">
+          <div>
+            <div class="name">オンボーディングを有効化</div>
+            <div class="desc">無効の場合は質問もルール同意も出ません</div>
+          </div>
+          <div class="toggle on"></div>
+        </div>
+        <div class="field" style="margin-top:14px">
+          <label>既定で見えるチャンネル (default channels)</label>
+          <select multiple size="3">
+            <option selected>#welcome</option>
+            <option selected>#rule-guide</option>
+            <option>#our-information</option>
+          </select>
+          <div class="hint">入室直後に「常に見える」チャンネル。welcome / お知らせ系を入れる想定。</div>
+        </div>
+      </div>
+
+      <h2>❓ アンケート(1問・最大8選択肢)</h2>
+      <div class="card">
+        <div class="field">
+          <label>質問タイトル</label>
+          <input type="text" value="What brings you here? / 何のために参加されましたか？">
+        </div>
+
+        <div class="help-box">
+          <div class="h"><span class="ico">💡</span>選択肢ごとに紐づく動作</div>
+          選択肢を選ぶと: ① 指定したロールが自動付与される ② 指定したチャンネルが見えるようになる
+        </div>
+
+        <details open style="border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:10px">
+          <summary><b>選択肢 #1</b> — I want to buy cards</summary>
+          <div style="margin-top:10px">
+            <div class="row">
+              <div class="field"><label>絵文字</label><input type="text" value="🛒"></div>
+              <div class="field"><label>タイトル</label><input type="text" value="I want to buy cards"></div>
+            </div>
+            <div class="field"><label>説明</label><input type="text" value="購入・取引に興味があります"></div>
+            <div class="row">
+              <div class="field">
+                <label>付与するロール</label>
+                <select multiple size="3"><option selected style="color:#23a55a">● Buyer</option><option>● Member</option></select>
+              </div>
+              <div class="field">
+                <label>公開するチャンネル</label>
+                <select multiple size="3"><option selected>#card-game</option><option selected>#delivery-room</option></select>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <details open style="border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:10px">
+          <summary><b>選択肢 #2</b> — Just browsing</summary>
+          <div style="margin-top:10px">
+            <div class="row">
+              <div class="field"><label>絵文字</label><input type="text" value="👀"></div>
+              <div class="field"><label>タイトル</label><input type="text" value="Just browsing for now"></div>
+            </div>
+            <div class="row">
+              <div class="field">
+                <label>付与するロール</label>
+                <select multiple size="3"><option selected style="color:#eb459e">● Visitor</option></select>
+              </div>
+              <div class="field">
+                <label>公開するチャンネル</label>
+                <select multiple size="3"><option selected>#free-talk</option></select>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <details style="border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:10px">
+          <summary><b>選択肢 #3</b> <span style="color:var(--muted)">(未入力)</span></summary>
+        </details>
+      </div>
+
+      <div class="sticky-save">
+        <button class="btn green">💾 保存して Discord に反映</button>
+        <a href="#" onclick="show('setup');return false;" class="btn outline">設定に戻る</a>
+        <span style="margin-left:auto;color:var(--muted);font-size:12px">
+          オンボーディング: <span style="color:var(--green)">● 有効</span>
+        </span>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- ============ MONITORING ============ -->
+<section id="monitoring" class="screen">
+  <div class="wrap">
+    <aside class="sidebar">
+      <div class="brand"><span class="dot"></span>Support Bot</div>
+      <nav class="nav">
+        <a href="#" onclick="show('dashboard');return false;">📋 サーバー一覧</a>
+        <a href="#" class="active">⚙️ 👀🤓</a>
+        <div style="margin-left:24px;padding-left:8px;border-left:2px solid var(--line);margin-top:6px">
+          <a href="#" onclick="show('setup');return false;">設定</a>
+          <a href="#" onclick="show('status');return false;">稼働状況・ログ</a>
+          <a href="#">🎉 Giveaway</a>
+          <a href="#" onclick="show('onboarding');return false;">🚪 オンボーディング</a>
+          <a href="#" class="active">📊 監視/ダイジェスト</a>
+        </div>
+      </nav>
+    </aside>
+    <main class="main">
+      <h1>📊 監視 / ダイジェスト</h1>
+      <p class="subtitle">BOT が自動で収集する週次ダイジェスト・ヘルスチェック・日次バックアップの状態を確認できます。</p>
+
+      <h2>🏥 /health スナップショット <span class="help">いつでも実機で /health を叩いても同じ情報</span></h2>
+      <div class="stats">
+        <div class="stat"><div class="num" style="color:var(--green)">14d 7h</div><div class="lbl">稼働時間</div></div>
+        <div class="stat"><div class="num">42 ms</div><div class="lbl">Gateway latency</div></div>
+        <div class="stat"><div class="num">11</div><div class="lbl">読み込み中の cog</div></div>
+        <div class="stat"><div class="num">$1.20<span style="color:var(--muted);font-size:12px"> / $10</span></div><div class="lbl">Anthropic 月予算</div></div>
+      </div>
+
+      <h2>📊 今週のダイジェスト(プレビュー) <span class="help">毎週月曜 08:00 JST に自動投稿</span></h2>
+      <div class="help-box">
+        <div class="h"><span class="ico">💡</span>このダイジェストでわかること</div>
+        過去7日間のチケット数・翻訳回数・新規参加者・上位質問国・上位招待コード。<b>moderator-only に embed で自動投稿</b>されます。<br>
+        手動で見たい場合は実機で <code>/digest now</code> で preview、<code>/digest post</code> で即時投稿。
+      </div>
+      <div class="card">
+        <div class="discord-msg">
+          <div class="avatar">🎫</div>
+          <div class="body">
+            <div class="author">Support Bot<span class="bot">BOT</span><span class="ts">今日 08:00</span></div>
+            <div class="embed" style="border-left-color:#5865f2">
+              <div class="embed-title">📊 Weekly Digest — 2026-05-10 ~ 2026-05-17</div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px">
+                <div><div style="color:var(--muted);font-size:11px">🎫 New tickets</div><div style="font-weight:700;color:#fff">8</div></div>
+                <div><div style="color:var(--muted);font-size:11px">🌐 Translations</div><div style="font-weight:700;color:#fff">142</div></div>
+                <div><div style="color:var(--muted);font-size:11px">👥 New members</div><div style="font-weight:700;color:#fff">12</div></div>
+                <div><div style="color:var(--muted);font-size:11px">📦 Shipping quotes</div><div style="font-weight:700;color:#fff">23</div></div>
+                <div><div style="color:var(--muted);font-size:11px">🤖 Intent detected</div><div style="font-weight:700;color:#fff">7</div></div>
+              </div>
+              <div class="embed-field" style="margin-top:14px">
+                <div class="name">🌍 Top inquiry countries</div>
+                <div class="val">US (8) · MY (5) · TW (4) · HK (3) · SG (2)</div>
+              </div>
+              <div class="embed-field">
+                <div class="name">🚪 Top invite sources</div>
+                <div class="val">abcd1234 (7) · efgh5678 (4) · ijkl9012 (1)</div>
+              </div>
+              <div class="embed-footer">Generated 2026-05-17 08:00 JST</div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <button class="btn outline">↻ 集計を更新</button>
+          <button class="btn">📤 今すぐ投稿</button>
+          <button class="btn outline">⚙️ 投稿先 ch を変更</button>
+        </div>
+      </div>
+
+      <h2>📦 日次バックアップ <span class="help">毎日 03:00 JST に自動取得</span></h2>
+      <div class="help-box">
+        <div class="h"><span class="ico">💡</span>このバックアップで何が保存されるか</div>
+        ・サーバーのチャンネル/カテゴリ構造 + 権限オーバーライド<br>
+        ・全ロール (色・hoist・パーミッション)<br>
+        ・.env の中身 (TOKEN/API_KEY/SECRET は &lt;redacted&gt; マスク)<br>
+        JSONファイルとして moderator-only(または BACKUP_CHANNEL_ID)に添付されます。何かあった時の復元用です。
+      </div>
+      <div class="card">
+        <div class="feature">
+          <div>
+            <div class="name">📎 backup_2026-05-17_1499307488804343818.json</div>
+            <div class="desc">3 時間前 ・ 187 KB ・ roles: 14, categories: 7, channels: 23, env keys: 32</div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm outline">📥 ダウンロード</button>
+            <button class="btn btn-sm outline">🔍 中身を見る</button>
+          </div>
+        </div>
+        <div class="feature">
+          <div>
+            <div class="name">📎 backup_2026-05-16_1499307488804343818.json</div>
+            <div class="desc">1 日前 ・ 187 KB</div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm outline">📥 ダウンロード</button>
+            <button class="btn btn-sm outline">↻ この時点に戻す</button>
+          </div>
+        </div>
+        <div class="feature">
+          <div>
+            <div class="name">📎 backup_2026-05-15_1499307488804343818.json</div>
+            <div class="desc">2 日前 ・ 187 KB</div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm outline">📥 ダウンロード</button>
+            <button class="btn btn-sm outline">↻ この時点に戻す</button>
+          </div>
+        </div>
+        <div style="margin-top:14px">
+          <button class="btn green">📤 今すぐ手動バックアップ</button>
+        </div>
+      </div>
+
+      <h2>📈 過去 24 時間のイベント</h2>
+      <div class="card">
+        <div class="feature"><div><div class="name">🌐 翻訳</div><div class="desc">cogs.translator</div></div><div style="font-size:18px;font-weight:600">23 回</div></div>
+        <div class="feature"><div><div class="name">🎫 チケット作成</div><div class="desc">cogs.ticket</div></div><div style="font-size:18px;font-weight:600">2 件</div></div>
+        <div class="feature"><div><div class="name">👥 新規参加</div><div class="desc">cogs.invite_tracker</div></div><div style="font-size:18px;font-weight:600">3 人</div></div>
+        <div class="feature"><div><div class="name">📦 送料見積</div><div class="desc">cogs.shipping</div></div><div style="font-size:18px;font-weight:600">5 回</div></div>
+        <div class="feature"><div><div class="name">🤖 意図検出</div><div class="desc">cogs.suggester</div></div><div style="font-size:18px;font-weight:600">1 件</div></div>
       </div>
     </main>
   </div>
