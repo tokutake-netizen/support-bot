@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import os
 import re
 from datetime import datetime, timedelta, timezone
@@ -119,12 +120,13 @@ def _resolve_deal_category(guild: discord.Guild) -> Optional[discord.CategoryCha
     return None
 
 
-def _fmt_money(amount: int, currency: str) -> str:
-    if currency.upper() in {"JPY", "¥"}:
-        return f"¥{amount:,}"
-    if currency.upper() in {"USD", "$"}:
-        return f"${amount:,}"
-    return f"{amount:,} {currency.upper()}"
+#: 入札は最高値の (1 + BID_INCREMENT_PCT) 倍以上が必須。「ちょいノリ入札」防止。
+BID_INCREMENT_PCT = 0.05
+
+
+def _fmt_money(amount: int, currency: str = "JPY") -> str:
+    # 通貨は JPY 固定。引数は将来拡張用に残してあるが事実上無視。
+    return f"¥{amount:,}"
 
 
 def _highest_bid(auction: dict) -> Optional[dict]:
@@ -135,11 +137,19 @@ def _highest_bid(auction: dict) -> Optional[dict]:
 
 
 def _current_price(auction: dict) -> int:
-    """The amount the next bid must exceed (or equal for the very first bid)."""
+    """次の入札が満たすべき最低額。
+
+    - 初回入札: `starting_bid` 以上
+    - 2回目以降: `max(highest + min_increment, ceil(highest * (1 + 5%)))`
+      = 絶対増分（floor）と 5% UP の両方を満たす必要がある
+    """
     hi = _highest_bid(auction)
     if hi is None:
         return int(auction["starting_bid"])
-    return int(hi["amount"]) + int(auction.get("min_increment", 100))
+    high = int(hi["amount"])
+    floor_inc = high + int(auction.get("min_increment", 100))
+    pct_inc = math.ceil(high * (1.0 + BID_INCREMENT_PCT))
+    return max(floor_inc, pct_inc)
 
 
 # ---------- Embed ----------
@@ -178,8 +188,11 @@ def _build_embed(auction: dict) -> discord.Embed:
             _fmt_money(int(auction["starting_bid"]), currency),
             True,
         ))
-    fields.append(("➕ Min increment", _fmt_money(int(auction.get("min_increment", 100)), currency), True))
     fields.append(("👥 Bidders", str(len(set(b["user_id"] for b in auction.get("bids", [])))), True))
+    # 次の入札に必要な最低額（5% UP ルール＋絶対増分の両方を満たす値）
+    if not ended and not cancelled:
+        next_req = _current_price(auction)
+        fields.append(("📈 Next bid >=", _fmt_money(next_req), True))
 
     if ended and not cancelled:
         winner_id = auction.get("winner")
@@ -200,7 +213,11 @@ def _build_embed(auction: dict) -> discord.Embed:
     if auction.get("image_url"):
         embed.set_image(url=auction["image_url"])
     if not ended and not cancelled:
-        embed.set_footer(text="Click 💰 Place Bid to bid. Anti-snipe: bidding near the end extends the timer.")
+        pct = int(BID_INCREMENT_PCT * 100)
+        embed.set_footer(
+            text=f"Click 💰 Place Bid. Each bid must be at least +{pct}% over the current high. "
+                 f"Anti-snipe: bidding near the end extends the timer."
+        )
     return embed
 
 
@@ -210,12 +227,13 @@ def _build_embed(auction: dict) -> discord.Embed:
 class BidModal(discord.ui.Modal, title="Place Bid"):
     amount: discord.ui.TextInput
 
-    def __init__(self, auction_key: str, min_amount: int, currency: str) -> None:
+    def __init__(self, auction_key: str, min_amount: int, currency: str = "JPY") -> None:
         super().__init__()
         self._key = auction_key
         self._min = min_amount
+        pct = int(BID_INCREMENT_PCT * 100)
         self.amount = discord.ui.TextInput(
-            label=f"Your bid (>= {_fmt_money(min_amount, currency)})",
+            label=f"Your bid in JPY (>= {_fmt_money(min_amount)}, +{pct}% rule)"[:45],
             placeholder=str(min_amount),
             required=True,
             max_length=12,
@@ -251,8 +269,10 @@ class BidModal(discord.ui.Modal, title="Place Bid"):
 
         need = _current_price(auction)
         if amt < need:
+            pct = int(BID_INCREMENT_PCT * 100)
             await interaction.response.send_message(
-                f"⚠️ Your bid must be at least {_fmt_money(need, auction.get('currency','JPY'))}.",
+                f"⚠️ Bid must be **{_fmt_money(need)}** or higher "
+                f"(+{pct}% over the current high + min increment rule).",
                 ephemeral=True,
             )
             return
@@ -547,8 +567,7 @@ class AuctionCog(commands.Cog):
         description="Item description (optional)",
         image="Item image to attach (optional)",
         image_url="Item image URL (optional, if no attachment)",
-        min_increment="Minimum bid step (default 100)",
-        currency="Currency code: JPY (default) / USD / etc.",
+        min_increment="Absolute minimum yen increment (default 100). The 5% rule applies on top.",
         anti_snipe_window="Seconds before end that trigger extension (default 60)",
         anti_snipe_extend="Seconds added on snipe (default 60)",
     )
@@ -562,7 +581,6 @@ class AuctionCog(commands.Cog):
         image: Optional[discord.Attachment] = None,
         image_url: Optional[str] = None,
         min_increment: int = 100,
-        currency: str = "JPY",
         anti_snipe_window: int = 60,
         anti_snipe_extend: int = 60,
     ) -> None:
@@ -614,7 +632,7 @@ class AuctionCog(commands.Cog):
             "host_id": interaction.user.id,
             "starting_bid": int(starting_bid),
             "min_increment": int(min_increment),
-            "currency": currency.upper(),
+            "currency": "JPY",
             "ends_at": ends_at.isoformat(),
             "anti_snipe_threshold": int(anti_snipe_window),
             "anti_snipe_seconds": int(anti_snipe_extend),

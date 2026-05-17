@@ -1,6 +1,10 @@
 # Commands Guide / コマンド一覧
 
-全7グループ・25コマンド。
+全 11 グループ・35 コマンド超(2026-05-17 時点)。
+
+`A 翻訳` / `B 意図判定` / `C 送料計算` / `D チケット` / `E Welcome` /
+`F Giveaway` / `G オークション` / `H 招待トラッキング` /
+`I 週次ダイジェスト` / `J 設定バックアップ` / `K ヘルスチェック`
 
 ---
 
@@ -194,20 +198,25 @@ WELCOME_DESCRIPTION=        # 本文テンプレ
 | 引数 | 既定値 | 説明 |
 |------|------|------|
 | `title` | — | 商品名（例: `PSA 10 Charizard 1st Ed.`） |
-| `starting_bid` | — | 開始価格（整数） |
+| `starting_bid` | — | 開始価格（JPY、整数） |
 | `duration` | — | `12h` / `1d` / `6h30m` 等 |
 | `description` | 空 | 商品説明 |
 | `image` | — | 画像添付 |
 | `image_url` | — | URL指定（添付の代替） |
-| `min_increment` | `100` | 最小入札増分 |
-| `currency` | `JPY` | 通貨コード |
+| `min_increment` | `100` | 絶対最小増分（円）。5%ルールと両立 |
 | `anti_snipe_window` | `60` | 終了X秒前なら延長発動 |
 | `anti_snipe_extend` | `60` | スナイプ時に追加する秒数 |
+
+**通貨**：JPY 固定。
 
 **動作**
 - Forum Channel で実行 → スレッド自動作成＆オークション Embed 投稿
 - Text Channel で実行 → そのチャンネルに Embed 投稿
 - ボタン `💰 Place Bid` → モーダルで金額入力。Host は自分のオークションに入札不可
+- **入札条件（ちょいノリ防止）**：次の入札は **現最高値の +5% 以上** かつ **`min_increment` 以上の上乗せ** を両方満たす必要がある
+  - 例: 現最高値 ¥10,000 / `min_increment=100` → 次の必要額は `max(10100, ceil(10000×1.05)) = 10,500`
+  - 例: 現最高値 ¥500 / `min_increment=100` → `max(600, 525) = 600`（小額時は min_increment が支配的）
+  - 初回入札のみ `starting_bid` 以上であれば OK
 - アンチスナイプ：終了 `anti_snipe_window` 秒以内に入札があったら ends_at に `anti_snipe_extend` 秒追加
 - ボタン `📜 Bid history` で履歴 ephemeral 表示
 - 期限切れで自動終了 → Embed をグレーアウト＋勝者発表
@@ -222,10 +231,87 @@ WELCOME_DESCRIPTION=        # 本文テンプレ
 **例**
 ```
 /auction create title:PSA 10 リザードン 1st ED. starting_bid:50000 duration:1d
-/auction create title:Pokemon Box Sealed starting_bid:8000 duration:6h min_increment:500 currency:JPY image:[添付]
+/auction create title:Pokemon Box Sealed starting_bid:8000 duration:6h min_increment:500 image:[添付]
 /auction list
 /auction end message_id:1502...
 ```
+
+---
+
+## H. 招待トラッキング `/invite`
+
+入室時に「どの招待コードが +1 されたか」を差分判定して、Welcome embed と運営ログに自動記録。複数 Instagram アカウントの流入元判別に。
+
+| コマンド | 説明 | 権限 |
+|---------|------|------|
+| `/invite list` | 現在の招待コード+使用回数+招待主+チャンネル一覧 | Admin |
+| `/invite create [channel] [max_uses] [max_age_hours]` | 招待リンク発行 | Admin or `INVITE_CREATOR_ROLE_IDS` |
+
+**自動動作**
+- 全 invite の使用回数を起動時にキャッシュ
+- `on_member_join` で再 fetch → +1 した code を特定
+- Welcome embed に `✨ Invited via <code> by @inviter` フィールドを差し込み
+- `INVITE_LOG_CHANNEL_ID`(または `MODERATOR_CHANNEL_ID`)に監査ログ
+
+**bot に必要な権限**: `Manage Server`(`guild.invites()`)
+
+---
+
+## I. 週次ダイジェスト `/digest`
+
+毎週月曜 08:00 JST に過去 7 日のサマリ embed を投稿。
+
+| コマンド | 説明 | 権限 |
+|---------|------|------|
+| `/digest now` | 過去 7 日分の preview を ephemeral 表示 | Admin |
+| `/digest post` | 即時にチャンネルへ投稿 | Admin |
+
+**集計項目**
+- 🎫 新規チケット数 / 🌐 翻訳回数 / 👥 新規参加者 / 📦 送料見積数 / 🤖 意図検出数
+- 🌍 上位質問国(`/shipping` で選ばれた国の上位 5)
+- 🚪 上位招待コード(`member_join` で +1 した上位 5)
+
+**送信先**: `DIGEST_CHANNEL_ID`(未設定なら `MODERATOR_CHANNEL_ID`)
+
+**仕組み**
+- `services/digest_store.py` が `data/digest_events.json` (31日ローリング)に各 cog のイベントを append-only で記録
+- 月曜の自動ポストと `/health` の "Last 24h" はこのストアを共有
+
+---
+
+## J. 設定バックアップ `/backup`
+
+毎日 03:00 JST に全 guild のチャンネル/ロール/.env をスナップショットして JSON 添付で投稿。
+
+| コマンド | 説明 | 権限 |
+|---------|------|------|
+| `/backup now` | 今この瞬間の状態を即時スナップショット | Admin |
+
+**スナップショット内容**
+- roles(id/name/color/hoist/mentionable/permissions/position/managed)
+- categories(id/name/position + 権限オーバーライド)
+- channels(id/name/type/topic/nsfw/slowmode + 権限オーバーライド)
+- `.env` の中身(`TOKEN` / `API_KEY` / `SECRET` / `PASSWORD` 系は `<redacted>` でマスク)
+
+**送信先**: `BACKUP_CHANNEL_ID`(未設定なら `MODERATOR_CHANNEL_ID`)
+
+**用途**
+- 「気付いたら誰かが ch 削除/設定変更してしまった」時の復元用
+- `scripts/clone_server.py` (適用方向)の **保存方向**
+
+---
+
+## K. ヘルスチェック `/health`
+
+| コマンド | 説明 | 権限 |
+|---------|------|------|
+| `/health` | BOT 状態スナップショットを ephemeral 表示 | Admin |
+
+**表示項目**
+- Process: uptime / gateway latency / guild 数 / 読込済み cog 数
+- API budget: Anthropic 月予算消費率, DeepL 月文字数
+- Last 24h: digest_store から過去 24 時間のイベント種別ごとの集計
+- Cogs loaded: 全 cog 名
 
 ---
 
@@ -235,6 +321,7 @@ WELCOME_DESCRIPTION=        # 本文テンプレ
 - **Admin** = `Administrator` 権限を持つメンバーのみ実行可
 - 非Adminが打つと Discord側で「You do not have permission」と弾かれbotには届かない
 - `/shipping` のみ全員実行可
+- `/giveaway` `/invite create` `/auction` は専用ロール(`*_MANAGER_ROLE_IDS` / `INVITE_CREATOR_ROLE_IDS`)でも実行可
 
 ### Ephemeral応答
 多くの管理コマンドは「あなたにのみ表示」のephemeral応答。チャンネルを汚さない。

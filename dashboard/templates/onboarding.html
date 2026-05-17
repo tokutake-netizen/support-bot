@@ -44,7 +44,7 @@
   </aside>
   <main class="main">
     <h1>🚪 オンボーディング</h1>
-    <p class="subtitle">新規メンバーの「初回入室体験」を Discord に組み込みます: ルール表示 → アンケート(1問) → 回答に応じてロール自動付与＆チャンネル公開。</p>
+    <p class="subtitle">新規メンバーの「初回入室体験」を Discord に組み込みます。ルール表示 → アンケート(最大 {{ MAX_PROMPTS }} 問) → 各回答に応じてロール自動付与＆チャンネル公開。Discord ネイティブの Onboarding API を直接操作するため、Discord サーバー設定の「オンボーディング」と同じ動作になります。</p>
 
     {% if request.query_params.get("saved") %}
       <div class="flash ok">✓ オンボーディング設定を保存しました。Discord 側にも即時反映されています。</div>
@@ -71,15 +71,14 @@
         </div>
       </div>
 
-      <h2>🚪 オンボーディング</h2>
-      <p class="section-desc">有効にすると、新規メンバーは入室直後に Discord 純正のオンボーディング画面を通ります。下の質問を一問だけ表示し、選んだ回答に応じてロールを自動付与できます。</p>
+      <h2>🚪 全体設定</h2>
       <div class="card">
         <div class="feature">
           <div>
             <div class="name">オンボーディングを有効化</div>
             <div class="desc">無効の場合は質問もルール同意も出ません(通常の入室)</div>
           </div>
-          <label class="switch" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
             <input type="checkbox" name="enabled" value="1"{% if onboarding_enabled %} checked{% endif %} style="width:auto;height:auto">
             <span>有効化</span>
           </label>
@@ -91,54 +90,84 @@
         </div>
       </div>
 
-      <h2>❓ アンケート(1 問)</h2>
-      <p class="section-desc">最大 {{ MAX_OPTIONS }} 個の選択肢。空欄の選択肢はスキップされます。それぞれに <b>付与するロール</b> と <b>公開するチャンネル</b> を紐づけられます。</p>
-      <div class="card">
-        <div class="field">
-          <label>質問タイトル</label>
-          <input type="text" name="prompt_title" value="{{ prompt_title }}" placeholder="例: What brings you here? / 何のために参加されましたか?">
-          <div class="hint">入室時のオンボ画面で表示されます。短く分かりやすく。</div>
-        </div>
+      <h2>❓ アンケート設問(最大 {{ MAX_PROMPTS }} 問・各最大 {{ MAX_OPTIONS }} 選択肢)</h2>
+      <p class="section-desc">タイトルが空欄の設問は保存時に自動的に削除されます。設問を追加したい場合は空の枠を埋めるだけ。並び順は上から順に Discord で表示されます。</p>
 
-        <h3 style="color:#fff;font-size:13px;margin:18px 0 10px">選択肢</h3>
-        <div class="help-box">
-          <div class="h"><span class="ico">💡</span>ヒント</div>
-          絵文字は <code>🛒</code> のように貼り付け、またはサーバーの絵文字ID <code>&lt;:name:1234&gt;</code> 形式でも OK。ロール/チャンネルは複数選択可。
-        </div>
+      <div class="help-box">
+        <div class="h"><span class="ico">💡</span>ヒント</div>
+        ・絵文字は <code>🛒</code> のようにそのまま貼り付け、またはサーバー絵文字の <code>&lt;:name:1234&gt;</code> 形式で入力可<br>
+        ・各選択肢は「付与するロール」と「公開するチャンネル」を複数指定可<br>
+        ・<b>1問選択(ラジオ)</b> をオンにすると 1 つだけ選べる、オフだと複数選べる
+      </div>
 
-        {% for i in range(MAX_OPTIONS) %}
-        {% set opt = options[i] %}
-        <details {% if opt.title %}open{% endif %} style="border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:10px">
-          <summary><b>選択肢 #{{ i + 1 }}</b>{% if opt.title %} — {{ opt.title }}{% else %} <span style="color:var(--muted)">(未入力)</span>{% endif %}</summary>
-          <div style="margin-top:10px">
-            <div class="row">
-              <div class="field">
-                <label>絵文字</label>
-                <input type="text" name="opt_emoji_{{ i }}" value="{{ opt.emoji }}" placeholder="🛒">
-              </div>
-              <div class="field">
-                <label>タイトル(回答の表示文)</label>
-                <input type="text" name="opt_title_{{ i }}" value="{{ opt.title }}" placeholder="例: I want to buy cards">
-              </div>
+      {% for p in prompts %}
+      {% set pi = loop.index0 %}
+      <details {% if p.title %}open{% endif %} class="card" style="margin-bottom:14px">
+        <summary style="cursor:pointer;padding:6px 0;font-weight:600;color:#fff;display:flex;align-items:center;gap:8px">
+          <span style="background:var(--bg3);padding:2px 8px;border-radius:10px;font-size:12px">設問 #{{ pi + 1 }}</span>
+          {% if p.title %}{{ p.title }}{% else %}<span style="color:var(--muted);font-weight:400">(未入力 — 設問を追加するならここから)</span>{% endif %}
+        </summary>
+
+        <div style="margin-top:14px">
+          <div class="field">
+            <label>質問タイトル</label>
+            <input type="text" name="p{{ pi }}_title" value="{{ p.title }}" placeholder="例: What brings you here? / 何のために参加されましたか?">
+            <div class="hint">空欄のままだとこの設問は保存されず Discord 側からも消えます。</div>
+          </div>
+
+          <div class="row">
+            <div class="field">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                <input type="checkbox" name="p{{ pi }}_single_select" value="1"{% if p.single_select %} checked{% endif %} style="width:auto;height:auto">
+                <span>1つだけ選択 (ラジオ式)</span>
+              </label>
+              <div class="hint">オフ = 複数選択可</div>
             </div>
             <div class="field">
-              <label>説明 (任意)</label>
-              <input type="text" name="opt_desc_{{ i }}" value="{{ opt.description }}" placeholder="例: 購入・取引に興味があります">
-            </div>
-            <div class="row">
-              <div class="field">
-                <label>付与するロール</label>
-                {{ role_select("opt_role_ids_" ~ i, roles, current=opt.role_ids, multiple=true) }}
-              </div>
-              <div class="field">
-                <label>公開するチャンネル</label>
-                {{ channel_select("opt_channel_ids_" ~ i, channels_grouped, current=opt.channel_ids, multiple=true) }}
-              </div>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                <input type="checkbox" name="p{{ pi }}_required" value="1"{% if p.required %} checked{% endif %} style="width:auto;height:auto">
+                <span>回答必須</span>
+              </label>
+              <div class="hint">オフ = スキップ可</div>
             </div>
           </div>
-        </details>
-        {% endfor %}
-      </div>
+
+          <h3 style="color:#fff;font-size:13px;margin:18px 0 10px">選択肢</h3>
+          {% for opt in p.options %}
+          {% set oj = loop.index0 %}
+          <details {% if opt.title %}open{% endif %} style="border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:8px">
+            <summary><b>選択肢 #{{ oj + 1 }}</b>{% if opt.title %} — {{ opt.title }}{% else %} <span style="color:var(--muted)">(未入力)</span>{% endif %}</summary>
+            <div style="margin-top:10px">
+              <div class="row">
+                <div class="field">
+                  <label>絵文字</label>
+                  <input type="text" name="p{{ pi }}_opt_emoji_{{ oj }}" value="{{ opt.emoji }}" placeholder="🛒">
+                </div>
+                <div class="field">
+                  <label>タイトル(回答の表示文)</label>
+                  <input type="text" name="p{{ pi }}_opt_title_{{ oj }}" value="{{ opt.title }}" placeholder="例: I want to buy cards">
+                </div>
+              </div>
+              <div class="field">
+                <label>説明 (任意)</label>
+                <input type="text" name="p{{ pi }}_opt_desc_{{ oj }}" value="{{ opt.description }}" placeholder="例: 購入・取引に興味があります">
+              </div>
+              <div class="row">
+                <div class="field">
+                  <label>付与するロール</label>
+                  {{ role_select("p" ~ pi ~ "_opt_role_ids_" ~ oj, roles, current=opt.role_ids, multiple=true) }}
+                </div>
+                <div class="field">
+                  <label>公開するチャンネル</label>
+                  {{ channel_select("p" ~ pi ~ "_opt_channel_ids_" ~ oj, channels_grouped, current=opt.channel_ids, multiple=true) }}
+                </div>
+              </div>
+            </div>
+          </details>
+          {% endfor %}
+        </div>
+      </details>
+      {% endfor %}
 
       <div class="sticky-save">
         <button type="submit" class="btn green">💾 保存して Discord に反映</button>

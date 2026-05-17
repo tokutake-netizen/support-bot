@@ -573,6 +573,8 @@ async def giveaway_end(
 
 # -------------------------- onboarding routes --------------------------
 
+# Discord's hard limits.
+ONBOARDING_MAX_PROMPTS = 5
 ONBOARDING_MAX_OPTIONS = 8
 
 
@@ -591,6 +593,46 @@ def _parse_emoji(text: str) -> Optional[dict]:
         except Exception:
             pass
     return {"name": s, "id": None}
+
+
+def _normalize_prompt(prompt: dict) -> dict:
+    """Convert a Discord onboarding prompt into the template's flat dict shape."""
+    options = []
+    for opt in prompt.get("options", []):
+        emoji = opt.get("emoji") or {}
+        emoji_str = ""
+        if emoji.get("id"):
+            ap = "a" if emoji.get("animated") else ""
+            emoji_str = f"<{ap}:{emoji.get('name','')}:{emoji['id']}>"
+        elif emoji.get("name"):
+            emoji_str = emoji["name"]
+        options.append({
+            "emoji": emoji_str,
+            "title": opt.get("title", ""),
+            "description": opt.get("description", "") or "",
+            "role_ids": [str(x) for x in opt.get("role_ids", [])],
+            "channel_ids": [str(x) for x in opt.get("channel_ids", [])],
+        })
+    while len(options) < ONBOARDING_MAX_OPTIONS:
+        options.append({"emoji": "", "title": "", "description": "", "role_ids": [], "channel_ids": []})
+    return {
+        "title": prompt.get("title", ""),
+        "single_select": prompt.get("single_select", True),
+        "required": prompt.get("required", True),
+        "options": options,
+    }
+
+
+def _empty_prompt() -> dict:
+    return {
+        "title": "",
+        "single_select": True,
+        "required": False,
+        "options": [
+            {"emoji": "", "title": "", "description": "", "role_ids": [], "channel_ids": []}
+            for _ in range(ONBOARDING_MAX_OPTIONS)
+        ],
+    }
 
 
 @app.get("/guild/{guild_id}/onboarding", response_class=HTMLResponse)
@@ -616,28 +658,10 @@ async def onboarding_page(
         rls = await rest.list_roles(guild_id)
         roles = assignable_roles(rls)
 
-    prompt_title = ""
-    options: list[dict] = []
-    if onboarding and onboarding.get("prompts"):
-        first = onboarding["prompts"][0]
-        prompt_title = first.get("title", "")
-        for opt in first.get("options", []):
-            emoji = opt.get("emoji") or {}
-            emoji_str = ""
-            if emoji.get("id"):
-                ap = "a" if emoji.get("animated") else ""
-                emoji_str = f"<{ap}:{emoji.get('name','')}:{emoji['id']}>"
-            elif emoji.get("name"):
-                emoji_str = emoji["name"]
-            options.append({
-                "emoji": emoji_str,
-                "title": opt.get("title", ""),
-                "description": opt.get("description", "") or "",
-                "role_ids": [str(x) for x in opt.get("role_ids", [])],
-                "channel_ids": [str(x) for x in opt.get("channel_ids", [])],
-            })
-    while len(options) < ONBOARDING_MAX_OPTIONS:
-        options.append({"emoji": "", "title": "", "description": "", "role_ids": [], "channel_ids": []})
+    existing_prompts = (onboarding or {}).get("prompts", []) or []
+    prompts = [_normalize_prompt(p) for p in existing_prompts[:ONBOARDING_MAX_PROMPTS]]
+    while len(prompts) < ONBOARDING_MAX_PROMPTS:
+        prompts.append(_empty_prompt())
 
     is_community = bool(guild_info and "COMMUNITY" in (guild_info.get("features") or []))
 
@@ -655,8 +679,8 @@ async def onboarding_page(
             "rules_channel_id": str((guild_info or {}).get("rules_channel_id") or ""),
             "onboarding_enabled": bool(onboarding and onboarding.get("enabled")),
             "default_channel_ids": [str(x) for x in (onboarding or {}).get("default_channel_ids", [])],
-            "prompt_title": prompt_title,
-            "options": options,
+            "prompts": prompts,
+            "MAX_PROMPTS": ONBOARDING_MAX_PROMPTS,
             "MAX_OPTIONS": ONBOARDING_MAX_OPTIONS,
         },
     )
@@ -686,36 +710,38 @@ async def onboarding_save(
         log.warning("patch_guild rules_channel_id failed: %s", e)
 
     enabled = form.get("enabled") == "1"
-    prompt_title = (form.get("prompt_title") or "").strip()
     default_channel_ids = [v for v in form.getlist("default_channel_ids") if v]
 
-    options: list[dict] = []
-    for i in range(ONBOARDING_MAX_OPTIONS):
-        title = (form.get(f"opt_title_{i}") or "").strip()
+    prompts: list[dict] = []
+    for pi in range(ONBOARDING_MAX_PROMPTS):
+        title = (form.get(f"p{pi}_title") or "").strip()
         if not title:
             continue
-        emoji_text = form.get(f"opt_emoji_{i}") or ""
-        desc = (form.get(f"opt_desc_{i}") or "").strip()
-        role_ids = [v for v in form.getlist(f"opt_role_ids_{i}") if v]
-        channel_ids = [v for v in form.getlist(f"opt_channel_ids_{i}") if v]
-        emoji = _parse_emoji(emoji_text)
-        options.append({
-            "title": title,
-            "description": desc or None,
-            "emoji": emoji,
-            "role_ids": role_ids,
-            "channel_ids": channel_ids,
-        })
-
-    prompts: list[dict] = []
-    if prompt_title and options:
+        options: list[dict] = []
+        for oj in range(ONBOARDING_MAX_OPTIONS):
+            opt_title = (form.get(f"p{pi}_opt_title_{oj}") or "").strip()
+            if not opt_title:
+                continue
+            emoji_text = form.get(f"p{pi}_opt_emoji_{oj}") or ""
+            desc = (form.get(f"p{pi}_opt_desc_{oj}") or "").strip()
+            role_ids = [v for v in form.getlist(f"p{pi}_opt_role_ids_{oj}") if v]
+            channel_ids = [v for v in form.getlist(f"p{pi}_opt_channel_ids_{oj}") if v]
+            options.append({
+                "title": opt_title,
+                "description": desc or None,
+                "emoji": _parse_emoji(emoji_text),
+                "role_ids": role_ids,
+                "channel_ids": channel_ids,
+            })
+        if not options:
+            continue
         prompts.append({
-            "id": "0",
+            "id": str(pi),
             "type": 0,
-            "title": prompt_title,
+            "title": title,
             "options": options,
-            "single_select": True,
-            "required": True,
+            "single_select": form.get(f"p{pi}_single_select") == "1",
+            "required": form.get(f"p{pi}_required") == "1",
             "in_onboarding": True,
         })
 

@@ -974,7 +974,7 @@ Click the button below to enter!</div>
     </aside>
     <main class="main">
       <h1>🚪 オンボーディング</h1>
-      <p class="subtitle">新規メンバーの「初回入室体験」を Discord に組み込みます: ルール表示 → アンケート(1問) → 回答に応じてロール自動付与＆チャンネル公開。Discord ネイティブの Onboarding API を直接操作します。</p>
+      <p class="subtitle">新規メンバーの「初回入室体験」を Discord に組み込みます: ルール表示 → アンケート(最大 5 問) → 各回答に応じてロール自動付与＆チャンネル公開。Discord ネイティブの Onboarding API を直接操作します。</p>
 
       <h2>📜 ルール設定</h2>
       <p class="section-desc">「ルール」と書かれたチャンネルを指定すると、入室画面で「ルールに同意」ステップが表示されます。</p>
@@ -1006,63 +1006,136 @@ Click the button below to enter!</div>
         </div>
       </div>
 
-      <h2>❓ アンケート(1問・最大8選択肢)</h2>
-      <div class="card">
-        <div class="field">
-          <label>質問タイトル</label>
-          <input type="text" value="What brings you here? / 何のために参加されましたか？">
-        </div>
-
-        <div class="help-box">
-          <div class="h"><span class="ico">💡</span>選択肢ごとに紐づく動作</div>
-          選択肢を選ぶと: ① 指定したロールが自動付与される ② 指定したチャンネルが見えるようになる
-        </div>
-
-        <details open style="border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:10px">
-          <summary><b>選択肢 #1</b> — I want to buy cards</summary>
-          <div style="margin-top:10px">
-            <div class="row">
-              <div class="field"><label>絵文字</label><input type="text" value="🛒"></div>
-              <div class="field"><label>タイトル</label><input type="text" value="I want to buy cards"></div>
-            </div>
-            <div class="field"><label>説明</label><input type="text" value="購入・取引に興味があります"></div>
-            <div class="row">
-              <div class="field">
-                <label>付与するロール</label>
-                <select multiple size="3"><option selected style="color:#23a55a">● Buyer</option><option>● Member</option></select>
-              </div>
-              <div class="field">
-                <label>公開するチャンネル</label>
-                <select multiple size="3"><option selected>#card-game</option><option selected>#delivery-room</option></select>
-              </div>
-            </div>
-          </div>
-        </details>
-
-        <details open style="border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:10px">
-          <summary><b>選択肢 #2</b> — Just browsing</summary>
-          <div style="margin-top:10px">
-            <div class="row">
-              <div class="field"><label>絵文字</label><input type="text" value="👀"></div>
-              <div class="field"><label>タイトル</label><input type="text" value="Just browsing for now"></div>
-            </div>
-            <div class="row">
-              <div class="field">
-                <label>付与するロール</label>
-                <select multiple size="3"><option selected style="color:#eb459e">● Visitor</option></select>
-              </div>
-              <div class="field">
-                <label>公開するチャンネル</label>
-                <select multiple size="3"><option selected>#free-talk</option></select>
-              </div>
-            </div>
-          </div>
-        </details>
-
-        <details style="border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:10px">
-          <summary><b>選択肢 #3</b> <span style="color:var(--muted)">(未入力)</span></summary>
-        </details>
+      <h2>❓ アンケート設問(最大 5 問・各最大 8 選択肢)</h2>
+      <p class="section-desc">タイトル空欄の設問は保存時に削除されます。設問を追加したい場合は空の枠を埋めるだけ。並び順は上から順に Discord で表示されます。</p>
+      <div class="help-box">
+        <div class="h"><span class="ico">💡</span>ヒント</div>
+        ・絵文字は <code>🛒</code> でそのまま、またはサーバー絵文字の <code>&lt;:name:1234&gt;</code> 形式<br>
+        ・各選択肢は「付与するロール」と「公開するチャンネル」を複数指定可<br>
+        ・<b>1問選択(ラジオ)</b> をオンにすると1つだけ選べる、オフだと複数選べる
       </div>
+
+      <!-- 設問 #1 -->
+      <details open class="card" style="margin-bottom:14px">
+        <summary style="cursor:pointer;padding:6px 0;font-weight:600;color:#fff;display:flex;align-items:center;gap:8px">
+          <span style="background:var(--bg3);padding:2px 8px;border-radius:10px;font-size:12px">設問 #1</span>
+          What brings you here?
+        </summary>
+        <div style="margin-top:14px">
+          <div class="field">
+            <label>質問タイトル</label>
+            <input type="text" value="What brings you here? / 何のために参加されましたか?">
+          </div>
+          <div class="row">
+            <div class="field">
+              <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" checked style="width:auto"><span>1つだけ選択 (ラジオ式)</span></label>
+            </div>
+            <div class="field">
+              <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" checked style="width:auto"><span>回答必須</span></label>
+            </div>
+          </div>
+          <h3 style="color:#fff;font-size:13px;margin:18px 0 10px">選択肢</h3>
+          <details open style="border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:8px">
+            <summary><b>選択肢 #1</b> — I want to buy cards</summary>
+            <div style="margin-top:10px">
+              <div class="row">
+                <div class="field"><label>絵文字</label><input type="text" value="🛒"></div>
+                <div class="field"><label>タイトル</label><input type="text" value="I want to buy cards"></div>
+              </div>
+              <div class="row">
+                <div class="field"><label>付与するロール</label><select multiple size="2"><option selected style="color:#23a55a">● Buyer</option></select></div>
+                <div class="field"><label>公開するチャンネル</label><select multiple size="2"><option selected>#card-game</option><option selected>#delivery-room</option></select></div>
+              </div>
+            </div>
+          </details>
+          <details open style="border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:8px">
+            <summary><b>選択肢 #2</b> — Just browsing</summary>
+            <div style="margin-top:10px">
+              <div class="row">
+                <div class="field"><label>絵文字</label><input type="text" value="👀"></div>
+                <div class="field"><label>タイトル</label><input type="text" value="Just browsing for now"></div>
+              </div>
+              <div class="row">
+                <div class="field"><label>付与するロール</label><select multiple size="2"><option selected style="color:#eb459e">● Visitor</option></select></div>
+                <div class="field"><label>公開するチャンネル</label><select multiple size="2"><option selected>#free-talk</option></select></div>
+              </div>
+            </div>
+          </details>
+          <details style="border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:8px">
+            <summary><b>選択肢 #3</b> <span style="color:var(--muted)">(未入力)</span></summary>
+          </details>
+        </div>
+      </details>
+
+      <!-- 設問 #2 -->
+      <details open class="card" style="margin-bottom:14px">
+        <summary style="cursor:pointer;padding:6px 0;font-weight:600;color:#fff;display:flex;align-items:center;gap:8px">
+          <span style="background:var(--bg3);padding:2px 8px;border-radius:10px;font-size:12px">設問 #2</span>
+          Which Pokemon TCG sets are you into?
+        </summary>
+        <div style="margin-top:14px">
+          <div class="field">
+            <label>質問タイトル</label>
+            <input type="text" value="Which Pokemon TCG sets are you into? / 興味のあるシリーズは?">
+          </div>
+          <div class="row">
+            <div class="field">
+              <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" style="width:auto"><span>1つだけ選択 (ラジオ式)</span></label>
+              <div class="hint">オフ = 複数選択可</div>
+            </div>
+            <div class="field">
+              <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" style="width:auto"><span>回答必須</span></label>
+            </div>
+          </div>
+          <h3 style="color:#fff;font-size:13px;margin:18px 0 10px">選択肢</h3>
+          <details open style="border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:8px">
+            <summary><b>選択肢 #1</b> — Vintage (Base–Neo)</summary>
+            <div style="margin-top:10px">
+              <div class="row">
+                <div class="field"><label>絵文字</label><input type="text" value="🗿"></div>
+                <div class="field"><label>タイトル</label><input type="text" value="Vintage (Base–Neo)"></div>
+              </div>
+              <div class="row">
+                <div class="field"><label>付与するロール</label><select multiple size="2"><option selected style="color:#f1c40f">● Vintage Fan</option></select></div>
+                <div class="field"><label>公開するチャンネル</label><select multiple size="2"><option selected>#vintage-trades</option></select></div>
+              </div>
+            </div>
+          </details>
+          <details open style="border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:8px">
+            <summary><b>選択肢 #2</b> — Modern (Scarlet & Violet)</summary>
+            <div style="margin-top:10px">
+              <div class="row">
+                <div class="field"><label>絵文字</label><input type="text" value="🆕"></div>
+                <div class="field"><label>タイトル</label><input type="text" value="Modern (Scarlet & Violet)"></div>
+              </div>
+              <div class="row">
+                <div class="field"><label>付与するロール</label><select multiple size="2"><option selected style="color:#5865f2">● Modern Fan</option></select></div>
+                <div class="field"><label>公開するチャンネル</label><select multiple size="2"><option selected>#modern-trades</option></select></div>
+              </div>
+            </div>
+          </details>
+        </div>
+      </details>
+
+      <!-- 設問 #3 (空) -->
+      <details class="card" style="margin-bottom:14px">
+        <summary style="cursor:pointer;padding:6px 0;font-weight:600;color:#fff;display:flex;align-items:center;gap:8px">
+          <span style="background:var(--bg3);padding:2px 8px;border-radius:10px;font-size:12px">設問 #3</span>
+          <span style="color:var(--muted);font-weight:400">(未入力 — 設問を追加するならここから)</span>
+        </summary>
+      </details>
+      <details class="card" style="margin-bottom:14px">
+        <summary style="cursor:pointer;padding:6px 0;font-weight:600;color:#fff;display:flex;align-items:center;gap:8px">
+          <span style="background:var(--bg3);padding:2px 8px;border-radius:10px;font-size:12px">設問 #4</span>
+          <span style="color:var(--muted);font-weight:400">(未入力)</span>
+        </summary>
+      </details>
+      <details class="card" style="margin-bottom:14px">
+        <summary style="cursor:pointer;padding:6px 0;font-weight:600;color:#fff;display:flex;align-items:center;gap:8px">
+          <span style="background:var(--bg3);padding:2px 8px;border-radius:10px;font-size:12px">設問 #5</span>
+          <span style="color:var(--muted);font-weight:400">(未入力)</span>
+        </summary>
+      </details>
 
       <div class="sticky-save">
         <button class="btn green">💾 保存して Discord に反映</button>
