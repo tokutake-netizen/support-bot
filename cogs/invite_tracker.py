@@ -103,6 +103,12 @@ class InviteTrackerCog(commands.Cog):
         guild = member.guild
         used = await self._detect_invite(guild)
 
+        from services import digest_store
+        digest_store.append(
+            "member_join",
+            {"user_id": member.id, "invite_code": used.code if used else None},
+        )
+
         # Hand off to welcome cog so the welcome embed can include invite attribution
         welcome_cog = self.bot.get_cog("WelcomeCog")
         if welcome_cog is not None and hasattr(welcome_cog, "post_welcome"):

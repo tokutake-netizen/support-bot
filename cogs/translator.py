@@ -170,6 +170,8 @@ class TranslatorCog(commands.Cog):
             return
 
         flag = JA_FLAG if target_lang == "ja" else EN_FLAG
+        from services import digest_store
+        digest_store.append("translation", {"direction": target_lang, "chars": len(content)})
         try:
             await message.reply(
                 f"{flag} {translated}",

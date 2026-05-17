@@ -136,6 +136,8 @@ class SuggesterCog(commands.Cog):
             )
             self.advised_ids.add(message.id)
             self._save_state()
+            from services import digest_store
+            digest_store.append("intent_detected", {"label": label, "lang": "en" if is_en else "ja"})
         except discord.HTTPException:
             log.exception("suggest reply failed")
 

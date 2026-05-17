@@ -564,6 +564,12 @@ class ShippingView(discord.ui.View):
         if not block_header:
             return {"content": f"❌ block not configured for {st.country.display(lang)}", "view": self}
 
+        from services import digest_store
+        digest_store.append(
+            "shipping_quote",
+            {"country": st.country.iso3 or st.country.name_en, "items_g": st.items_weight_g},
+        )
+
         pkg_g = int(os.getenv("PACKAGING_WEIGHT_G", "1000"))
         max_box_kg = float(os.getenv("MAX_BOX_TOTAL_KG", "20"))
         items_g = st.items_weight_g

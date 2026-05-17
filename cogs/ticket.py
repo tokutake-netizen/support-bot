@@ -263,6 +263,9 @@ class TicketOpenView(discord.ui.View):
         except discord.HTTPException:
             log.exception("welcome message failed")
 
+        from services import digest_store
+        digest_store.append("ticket_open", {"n": n, "opener_id": interaction.user.id})
+
         # Track ownership for duplicate prevention
         _set_owner(interaction.user.id, new_channel.id)
 
