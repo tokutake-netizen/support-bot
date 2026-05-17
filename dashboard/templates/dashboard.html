@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}サーバー一覧 — Support Bot{% endblock %}
+{% block body %}
+<div class="wrap">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span>Support Bot</div>
+    <nav class="nav">
+      <a href="/dashboard" class="active">📋 サーバー一覧</a>
+      <div class="section-label">アカウント</div>
+      <a href="#" style="color:var(--muted)">👤 {{ session.username }}</a>
+      <a href="/logout" style="color:var(--muted)">🚪 ログアウト</a>
+    </nav>
+  </aside>
+  <main class="main">
+    <h1>サーバー一覧</h1>
+    <p class="subtitle">あなたが Administrator として参加している Discord サーバーが表示されます。設定したいサーバーをクリックしてください。BOT が未導入のサーバーは右下から招待 URL を生成できます。</p>
+
+    {% set running = guilds | selectattr("bot_running") | list | length %}
+    {% set unconfigured = guilds | rejectattr("configured") | list | length %}
+    <div class="stats">
+      <div class="stat"><div class="num">{{ guilds | length }}</div><div class="lbl">サーバー数</div></div>
+      <div class="stat"><div class="num" style="color:var(--green)">{{ running }}</div><div class="lbl">BOT 稼働中</div></div>
+      <div class="stat"><div class="num" style="color:var(--yellow)">{{ unconfigured }}</div><div class="lbl">未設定</div></div>
+      <div class="stat"><div class="num">—</div><div class="lbl">今月の API 利用料</div></div>
+    </div>
+
+    {% if guilds %}
+    <div class="grid">
+      {% for g in guilds %}
+      <a class="guild-card" href="/guild/{{ g.id }}/setup">
+        <div class="name">{{ g.name }}</div>
+        <div class="meta">guild_id: {{ g.id }}</div>
+        {% if g.bot_running %}
+          <span class="badge running">● 稼働中</span>
+        {% elif g.configured %}
+          <span class="badge stopped">○ 停止中</span>
+        {% else %}
+          <span class="badge unconfigured">○ セットアップ必要</span>
+        {% endif %}
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="card">
+      <p style="color:var(--muted)">管理者として参加しているサーバーが見つかりませんでした。Discord でこのアプリを利用するには、サーバーの「Administrator」権限が必要です。</p>
+    </div>
+    {% endif %}
+  </main>
+</div>
+{% endblock %}

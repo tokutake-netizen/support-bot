@@ -1,0 +1,395 @@
+{% extends "base.html" %}
+{% block title %}{{ guild_name }} の設定 — Support Bot{% endblock %}
+
+{# ============ macros ============ #}
+{% macro channel_select(name, env, channels_grouped, multiple=false, placeholder="(未選択)") %}
+  {% set raw = env.get(name, "") %}
+  {% set selected = raw.split(",") if raw else [] %}
+  <select name="{{ name }}"{% if multiple %} multiple size="4"{% endif %}>
+    {% if not multiple %}<option value="">{{ placeholder }}</option>{% endif %}
+    {% for cat, chs in channels_grouped %}
+      {% if cat %}
+        <optgroup label="📂 {{ cat.name }}">
+      {% endif %}
+      {% for c in chs %}
+        <option value="{{ c.id }}"{% if c.id in selected %} selected{% endif %}># {{ c.name }}</option>
+      {% endfor %}
+      {% if cat %}</optgroup>{% endif %}
+    {% endfor %}
+  </select>
+{% endmacro %}
+
+{% macro category_select(name, env, channels_grouped, multiple=false, placeholder="(未選択)") %}
+  {% set raw = env.get(name, "") %}
+  {% set selected = raw.split(",") if raw else [] %}
+  <select name="{{ name }}"{% if multiple %} multiple size="4"{% endif %}>
+    {% if not multiple %}<option value="">{{ placeholder }}</option>{% endif %}
+    {% for cat, _ in channels_grouped %}
+      {% if cat %}
+        <option value="{{ cat.id }}"{% if cat.id in selected %} selected{% endif %}>📂 {{ cat.name }}</option>
+      {% endif %}
+    {% endfor %}
+  </select>
+{% endmacro %}
+
+{% macro role_select(name, env, roles, multiple=true) %}
+  {% set raw = env.get(name, "") %}
+  {% set selected = raw.split(",") if raw else [] %}
+  <select name="{{ name }}"{% if multiple %} multiple size="4"{% endif %}>
+    {% if not multiple %}<option value="">(未選択)</option>{% endif %}
+    {% for r in roles %}
+      <option value="{{ r.id }}"{% if r.id in selected %} selected{% endif %}
+        {% if r.color %}style="color:#{{ '%06x' | format(r.color) }}"{% endif %}>● {{ r.name }}</option>
+    {% endfor %}
+  </select>
+{% endmacro %}
+
+{% block body %}
+<div class="wrap">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span>Support Bot</div>
+    <nav class="nav">
+      <a href="/dashboard">📋 サーバー一覧</a>
+      <a href="#" class="active">⚙️ {{ guild_name }}</a>
+      <div style="margin-left:24px;padding-left:8px;border-left:2px solid var(--line);margin-top:6px">
+        <a href="/guild/{{ guild_id }}/setup" class="active">設定</a>
+        <a href="/guild/{{ guild_id }}/status">稼働状況・ログ</a>
+      </div>
+      <div class="section-label">アカウント</div>
+      <a href="#" style="color:var(--muted)">👤 {{ session.username }}</a>
+      <a href="/logout" style="color:var(--muted)">🚪 ログアウト</a>
+    </nav>
+  </aside>
+  <main class="main">
+    <h1>⚙️ {{ guild_name }} の設定</h1>
+    <p class="subtitle">機能ごとに ON/OFF・チャンネル・ロール・メッセージ文面を編集できます。保存すると BOT が自動で再起動して反映されます(約 5 秒)。</p>
+
+    {% if request.query_params.get("saved") %}
+      <div class="flash ok">✓ 設定を保存しました。BOT は数秒で再起動して反映されます。</div>
+    {% endif %}
+
+    {% if not discord_ok %}
+      <div class="callout">
+        ⚠️ <b>初回セットアップ:</b> まず下の「Discord BOT トークン」を入力して保存してください。トークンが入ると、チャンネル一覧やロール一覧が Discord から自動取得されてプルダウンに表示されます。<br>
+        トークン発行先: <a href="https://discord.com/developers/applications" target="_blank" style="color:var(--cyan)">Discord Developer Portal</a> → アプリ作成 → Bot → Reset Token
+      </div>
+    {% endif %}
+
+    <form method="post" action="/guild/{{ guild_id }}/save" enctype="multipart/form-data">
+
+      {# ============ API KEYS ============ #}
+      <h2>🔑 API キー <span class="help">トークン類は暗号化されたフォームでサーバー側に保存されます</span></h2>
+      <div class="card">
+        <div class="help-box">
+          <div class="h"><span class="ico">💡</span>キーの取得先</div>
+          <b>Discord BOT トークン:</b> <a href="https://discord.com/developers/applications" target="_blank">Discord Developer Portal</a> → Bot →
+          <b>DeepL:</b> <a href="https://www.deepl.com/pro-api" target="_blank">deepl.com/pro-api</a> →
+          <b>Anthropic:</b> <a href="https://console.anthropic.com/" target="_blank">console.anthropic.com</a>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Discord BOT トークン<span class="req">*</span></label>
+            <input type="password" name="DISCORD_TOKEN_SUPPORT" value="{{ env.get('DISCORD_TOKEN_SUPPORT','') }}" autocomplete="off">
+            <div class="hint">BOT 本体の認証。これを入れて保存すると、下のチャンネル/ロール一覧が自動取得されます。</div>
+          </div>
+          <div class="field">
+            <label>DeepL API キー</label>
+            <input type="password" name="DEEPL_API_KEY" value="{{ env.get('DEEPL_API_KEY','') }}" autocomplete="off">
+            <div class="hint">翻訳に使用。Free / Pro どちらでも可。空欄なら Anthropic にフォールバック。</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Anthropic API キー</label>
+            <input type="password" name="ANTHROPIC_API_KEY" value="{{ env.get('ANTHROPIC_API_KEY','') }}" autocomplete="off">
+            <div class="hint">意図判定機能および翻訳のフォールバックに使用。</div>
+          </div>
+          <div class="field">
+            <label>Anthropic モデル</label>
+            <input type="text" name="ANTHROPIC_MODEL" value="{{ env.get('ANTHROPIC_MODEL','claude-haiku-4-5') }}">
+            <div class="hint">既定: claude-haiku-4-5</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Guild ID (固定)</label>
+            <input type="text" name="GUILD_ID" value="{{ guild_id }}" readonly>
+          </div>
+          <div class="field">
+            <label>月間予算 (USD)</label>
+            <input type="number" name="MONTHLY_BUDGET_USD" value="{{ env.get('MONTHLY_BUDGET_USD','10') }}" step="0.1" min="0">
+            <div class="hint">この金額を超えたら自動翻訳が一時停止します。</div>
+          </div>
+        </div>
+      </div>
+
+      {% if discord_ok %}
+
+      {# ============ TRANSLATION ============ #}
+      <h2>🌐 自動翻訳</h2>
+      <p class="section-desc">指定したチャンネルでの英語・日本語の発言を BOT が自動翻訳して返信します。</p>
+      <div class="card">
+        <div class="row">
+          <div class="field">
+            <label>翻訳対象チャンネル (複数可)</label>
+            {{ channel_select("TRANSLATE_CHANNEL_IDS", env, channels_grouped, multiple=true) }}
+            <div class="hint">Cmd/Ctrl クリックで複数選択。</div>
+          </div>
+          <div class="field">
+            <label>チケットカテゴリ全体を翻訳対象に</label>
+            {{ category_select("TICKET_CATEGORY_IDS", env, channels_grouped, multiple=true) }}
+            <div class="hint">配下の動的に作られるチケット ch も自動対象。</div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>翻訳プロバイダ</label>
+            <select name="TRANSLATE_PROVIDER">
+              {% set p = env.get('TRANSLATE_PROVIDER','deepl') %}
+              <option value="deepl"{% if p=='deepl' %} selected{% endif %}>DeepL (推奨)</option>
+              <option value="claude"{% if p=='claude' %} selected{% endif %}>Anthropic Claude</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>既定の翻訳方向</label>
+            <select name="TRANSLATE_DEFAULT_MODE">
+              {% set m = env.get('TRANSLATE_DEFAULT_MODE','both') %}
+              <option value="both"{% if m=='both' %} selected{% endif %}>双方向 (EN↔JP)</option>
+              <option value="en2ja"{% if m=='en2ja' %} selected{% endif %}>英 → 日 のみ</option>
+              <option value="ja2en"{% if m=='ja2en' %} selected{% endif %}>日 → 英 のみ</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {# ============ TICKETS ============ #}
+      <h2>🎫 チケット (個別チャット)</h2>
+      <p class="section-desc">お客様が「Open ticket」ボタンを押すと、自分専用のプライベートチャンネルが自動作成されます。</p>
+      <div class="card">
+        <div class="row">
+          <div class="field">
+            <label>チケット親カテゴリ</label>
+            {{ category_select("TICKET_CATEGORY_ID", env, channels_grouped) }}
+            <div class="hint">新規チケット ch はここの配下に作成されます。</div>
+          </div>
+          <div class="field">
+            <label>パネル文中で言及するチャンネル</label>
+            {{ channel_select("CARD_GAME_CHANNEL_ID", env, channels_grouped, placeholder="(言及しない)") }}
+            <div class="hint">「#card-game で気になるカードを見つけたら…」誘導文に使用。</div>
+          </div>
+        </div>
+        <div class="field">
+          <label>運営スタッフロール (チケット閲覧可)</label>
+          {{ role_select("TICKET_STAFF_ROLE_IDS", env, roles, multiple=true) }}
+          <div class="hint">これらのロール保有者だけがチケット ch を見られます。</div>
+        </div>
+        <div class="field">
+          <label>UI 言語の固定</label>
+          <select name="FORCE_UI_LANG_TICKET">
+            {% set t = env.get('FORCE_UI_LANG_TICKET','en') %}
+            <option value="en"{% if t=='en' %} selected{% endif %}>英語に固定 (推奨)</option>
+            <option value="ja"{% if t=='ja' %} selected{% endif %}>日本語に固定</option>
+            <option value=""{% if not t %} selected{% endif %}>ユーザー言語に従う</option>
+          </select>
+        </div>
+      </div>
+
+      {# ============ WELCOME ============ #}
+      <h2>🎊 Welcome メッセージ</h2>
+      <p class="section-desc">新しい人がサーバーに入った瞬間に、welcome チャンネルへ歓迎メッセージを自動投稿。招待元も同時に表示されます。</p>
+      <div class="card">
+        <div class="row">
+          <div class="field">
+            <label>Welcome 投稿先チャンネル</label>
+            {{ channel_select("WELCOME_CHANNEL_ID", env, channels_grouped) }}
+          </div>
+          <div class="field">
+            <label>入室時に自動付与するロール</label>
+            {{ role_select("WELCOME_AUTOROLE_IDS", env, roles, multiple=true) }}
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>タイトル</label>
+            <input type="text" name="WELCOME_TITLE" value="{{ env.get('WELCOME_TITLE','🎊 Welcome to the server!') }}">
+          </div>
+          <div class="field">
+            <label>左バーの色 (16進)</label>
+            <input type="text" name="WELCOME_COLOR" value="{{ env.get('WELCOME_COLOR','0x57F287') }}">
+          </div>
+        </div>
+        <div class="field">
+          <label>本文テンプレート</label>
+          <textarea name="WELCOME_DESCRIPTION" rows="5">{{ env.get('WELCOME_DESCRIPTION','') }}</textarea>
+          <div class="hint">
+            使えるプレースホルダ:
+            <span class="chip">{user_mention}</span><span class="chip">{user_name}</span><span class="chip">{guild_name}</span><span class="chip">{member_count}</span><span class="chip">{rules}</span><span class="chip">{intro}</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>ルール案内 ch</label>
+            {{ channel_select("WELCOME_RULES_CHANNEL_ID", env, channels_grouped) }}
+          </div>
+          <div class="field">
+            <label>自己紹介 ch</label>
+            {{ channel_select("WELCOME_INTRO_CHANNEL_ID", env, channels_grouped) }}
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>バナー画像 URL</label>
+            <input type="url" name="WELCOME_BANNER_URL" value="{{ env.get('WELCOME_BANNER_URL','') }}">
+            <div class="hint">embed の下に表示される大きな画像。</div>
+          </div>
+          <div class="field">
+            <label>サムネ画像 URL (任意)</label>
+            <input type="url" name="WELCOME_THUMBNAIL_URL" value="{{ env.get('WELCOME_THUMBNAIL_URL','') }}">
+            <div class="hint">空欄ならユーザーアイコンが使われます。</div>
+          </div>
+        </div>
+      </div>
+
+      {# ============ SUGGESTER ============ #}
+      <h2>🤖 自動アドバイス (意図判定)</h2>
+      <p class="section-desc">指定 ch での発言を AI が分類して、商品問合せ/配送相談には誘導文を自動 reply します。</p>
+      <div class="card">
+        <div class="row">
+          <div class="field">
+            <label>監視対象チャンネル</label>
+            {{ channel_select("COMMUNITY_CHANNEL_ID", env, channels_grouped) }}
+          </div>
+          <div class="field">
+            <label>判定信頼度の最小値</label>
+            <input type="number" name="SUGGEST_MIN_CONFIDENCE" value="{{ env.get('SUGGEST_MIN_CONFIDENCE','0.70') }}" step="0.05" min="0.5" max="1">
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>商品問合せの誘導先</label>
+            {{ channel_select("PRODUCT_INQUIRY_CHANNEL_ID", env, channels_grouped) }}
+          </div>
+          <div class="field">
+            <label>配送相談の誘導先</label>
+            {{ channel_select("SHIPPING_GUIDE_CHANNEL_ID", env, channels_grouped) }}
+          </div>
+        </div>
+        <details>
+          <summary>📝 誘導テキストを編集する (日英 2 言語)</summary>
+          <div class="row" style="margin-top:10px">
+            <div class="field">
+              <label>商品問合せ → 日本語</label>
+              <textarea name="PRODUCT_ADVICE_TEXT" rows="3">{{ env.get('PRODUCT_ADVICE_TEXT','') }}</textarea>
+            </div>
+            <div class="field">
+              <label>商品問合せ → 英語</label>
+              <textarea name="PRODUCT_ADVICE_TEXT_EN" rows="3">{{ env.get('PRODUCT_ADVICE_TEXT_EN','') }}</textarea>
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label>配送相談 → 日本語</label>
+              <textarea name="SHIPPING_ADVICE_TEXT" rows="3">{{ env.get('SHIPPING_ADVICE_TEXT','') }}</textarea>
+            </div>
+            <div class="field">
+              <label>配送相談 → 英語</label>
+              <textarea name="SHIPPING_ADVICE_TEXT_EN" rows="3">{{ env.get('SHIPPING_ADVICE_TEXT_EN','') }}</textarea>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      {# ============ SHIPPING ============ #}
+      <h2>📦 送料計算</h2>
+      <p class="section-desc">お客様が <code>/shipping</code> で送料を確認できます。Google Sheets「比較表US基準」から DHL/FedEx の安い方を自動選択。</p>
+      <div class="card">
+        <div class="help-box">
+          <div class="h"><span class="ico">📋</span>送料表スプレッドシートの繋ぎ方</div>
+          <b>① 共有設定 →</b> プラットフォーム所有のサービスアカウントを <b>Editor</b> で追加 →
+          <b>② URL を貼り付け</b> →
+          <b>③ 保存</b>
+          <div class="hint" style="margin-top:6px;color:#a3d4ff">サービスアカウントのメアドは管理者から共有されます。.env の <code>GOOGLE_SERVICE_ACCOUNT_JSON</code> は Railway 側で一括設定済み(個別アップロード不要)。</div>
+        </div>
+        <div class="field">
+          <label>送料表スプレッドシートの URL or ID</label>
+          <input type="text" name="SHIPPING_SHEET_ID" value="{{ env.get('SHIPPING_SHEET_ID','') }}" placeholder="https://docs.google.com/spreadsheets/d/.../edit">
+          <div class="hint">URL でも ID でも可。URL を貼ると自動で ID を抽出します。</div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>対象シート名</label>
+            <input type="text" name="SHIPPING_SHEET_NAME" value="{{ env.get('SHIPPING_SHEET_NAME','比較表US基準') }}">
+          </div>
+          <div class="field">
+            <label>梱包材重量 (g)</label>
+            <input type="number" name="PACKAGING_WEIGHT_G" value="{{ env.get('PACKAGING_WEIGHT_G','1000') }}">
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>実行を許可するチャンネル</label>
+            {{ channel_select("ALLOW_CH_SHIPPING", env, channels_grouped, multiple=true) }}
+          </div>
+          <div class="field">
+            <label>許可するカテゴリ全体</label>
+            {{ category_select("ALLOW_CAT_SHIPPING", env, channels_grouped, multiple=true) }}
+            <div class="hint">配下の動的チケット ch 全部で許可。</div>
+          </div>
+        </div>
+      </div>
+
+      {# ============ GIVEAWAY ============ #}
+      <h2>🎉 Giveaway (抽選)</h2>
+      <p class="section-desc">時間指定の参加ボタン式抽選。</p>
+      <div class="card">
+        <div class="row">
+          <div class="field">
+            <label>抽選を実施できるチャンネル</label>
+            {{ channel_select("ALLOW_CH_GIVEAWAY", env, channels_grouped, multiple=true) }}
+          </div>
+          <div class="field">
+            <label>抽選を管理できるロール</label>
+            {{ role_select("GIVEAWAY_MANAGER_ROLE_IDS", env, roles, multiple=true) }}
+            <div class="hint">これらの保有者は admin 権限なしで /giveaway を操作できます。</div>
+          </div>
+        </div>
+      </div>
+
+      {# ============ INVITE ============ #}
+      <h2>🚪 招待トラッキング</h2>
+      <p class="section-desc">入室時にどの招待コードで来たかを自動判定し、Welcome embed と運営ログに記録します。</p>
+      <div class="card">
+        <div class="row">
+          <div class="field">
+            <label>判定ログの送信先</label>
+            {{ channel_select("INVITE_LOG_CHANNEL_ID", env, channels_grouped, placeholder="(MODERATOR_CHANNEL_ID にフォールバック)") }}
+          </div>
+          <div class="field">
+            <label>/invite create が使える ch</label>
+            {{ channel_select("ALLOW_CH_INVITE", env, channels_grouped, multiple=true) }}
+          </div>
+        </div>
+        <div class="field">
+          <label>/invite create が使えるロール</label>
+          {{ role_select("INVITE_CREATOR_ROLE_IDS", env, roles, multiple=true) }}
+          <div class="hint">空欄なら admin 限定。ここに入れたロールの人は招待リンクを発行できます。</div>
+        </div>
+        <div class="field">
+          <label>運営通知の送信先 (moderator-only)</label>
+          {{ channel_select("MODERATOR_CHANNEL_ID", env, channels_grouped) }}
+        </div>
+      </div>
+
+      {% endif %}{# discord_ok #}
+
+      <div class="sticky-save">
+        <button type="submit" class="btn green">💾 保存して BOT を再起動</button>
+        <a href="/guild/{{ guild_id }}/status" class="btn outline">📊 稼働状況・ログを見る</a>
+        <span style="margin-left:auto;color:var(--muted);font-size:12px">
+          BOT: {% if bot_running %}<span style="color:var(--green)">● 稼働中</span>{% else %}<span style="color:var(--red)">○ 停止中</span>{% endif %}
+        </span>
+      </div>
+    </form>
+  </main>
+</div>
+{% endblock %}

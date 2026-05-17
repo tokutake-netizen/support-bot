@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}{{ guild_name }} の稼働状況 — Support Bot{% endblock %}
+{% block body %}
+<div class="wrap">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span>Support Bot</div>
+    <nav class="nav">
+      <a href="/dashboard">📋 サーバー一覧</a>
+      <a href="#" class="active">⚙️ {{ guild_name }}</a>
+      <div style="margin-left:24px;padding-left:8px;border-left:2px solid var(--line);margin-top:6px">
+        <a href="/guild/{{ guild_id }}/setup">設定</a>
+        <a href="/guild/{{ guild_id }}/status" class="active">稼働状況・ログ</a>
+      </div>
+      <div class="section-label">アカウント</div>
+      <a href="#" style="color:var(--muted)">👤 {{ session.username }}</a>
+      <a href="/logout" style="color:var(--muted)">🚪 ログアウト</a>
+    </nav>
+  </aside>
+  <main class="main">
+    <h1>稼働状況・ログ</h1>
+    <p class="subtitle">BOT プロセスの状態を確認できます。問題がある場合は下のログから原因を特定できます。</p>
+
+    <div class="card" style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+      <div>
+        <h3>プロセス状態</h3>
+        {% if status.running %}
+          <div style="font-size:18px;font-weight:600;color:var(--green)">● 稼働中</div>
+          <div style="color:var(--muted);font-size:12px">PID: {{ status.pid }}</div>
+        {% else %}
+          <div style="font-size:18px;font-weight:600;color:var(--red)">○ 停止中</div>
+        {% endif %}
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <form method="post" action="/guild/{{ guild_id }}/start" style="display:inline">
+          <button class="btn green" {% if status.running %}disabled style="opacity:.5"{% endif %}>▶ 起動</button>
+        </form>
+        <form method="post" action="/guild/{{ guild_id }}/restart" style="display:inline">
+          <button class="btn outline">↻ 再起動</button>
+        </form>
+        <form method="post" action="/guild/{{ guild_id }}/stop" style="display:inline">
+          <button class="btn red" {% if not status.running %}disabled style="opacity:.5"{% endif %}>■ 停止</button>
+        </form>
+      </div>
+    </div>
+
+    <h2>📡 ログ (直近 200 行) <a href="/guild/{{ guild_id }}/log.txt?lines=2000" target="_blank" style="font-size:12px;font-weight:400;margin-left:auto">全文ダウンロード</a></h2>
+    <div class="card" style="padding:0;border:none">
+      <pre class="log" id="log">{{ log_tail }}</pre>
+    </div>
+
+    <p style="color:var(--muted);font-size:12px;text-align:right">
+      <a href="javascript:location.reload()">↻ 更新</a> · 自動更新は 10 秒ごと
+    </p>
+  </main>
+</div>
+<script>
+  // Auto-refresh log every 10s
+  setInterval(async () => {
+    try {
+      const r = await fetch("/guild/{{ guild_id }}/log.txt?lines=200");
+      if(r.ok) document.getElementById('log').textContent = await r.text();
+    } catch(e){}
+  }, 10000);
+</script>
+{% endblock %}
