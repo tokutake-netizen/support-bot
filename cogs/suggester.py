@@ -86,6 +86,29 @@ class SuggesterCog(commands.Cog):
         except Exception:
             return "ja"
 
+    def _related_faq_hint(self, label: str, is_en: bool) -> str:
+        """Look up FAQs tagged with the intent label and produce a short hint line.
+
+        Returns empty string when no FAQs match — so the existing advice text
+        stays untouched in fresh deployments. Tag convention:
+          - product_inquiry → FAQs tagged `product`
+          - shipping_inquiry → FAQs tagged `shipping`
+        Admins control participation just by tagging their FAQ entries.
+        """
+        tag = "product" if label == "product_inquiry" else "shipping"
+        try:
+            from cogs.faq import find_faqs_by_tag
+        except ImportError:
+            return ""
+        slugs = find_faqs_by_tag(tag, limit=3)
+        if not slugs:
+            return ""
+        # 短く控えめに。slug を inline code で並べるだけ。
+        slug_list = ", ".join(f"`{s}`" for s in slugs)
+        if is_en:
+            return f"💡 You might also find answers via `/faq`: {slug_list}"
+        return f"💡 `/faq` でも答えが見つかるかも： {slug_list}"
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
         if not self.enabled or message.author.bot or not message.guild:
@@ -127,8 +150,14 @@ class SuggesterCog(commands.Cog):
         else:
             advice = self.shipping_advice_en if is_en else self.shipping_advice_ja
 
+        # 関連 FAQ があれば末尾に1行だけ添える（介入最小化の範囲内：誘導のみ）
+        faq_hint = self._related_faq_hint(label, is_en)
+
         ai_note = t("suggester.ai_note", "en" if is_en else "ja")
-        body = f"{message.author.mention} {advice}\n_{ai_note} (confidence {confidence:.2f})_"
+        body = f"{message.author.mention} {advice}"
+        if faq_hint:
+            body += f"\n{faq_hint}"
+        body += f"\n_{ai_note} (confidence {confidence:.2f})_"
 
         try:
             await message.reply(

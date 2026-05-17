@@ -99,8 +99,9 @@ def require_session(session_cookie: Optional[str]) -> dict:
 
 
 def require_admin_for_guild(sess: dict, guild_id: str) -> dict:
+    # Session stores admin-only guilds; presence == admin.
     for g in sess.get("guilds", []):
-        if str(g["id"]) == str(guild_id) and g.get("admin"):
+        if str(g["id"]) == str(guild_id):
             return g
     raise HTTPException(status_code=403, detail="not an admin of that guild")
 
@@ -153,14 +154,17 @@ async def oauth_callback(
     access_token = token["access_token"]
     user = await auth.fetch_user(access_token)
     raw_guilds = await auth.fetch_user_guilds(access_token)
+    # Only keep admin guilds — non-admin ones aren't actionable and bloat the
+    # session cookie past the 4 KB browser limit when the user belongs to
+    # many servers, causing the cookie to be silently dropped and the login
+    # to loop back through /oauth/start. id+name only for the same reason.
     guilds = [
-        {"id": g["id"], "name": g["name"], "icon": g.get("icon"), "admin": auth.is_admin(g)}
-        for g in raw_guilds
+        {"id": g["id"], "name": g["name"]}
+        for g in raw_guilds if auth.is_admin(g)
     ]
     sess = {
         "user_id": user["id"],
         "username": user.get("global_name") or user.get("username"),
-        "avatar": user.get("avatar"),
         "guilds": guilds,
     }
     resp = RedirectResponse("/dashboard")
@@ -181,7 +185,7 @@ async def dashboard(request: Request, session: Optional[str] = Cookie(None)):
     sess = get_session(session)
     if not sess:
         return RedirectResponse("/login")
-    admin_guilds = [g for g in sess.get("guilds", []) if g.get("admin")]
+    admin_guilds = list(sess.get("guilds", []))
     # Annotate with bot running status
     for g in admin_guilds:
         g["bot_running"] = bot_manager.is_running(str(g["id"]))

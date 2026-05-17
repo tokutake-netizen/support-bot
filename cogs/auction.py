@@ -528,7 +528,36 @@ class AuctionCog(commands.Cog):
 
         if hi and reserve_met:
             await self._open_deal_channel(auction, hi)
+        elif hi and not reserve_met:
+            # Host への follow-up DM: 最高入札者を伝えて、オフライン交渉の足がかりにする。
+            # 公開 embed では top bidder を伏せているので、ここだけで Host に開示。
+            await self._dm_host_reserve_not_met(auction, hi, reserve)
         return hi
+
+    async def _dm_host_reserve_not_met(self, auction: dict, hi: dict, reserve: int) -> None:
+        guild_id = auction.get("guild_id")
+        guild = self.bot.get_guild(int(guild_id)) if guild_id else None
+        if guild is None:
+            return
+        host = guild.get_member(int(auction["host_id"]))
+        if host is None:
+            try:
+                host = await guild.fetch_member(int(auction["host_id"]))
+            except discord.HTTPException:
+                return
+        body = (
+            f"🔒 **Auction closed — reserve not met**\n"
+            f"・Item: **{auction.get('title')}**\n"
+            f"・Top bid: **{_fmt_money(int(hi['amount']))}** (reserve was {_fmt_money(int(reserve))})\n"
+            f"・Top bidder: <@{hi['user_id']}>\n\n"
+            f"No deal channel was created. If you'd like to negotiate offline, "
+            f"you can DM the top bidder directly. Otherwise, consider relisting "
+            f"at a lower reserve."
+        )
+        try:
+            await host.send(body)
+        except discord.HTTPException:
+            log.info("auction: host DM (reserve not met) failed for %s", auction.get("host_id"))
 
     async def _open_deal_channel(self, auction: dict, hi: dict) -> None:
         guild_id = auction.get("guild_id")

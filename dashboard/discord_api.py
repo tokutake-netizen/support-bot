@@ -106,6 +106,38 @@ class DiscordREST:
             r.raise_for_status()
             return r.json()
 
+    # ---------- scheduled events ----------
+
+    async def list_scheduled_events(self, guild_id: int | str) -> list[dict]:
+        url = f"{DISCORD_API}/guilds/{guild_id}/scheduled-events"
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.get(url, headers=self._headers(), params={"with_user_count": "true"})
+            return r.json() if r.status_code == 200 else []
+
+    async def create_scheduled_event(self, guild_id: int | str, payload: dict) -> dict:
+        url = f"{DISCORD_API}/guilds/{guild_id}/scheduled-events"
+        hdr = {**self._headers(), "Content-Type": "application/json"}
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.post(url, headers=hdr, json=payload)
+            r.raise_for_status()
+            return r.json()
+
+    async def patch_scheduled_event(
+        self, guild_id: int | str, event_id: int | str, payload: dict
+    ) -> dict:
+        url = f"{DISCORD_API}/guilds/{guild_id}/scheduled-events/{event_id}"
+        hdr = {**self._headers(), "Content-Type": "application/json"}
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.patch(url, headers=hdr, json=payload)
+            r.raise_for_status()
+            return r.json()
+
+    async def delete_scheduled_event(self, guild_id: int | str, event_id: int | str) -> bool:
+        url = f"{DISCORD_API}/guilds/{guild_id}/scheduled-events/{event_id}"
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.delete(url, headers=self._headers())
+            return r.status_code in (204, 200)
+
 
 # Discord channel types we care about
 CH_TEXT = 0

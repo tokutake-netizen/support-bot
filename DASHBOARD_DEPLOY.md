@@ -7,13 +7,17 @@
 ダッシュボードは「ユーザーが Discord アカウントでログインして、自分が admin のサーバーを設定する」仕組みです。そのために OAuth 用の Discord アプリを 1 つ用意します(各サーバーの bot 本体とは別)。
 
 1. https://discord.com/developers/applications を開く → **New Application** で適当な名前(例: `Support Bot Dashboard`)で作成
-2. **OAuth2** タブ → **Client ID** と **Client Secret** をコピー(後で Railway に貼る)
-3. **OAuth2 → Redirects** に以下を追加:
-   - 開発用: `http://localhost:8000/oauth/callback`
-   - 本番用: `https://<your-railway-domain>/oauth/callback` ← Railway デプロイ後の URL を入れる
+2. 左メニュー **OAuth2** タブを開く
+3. **Client information** セクション:
+   - `CLIENT ID` をコピー
+   - 「Reset Secret」を押して **Client Secret** を生成 → コピー(一度しか表示されない)
+4. **Redirects** セクション → **Add Redirect** ボタン → 以下を貼り付け → 一番下の **Save Changes**:
+   - 本番(Railway): `https://<your-railway-domain>/oauth/callback`
+   - 開発(ローカル): `http://localhost:8000/oauth/callback`
 
-> **注:** ここで作るのは「ダッシュボードログイン用」のアプリ。
-> 各 Discord サーバーで動かす BOT 自体は別の Discord アプリで、ダッシュボードからトークンを入れて使います。
+> ⚠️ **`Save Changes` を押すまで効きません** — 緑色のバナーが下に出るので、それを押し忘れない。
+> ⚠️ URL は **完全一致**必要 — 末尾スラッシュなし、`http`/`https` も一致、ポート番号も一致。
+> ⚠️ ここで作るのは「ダッシュボードログイン用」のアプリ。各 Discord サーバーで動かす BOT 本体は別の Discord アプリで、ダッシュボードからトークンを入れて使います。
 
 ## 2. Railway へデプロイ
 
@@ -40,7 +44,9 @@
 
 4. **Settings → Networking → Generate Domain** で公開 URL を発行
 
-5. Step 1 の Discord アプリ → OAuth2 → Redirects に発行された URL の `/oauth/callback` を追加
+5. Step 1 の Discord アプリ → OAuth2 → Redirects に発行された URL の `/oauth/callback` を追加 → **Save Changes** を必ず押す
+   - 例: `https://support-bot-production-xxxx.up.railway.app/oauth/callback`
+   - これを忘れるとログイン時に「OAuth2 redirect_uri が無効です」エラー
 
 6. Railway の Variables の `DASHBOARD_BASE_URL` を実際の URL に更新 → 再デプロイ
 
@@ -60,7 +66,8 @@
 | 症状 | 対処 |
 |---|---|
 | `/healthz` が 200 を返さない | Railway のログを確認、`DASHBOARD_SECRET` が未設定の可能性 |
-| OAuth で redirect_uri mismatch | Discord アプリの Redirects に `DASHBOARD_BASE_URL/oauth/callback` を入れたか確認 |
+| 「OAuth2 redirect_uri が無効です」 | Discord アプリ → OAuth2 → Redirects に `<DASHBOARD_BASE_URL>/oauth/callback` を**完全一致**で追加 + **Save Changes** を押したか確認。末尾スラッシュなし、`https://` で `http` ではない |
+| OAuth で redirect_uri mismatch | 上に同じ。`DASHBOARD_BASE_URL` の env 値と Discord Redirects の URL がバイト単位で一致してるかチェック |
 | ログイン後にサーバー一覧が空 | 対象サーバーで「Administrator」権限を持っていますか? |
 | 「Discord 連携失敗」(チャンネル一覧が出ない) | BOT トークンを保存しましたか? BOT を対象サーバーに招待しましたか? |
 | 設定が再デプロイ後に消える | Volume を `/data` にマウントし、`DEPLOYMENTS_ROOT=/data/deployments` を設定したか確認 |

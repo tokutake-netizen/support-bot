@@ -320,6 +320,72 @@ WELCOME_DESCRIPTION=        # 本文テンプレ
 
 ---
 
+## L. FAQ `/faq` / `/faqadmin`
+
+JP/EN 両対応のナレッジベース。海外バイヤーの定型質問は `/faq` で自己解決。
+
+| コマンド | 説明 | 権限 |
+|---------|------|------|
+| `/faq show <slug>` | 該当 FAQ を ephemeral 返信。slug は autocomplete対応 | 全員 |
+| `/faq list` | 全 FAQ slug 列挙 | 全員 |
+| `/faqadmin add <slug> <ja> <en> [tags]` | 追加 or 更新 | Admin |
+| `/faqadmin remove <slug>` | 削除 | Admin |
+| `/faqadmin show <slug>` | 生データ確認（編集前確認用） | Admin |
+
+**特徴**
+- 言語自動切替: ユーザーの Discord locale が `ja*` なら日本語、それ以外は英語
+- autocomplete: slug 入力中に部分一致＋タグ一致で候補表示
+- データ: `deployments/<server>/data/faqs.json` に永続化
+- 改行は `\n` で記述可（保存時に実改行に変換）
+
+**例**
+```
+/faqadmin add slug:shipping ja:📦 送料は `/shipping` で…  en:📦 Estimate shipping with `/shipping`…  tags:shipping,送料,配送
+/faqadmin add slug:psa ja:PSA鑑定済み商品は…  en:All PSA-graded items are…  tags:psa,grading,鑑定
+/faq show slug:shipping
+```
+
+---
+
+## M. Safety nets `/safety`
+
+介入最小化を保ったまま3つの軽い防衛機構。**削除・キック・自動BANは一切しない**。
+
+| コマンド | 説明 | 権限 |
+|---------|------|------|
+| `/safety status` | 各機構のON/OFFと閾値を確認 | Admin |
+
+**自動動作**
+
+1. **新規アカウント警告** (`on_member_join`)
+   - 作成日 < `NEW_ACCOUNT_THRESHOLD_DAYS`（既定 7 日）の入室者を検知
+   - `MODERATOR_CHANNEL_ID` に黄色 Embed で通知（メンバー名・ID・アカウント年齢・アバター）
+   - **キックなし、自動アクションなし**。判断は人間
+   - 閾値を 0 にすると無効化
+
+2. **Audit ログミラー** (`on_audit_log_entry_create`)
+   - chチャンネル / ロール / メンバー（kick/ban/role-update）/ サーバー / 絵文字の変更を `MODERATOR_CHANNEL_ID` に転送
+   - bot 自身の操作は除外
+   - bot に **View Audit Log** 権限必要
+   - 既定: ON（`SAFETY_AUDIT_MIRROR=0` で OFF）
+
+3. **PII 検知 → DM** (`on_message`)
+   - クレジットカード番号（13〜19桁、Luhn検証パス）
+   - 日本マイナンバー（12桁 ＋ `マイナンバー` / `個人番号` / `my number` キーワード文脈）
+   - URL 内の数字は誤検知除外
+   - 検出時：投稿者本人に **DM で削除推奨**、チャンネルは触らない、運営にも通知しない
+   - 既定: **OFF**（`SAFETY_PII_ENABLED=1` で ON）
+
+**設定 env**
+```
+NEW_ACCOUNT_THRESHOLD_DAYS=7
+SAFETY_AUDIT_MIRROR=1
+SAFETY_PII_ENABLED=0
+MODERATOR_CHANNEL_ID=<必須>
+```
+
+---
+
 ## 共通事項
 
 ### 権限

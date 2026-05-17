@@ -1,0 +1,42 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# --- Logs ---
+*.log
+
+# --- Secrets / per-deployment state (volume-mounted at runtime, NOT baked in) ---
+.env
+.env.*
+!*.env.example
+deployments/*/.env
+deployments/*/.env.*
+!deployments/*/.env.example
+!deployments/template/.env.example
+deployments/*/credentials/*
+!deployments/*/credentials/.gitkeep
+deployments/*/data/*
+!deployments/*/data/.gitkeep
+deployments/*/*.log
+
+# --- Local artefacts (top-level only; dashboard/templates/*.html is kept) ---
+.git/
+.DS_Store
+.idea/
+.vscode/
+/commands_summary.html
+/server_clone_guide.html
+/dashboard_mock.html
+/manual.html
+/translator_mock.html
+SPECIFICATION.md
+COMMANDS.md
+DASHBOARD_DEPLOY.md
+SETUP.md
+README.md
+translate_requirements.md
+discordbot.md

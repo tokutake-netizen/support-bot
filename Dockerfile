@@ -6,14 +6,17 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source (deployments/ is mounted as volume per-server)
+# Copy source
 COPY main.py run.sh ./
 COPY cogs ./cogs
 COPY services ./services
+COPY dashboard ./dashboard
 COPY i18n ./i18n
-COPY data ./data
 COPY scripts ./scripts
+# Seed default deployments scaffolding (template) so the dashboard has the .env.example.
+COPY deployments ./deployments
 
-# /data is the per-deployment mount point
-WORKDIR /data
-CMD ["python3", "/app/main.py", "--env-dir", "/data"]
+# Default to running the dashboard. Railway can override via railway.json startCommand.
+ENV PYTHONUNBUFFERED=1
+EXPOSE 8000
+CMD ["sh", "-c", "uvicorn dashboard.app:app --host 0.0.0.0 --port ${PORT:-8000}"]
