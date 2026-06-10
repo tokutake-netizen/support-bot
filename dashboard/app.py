@@ -34,7 +34,16 @@ from itsdangerous import BadSignature, URLSafeSerializer
 import random
 from datetime import datetime, timezone
 
-from . import auth, bot_manager, config_store, giveaway_helpers as gh
+from . import (
+    auth,
+    bot_manager,
+    config_store,
+    giveaway_helpers as gh,
+    auction_helpers as ah,
+    users as user_store,
+    mailer,
+    server_template,
+)
 from .discord_api import DiscordREST, assignable_roles, channels_grouped
 
 # Reach into the bot-side cmd_queue helper too.
@@ -104,11 +113,20 @@ def require_session(session_cookie: Optional[str]) -> dict:
 
 
 def require_admin_for_guild(sess: dict, guild_id: str) -> dict:
-    # Session stores admin-only guilds; presence == admin.
+    # Email-auth users with allowed=True get blanket access to any guild
+    # that has a deployment dir on the volume — same as a Discord admin.
+    if sess.get("auth_method") == "email":
+        return {"id": guild_id, "name": guild_id}
+    # Discord auth: session stores admin-only guilds; presence == admin.
     for g in sess.get("guilds", []):
         if str(g["id"]) == str(guild_id):
             return g
     raise HTTPException(status_code=403, detail="not an admin of that guild")
+
+
+def require_root(sess: dict) -> None:
+    if not sess.get("is_root"):
+        raise HTTPException(status_code=403, detail="root admin only")
 
 
 # -------------------------- routes --------------------------
@@ -179,11 +197,186 @@ async def oauth_callback(
     return resp
 
 
+@app.get("/register", response_class=HTMLResponse)
+async def register_form(request: Request):
+    return templates.TemplateResponse("register.html", {"request": request})
+
+
+@app.post("/register")
+async def register_submit(email: str = Form(...)):
+    try:
+        user_store.request_access(email)
+    except ValueError as e:
+        return RedirectResponse(f"/register?err={e}", status_code=303)
+    return RedirectResponse("/register?ok=1", status_code=303)
+
+
+@app.get("/forgot", response_class=HTMLResponse)
+async def forgot_form(request: Request):
+    return templates.TemplateResponse("forgot.html", {"request": request})
+
+
+@app.post("/forgot")
+async def forgot_submit(email: str = Form(...)):
+    base = os.environ.get("DASHBOARD_BASE_URL", "").rstrip("/")
+    login_url = f"{base}/login" if base else "/login"
+    new_pw = user_store.regenerate_password(email)
+    if new_pw is None:
+        # Always say "if the email exists, we sent it" so we don't leak who's registered.
+        return RedirectResponse("/forgot?ok=1", status_code=303)
+    if mailer.smtp_configured():
+        subject, body = mailer.render_reset_email(email, new_pw, login_url)
+        ok, msg = mailer.send(email, subject, body)
+        if ok:
+            return RedirectResponse("/forgot?ok=1", status_code=303)
+        log.warning("forgot: email send failed: %s", msg)
+    return RedirectResponse("/forgot?ok=1", status_code=303)
+
+
+@app.post("/auth/login")
+async def auth_login(
+    email: str = Form(...),
+    password: str = Form(...),
+):
+    """Email + password authentication, runs alongside Discord OAuth.
+    Allowed users (or env-bootstrapped root admin) get a session cookie
+    with auth_method="email" and access to every configured guild.
+    """
+    user = user_store.authenticate(email, password)
+    if not user:
+        return RedirectResponse("/login?err=auth", status_code=303)
+
+    # For email users, populate the visible guild list from disk so the
+    # dashboard.html iteration works the same way as Discord-auth.
+    guilds = []
+    bot_token = os.environ.get("DISCORD_TOKEN_DEFAULT")
+    for gid in config_store.list_deployments():
+        name = gid  # placeholder; we don't fetch from Discord here to keep login fast
+        env_vals = config_store.read_env(gid)
+        tok = env_vals.get("DISCORD_TOKEN_SUPPORT") or bot_token
+        if tok:
+            try:
+                rest = DiscordREST(tok)
+                info = await rest.get_guild(gid)
+                if info and info.get("name"):
+                    name = info["name"]
+            except Exception:
+                pass
+        guilds.append({"id": gid, "name": name, "icon": None})
+
+    sess = {
+        "auth_method": "email",
+        "username": user["email"],
+        "user_id": user["email"],
+        "is_root": user.get("is_root", False),
+        "guilds": guilds,
+    }
+    resp = RedirectResponse("/dashboard")
+    set_session(resp, sess)
+    return resp
+
+
 @app.get("/logout")
 async def logout():
     resp = RedirectResponse("/login")
     resp.delete_cookie("session")
     return resp
+
+
+# -------------------------- admin: user allowlist --------------------------
+
+@app.get("/admin/users", response_class=HTMLResponse)
+async def admin_users(request: Request, session: Optional[str] = Cookie(None)):
+    sess = require_session(session)
+    require_root(sess)
+    return templates.TemplateResponse(
+        "admin_users.html",
+        {
+            "request": request,
+            "session": sess,
+            "users": user_store.list_users(),
+        },
+    )
+
+
+@app.post("/admin/users/add")
+async def admin_users_add(
+    email: str = Form(...),
+    password: str = Form(...),
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_root(sess)
+    try:
+        user_store.add_user(email, password, added_by=sess.get("username") or "root")
+    except ValueError as e:
+        return RedirectResponse(f"/admin/users?err={e}", status_code=303)
+    return RedirectResponse("/admin/users?added=1", status_code=303)
+
+
+@app.post("/admin/users/remove")
+async def admin_users_remove(
+    email: str = Form(...),
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_root(sess)
+    user_store.remove_user(email)
+    return RedirectResponse("/admin/users?removed=1", status_code=303)
+
+
+@app.post("/admin/users/approve")
+async def admin_users_approve(
+    email: str = Form(...),
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_root(sess)
+    try:
+        user_rec, password = user_store.approve_user(email, approved_by=sess.get("username") or "root")
+    except ValueError as e:
+        return RedirectResponse(f"/admin/users?err={e}", status_code=303)
+    base = os.environ.get("DASHBOARD_BASE_URL", "").rstrip("/")
+    login_url = f"{base}/login" if base else "/login"
+    if mailer.smtp_configured():
+        subject, body = mailer.render_approval_email(user_rec["email"], password, login_url)
+        ok, msg = mailer.send(user_rec["email"], subject, body)
+        if not ok:
+            # Fall back to showing the password on the admin screen so the
+            # admin can deliver it manually.
+            return RedirectResponse(
+                f"/admin/users?approved={email}&password={password}&mail_err={msg}",
+                status_code=303,
+            )
+        return RedirectResponse(f"/admin/users?approved={email}&mailed=1", status_code=303)
+    # SMTP not configured — surface the password so admin can hand it over manually
+    return RedirectResponse(
+        f"/admin/users?approved={email}&password={password}&mail_err=smtp_not_configured",
+        status_code=303,
+    )
+
+
+@app.post("/admin/users/reject")
+async def admin_users_reject(
+    email: str = Form(...),
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_root(sess)
+    user_store.reject_user(email)
+    return RedirectResponse("/admin/users?rejected=1", status_code=303)
+
+
+@app.post("/admin/users/toggle")
+async def admin_users_toggle(
+    email: str = Form(...),
+    allowed: str = Form(...),
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_root(sess)
+    user_store.set_allowed(email, allowed.lower() in ("1", "true", "on", "yes"))
+    return RedirectResponse("/admin/users?toggled=1", status_code=303)
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -219,6 +412,16 @@ async def guild_setup(
     config_store.ensure_deployment(guild_id)
     env_vals = config_store.read_env(guild_id)
     bot_token = _bot_token_for(guild_id)
+    # Surface the auto-fetched fuel surcharge cache so the Shipping tab can
+    # show "last fetched" alongside the manual override fields.
+    fuel_cache: dict = {}
+    fuel_path = config_store.deployment_dir(guild_id) / "data" / "fuel_surcharge.json"
+    if fuel_path.exists():
+        try:
+            import json
+            fuel_cache = json.loads(fuel_path.read_text("utf-8"))
+        except Exception:
+            fuel_cache = {}
 
     channels: list = []
     grouped: list = []
@@ -249,6 +452,7 @@ async def guild_setup(
             "roles": roles,
             "discord_ok": discord_ok,
             "bot_running": bot_manager.is_running(guild_id),
+            "fuel_cache": fuel_cache,
         },
     )
 
@@ -388,6 +592,16 @@ async def guild_status_page(
         channels_groups = channels_grouped(chs)
     base_dir = config_store.deployment_dir(guild_id)
     recent_cmds = cmd_queue.recent(limit=15, base_dir=base_dir)
+    # Surface the bot-side fuel surcharge cache so the status page UI knows
+    # the auto-fetched values + when they were last fetched.
+    fuel_cache: dict = {}
+    fuel_path = base_dir / "data" / "fuel_surcharge.json"
+    if fuel_path.exists():
+        try:
+            import json
+            fuel_cache = json.loads(fuel_path.read_text("utf-8"))
+        except Exception:
+            fuel_cache = {}
     return templates.TemplateResponse(
         "status.html",
         {
@@ -403,6 +617,7 @@ async def guild_status_page(
             "channels_grouped": channels_groups,
             "recent_cmds": recent_cmds,
             "allowed_actions": sorted(cmd_queue.ALLOWED_ACTIONS),
+            "fuel_cache": fuel_cache,
         },
     )
 
@@ -416,6 +631,57 @@ async def guild_log(
     sess = require_session(session)
     require_admin_for_guild(sess, guild_id)
     return Response(bot_manager.tail_log(guild_id, lines=lines), media_type="text/plain")
+
+
+# -------------------------- server template --------------------------
+
+@app.post("/guild/{guild_id}/template/export")
+async def template_export(
+    request: Request,
+    guild_id: str,
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    bot_token = _bot_token_for(guild_id)
+    if not bot_token:
+        raise HTTPException(status_code=400, detail="BOT token not configured")
+    env_vals = config_store.read_env(guild_id)
+    ticket_cat = env_vals.get("TICKET_CATEGORY_ID") or None
+    snap = await server_template.snapshot_guild(bot_token, guild_id, ticket_category_id=ticket_cat)
+    server_template.save_template(snap)
+    return RedirectResponse(
+        f"/guild/{guild_id}/setup"
+        f"?template_exported=1"
+        f"&template_cats={len(snap['categories'])}"
+        f"&template_chs={sum(len(c['channels']) for c in snap['categories']) + len(snap['orphan_channels'])}",
+        status_code=303,
+    )
+
+
+@app.post("/guild/{guild_id}/template/apply")
+async def template_apply(
+    guild_id: str,
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    bot_token = _bot_token_for(guild_id)
+    if not bot_token:
+        raise HTTPException(status_code=400, detail="BOT token not configured")
+    template = server_template.load_template()
+    if not template:
+        raise HTTPException(status_code=400, detail="no template saved yet — export from a source guild first")
+    summary = await server_template.apply_template(bot_token, guild_id, template)
+    import urllib.parse as _u
+    return RedirectResponse(
+        f"/guild/{guild_id}/setup?template_applied=1"
+        f"&created_cats={len(summary['created_categories'])}"
+        f"&created_chs={len(summary['created_channels'])}"
+        f"&skipped={len(summary['skipped_categories']) + len(summary['skipped_channels'])}"
+        f"&errors={_u.quote(' / '.join(summary['errors'][:3]))}",
+        status_code=303,
+    )
 
 
 # -------------------------- command queue --------------------------
@@ -433,10 +699,16 @@ async def guild_cmd(
     if not action:
         raise HTTPException(status_code=400, detail="action required")
     params: dict = {}
-    for k in ("channel_id",):  # forwarded params
+    # Forward known optional params to the bot-side handler. New whitelist
+    # entries here when a new action needs more parameters.
+    for k in ("channel_id", "user_id"):
         v = form.get(k)
         if v:
             params[k] = v
+    # The admin's own user id is useful for "test post" style actions so
+    # the embed renders against a real member. Default to session user.
+    if "user_id" not in params:
+        params["user_id"] = str(sess.get("user_id") or "")
     base_dir = config_store.deployment_dir(guild_id)
     try:
         cmd_queue.enqueue(action, params, base_dir=base_dir)
@@ -600,6 +872,92 @@ async def giveaway_create(
 
     gh.add_giveaway(guild_id, msg["id"], gw)
     return RedirectResponse(f"/guild/{guild_id}/giveaway?created={msg['id']}", status_code=303)
+
+
+@app.post("/guild/{guild_id}/auction/create")
+async def auction_create(
+    request: Request,
+    guild_id: str,
+    session: Optional[str] = Cookie(None),
+    title: str = Form(...),
+    starting_bid: int = Form(...),
+    duration: str = Form(...),
+    channel_id: str = Form(...),
+    description: Optional[str] = Form(None),
+    reserve_price: int = Form(0),
+    min_increment: int = Form(100),
+    anti_snipe_window: int = Form(300),
+    anti_snipe_extend: int = Form(30),
+    image_url: Optional[str] = Form(None),
+    image: Optional[UploadFile] = File(None),
+):
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+
+    secs = ah.parse_duration(duration)
+    if secs is None or secs < 60:
+        raise HTTPException(status_code=400, detail="duration must be >= 1m, e.g. 12h / 1d")
+    if starting_bid < 1 or min_increment < 1:
+        raise HTTPException(status_code=400, detail="starting_bid and min_increment must be positive")
+    if reserve_price and reserve_price < starting_bid:
+        raise HTTPException(status_code=400, detail="reserve_price must be >= starting_bid (or 0)")
+
+    bot_token = _bot_token_for(guild_id)
+    if not bot_token:
+        raise HTTPException(status_code=400, detail="BOT token not configured")
+
+    image_bytes: Optional[bytes] = None
+    image_filename: Optional[str] = None
+    resolved_image_url: Optional[str] = None
+    if image is not None and image.filename:
+        image_bytes = await image.read()
+        if image_bytes:
+            image_filename = image.filename
+    elif image_url:
+        resolved_image_url = image_url.strip() or None
+
+    auction = {
+        "guild_id": int(guild_id),
+        "channel_id": int(channel_id),
+        "thread_id": None,
+        "title": title,
+        "description": (description or "").strip(),
+        "image_url": resolved_image_url,
+        "image_filename": image_filename,
+        "host_id": int(sess["user_id"]),
+        "starting_bid": int(starting_bid),
+        "min_increment": int(min_increment),
+        "reserve_price": int(reserve_price),
+        "currency": "JPY",
+        "ends_at": ah.future_iso(secs),
+        "anti_snipe_threshold": int(anti_snipe_window),
+        "anti_snipe_seconds": int(anti_snipe_extend),
+        "bids": [],
+        "ended": False,
+        "cancelled": False,
+        "winner": None,
+        "winning_bid": 0,
+    }
+
+    rest = DiscordREST(bot_token)
+    payload = {"embeds": [ah.build_embed(auction)], "components": ah.view_components()}
+    try:
+        msg = await rest.create_message(
+            channel_id, payload,
+            image_bytes=image_bytes, image_filename=image_filename,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Discord create_message failed: {e}")
+
+    # Swap placeholder attachment:// for the real CDN URL Discord returned
+    if image_bytes and msg.get("attachments"):
+        auction["image_url"] = msg["attachments"][0].get("url")
+        auction["image_filename"] = None  # CDN URL takes over; future re-renders use image_url
+
+    ah.add_auction(guild_id, msg["id"], auction)
+    return RedirectResponse(
+        f"/guild/{guild_id}/setup?auction_created={msg['id']}#tab-auction", status_code=303
+    )
 
 
 @app.post("/guild/{guild_id}/giveaway/{message_id}/end")

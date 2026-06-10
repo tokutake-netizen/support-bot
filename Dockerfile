@@ -1,10 +1,18 @@
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
+# Pinned to Debian 12 (bookworm). Trixie removed the font packages
+# Playwright's --with-deps installer asks for (ttf-ubuntu-font-family,
+# ttf-unifont), causing chromium install to fail with exit 100.
 
 WORKDIR /app
 
 # Install dependencies
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Install Chromium for Playwright (used by services/fuel_surcharge.py to
+# scrape DHL's JS-rendered surcharge page). --with-deps pulls in the
+# system libraries chromium needs (apt-get under the hood).
+RUN playwright install --with-deps chromium
 
 # Copy source
 COPY main.py run.sh ./

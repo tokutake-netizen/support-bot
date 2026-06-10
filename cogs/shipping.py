@@ -26,6 +26,69 @@ from services.country_search import Country, CountryRegistry
 from services.i18n import get_ui_lang, normalize_locale, t
 from services.sheets_client import SheetsClient
 
+
+# -------------------- fuel surcharge --------------------
+#
+# DHL / FedEx publish a monthly fuel surcharge (燃油サーチャージ) that we
+# need to add on top of the base rate from the spreadsheet. The Shipping
+# tab in the dashboard surfaces both as % fields.
+#
+# Lookup is by carrier name as it appears in the spreadsheet's "安い方"
+# column ("DHL" / "FedEx" / "DHL/FedEx" depending on the row). Unknown
+# carriers fall through to 0%.
+
+def _extra_surcharge_pct() -> float:
+    """A global add-on percentage applied on top of any carrier's fuel
+    surcharge. Used as an operator markup / safety buffer.
+    """
+    try:
+        return float(os.getenv("SHIPPING_EXTRA_SURCHARGE_PCT", "0") or 0)
+    except ValueError:
+        return 0.0
+
+
+def _carrier_fuel_pct(carrier: str) -> float:
+    """The fuel-surcharge-only portion (cache → manual env), no extra."""
+    if not carrier:
+        return 0.0
+    c = carrier.upper()
+    cache_key = "DHL" if "DHL" in c else ("FEDEX" if ("FEDEX" in c or "FED EX" in c) else None)
+    if cache_key:
+        try:
+            from services import fuel_surcharge as _fs
+            cached = _fs.get_cached_pct(cache_key)
+            if cached is not None:
+                return cached
+        except Exception:
+            pass
+    try:
+        if "DHL" in c:
+            return float(os.getenv("SHIPPING_DHL_FUEL_SURCHARGE_PCT", "0") or 0)
+        if "FEDEX" in c or "FED EX" in c:
+            return float(os.getenv("SHIPPING_FEDEX_FUEL_SURCHARGE_PCT", "0") or 0)
+    except ValueError:
+        return 0.0
+    return 0.0
+
+
+def _carrier_surcharge_pct(carrier: str) -> float:
+    """Effective total %% applied on top of base = fuel + extra.
+
+    Lookup order:
+      1. Auto-fetch cache (services.fuel_surcharge weekly task)
+      2. Env override (dashboard manual input)
+      3. + SHIPPING_EXTRA_SURCHARGE_PCT (operator markup, always added)
+    """
+    return _carrier_fuel_pct(carrier) + _extra_surcharge_pct()
+
+
+def _apply_fuel_surcharge(price_jpy: int, carrier: str) -> int:
+    """Multiply the sheet rate by (1 + pct/100). Rounded to the nearest yen."""
+    pct = _carrier_surcharge_pct(carrier)
+    if not pct:
+        return int(price_jpy)
+    return int(round(price_jpy * (1.0 + pct / 100.0)))
+
 log = logging.getLogger(__name__)
 
 PRODUCTS_PATH = Path(__file__).parent.parent / "data" / "products.json"
@@ -585,7 +648,10 @@ class ShippingView(discord.ui.View):
                     "content": f"{t('shipping.err_no_match', lang)} ({block_header} / {box_kg}kg)",
                     "view": self,
                 }
-            return self._format_single(rate, items_g, pkg_g, total_g, box_kg)
+            return self._format_single(
+                rate, items_g, pkg_g, total_g, box_kg,
+                price=_apply_fuel_surcharge(rate.price_jpy, rate.carrier),
+            )
 
         # split shipping
         n_boxes = math.ceil(items_g / per_box_net_g)
@@ -605,16 +671,19 @@ class ShippingView(discord.ui.View):
                     "view": self,
                 }
             carriers.append(rate.carrier)
-            prices.append(rate.price_jpy)
+            prices.append(_apply_fuel_surcharge(rate.price_jpy, rate.carrier))
             brackets.append(box_kg)
 
         return self._format_split(boxes_g, brackets, carriers, prices, items_g, pkg_g)
 
     def _format_single(
-        self, rate, items_g: int, pkg_g: int, total_g: int, bracket_kg: float
+        self, rate, items_g: int, pkg_g: int, total_g: int, bracket_kg: float,
+        price: Optional[int] = None,
     ) -> dict:
         lang = self.state.lang
         st = self.state
+        if price is None:
+            price = rate.price_jpy
         lines = [f"**{t('shipping.panel_result_title', lang)}**", "```"]
         lines.append(f"{t('shipping.items_label', lang)}:")
         for it in st.items:
@@ -628,7 +697,21 @@ class ShippingView(discord.ui.View):
         lines.append("")
         lines.append(f"  {t('shipping.destination', lang)} : {st.country.display(lang)}")
         lines.append(f"  {t('shipping.carrier', lang)}      : {rate.carrier}  {t('shipping.carrier_note', lang)}")
-        lines.append(f"  {t('shipping.price', lang)}         : ¥{rate.price_jpy:,}{t('shipping.currency_suffix', lang)}")
+        lines.append(f"  {t('shipping.price', lang)}         : ¥{price:,}{t('shipping.currency_suffix', lang)}")
+        # If a fuel surcharge was applied, surface the rate so the customer
+        # can see the breakdown rather than wondering why it doesn't match
+        # the sheet.
+        fuel_pct = _carrier_fuel_pct(rate.carrier)
+        extra_pct = _extra_surcharge_pct()
+        total_pct = fuel_pct + extra_pct
+        if total_pct:
+            base = rate.price_jpy
+            lines.append(f"    ・{t('shipping.bracket', lang)} base : ¥{base:,}")
+            if fuel_pct:
+                lines.append(f"    ・燃油サーチャージ {rate.carrier} {fuel_pct:.2f}%")
+            if extra_pct:
+                lines.append(f"    ・追加サーチャージ {extra_pct:.2f}%")
+            lines.append(f"    ・合計 +{total_pct:.2f}% : +¥{price - base:,}")
         lines.append("```")
         ts = datetime.now().strftime("%Y-%m-%d %H:%M JST")
         lines.append(t("shipping.footer_source", lang, ts=ts))
@@ -671,6 +754,17 @@ class ShippingView(discord.ui.View):
         lines.append(f"  {t('shipping.destination', lang)} : {st.country.display(lang)}")
         total_price = sum(prices)
         lines.append(f"  {t('shipping.price', lang)} (total): ¥{total_price:,}{t('shipping.currency_suffix', lang)}")
+        # Surcharge breakdown when applicable. List the active rate per carrier
+        # so the customer can reconcile against the sheet's raw value.
+        dhl_pct = _carrier_surcharge_pct("DHL")
+        fed_pct = _carrier_surcharge_pct("FedEx")
+        if dhl_pct and any("DHL" in (c or "").upper() for c in carriers):
+            lines.append(f"    ・燃油サーチャージ DHL +{_carrier_fuel_pct('DHL'):.2f}% 適用済")
+        if fed_pct and any("FEDEX" in (c or "").upper() for c in carriers):
+            lines.append(f"    ・燃油サーチャージ FedEx +{_carrier_fuel_pct('FedEx'):.2f}% 適用済")
+        extra_pct = _extra_surcharge_pct()
+        if extra_pct:
+            lines.append(f"    ・追加サーチャージ +{extra_pct:.2f}% 適用済")
         lines.append("```")
         ts = datetime.now().strftime("%Y-%m-%d %H:%M JST")
         lines.append(t("shipping.footer_source", lang, ts=ts))

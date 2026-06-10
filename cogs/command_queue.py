@@ -95,6 +95,8 @@ class CommandQueueCog(commands.Cog):
 
         if action == "ticket_panel":
             return await self._do_ticket_panel(params)
+        if action == "welcome_test":
+            return await self._do_welcome_test(params)
         if action == "digest_now":
             return await self._do_digest(force_post=True)
         if action == "digest_preview":
@@ -103,6 +105,8 @@ class CommandQueueCog(commands.Cog):
             return await self._do_backup()
         if action == "tree_sync":
             return await self._do_tree_sync()
+        if action == "fuel_surcharge_refresh":
+            return await self._do_fuel_surcharge_refresh()
         return f"unknown action: {action}"
 
     # ------------- handlers -------------
@@ -129,6 +133,40 @@ class CommandQueueCog(commands.Cog):
             view = None
         msg = await ch.send(embed=embed, view=view)
         return f"posted ticket panel as message {msg.id} in #{ch.name}"
+
+    async def _do_welcome_test(self, params: dict) -> str:
+        channel_id = params.get("channel_id")
+        user_id = params.get("user_id")
+        if not channel_id:
+            return "channel_id required"
+        ch = self.bot.get_channel(int(channel_id))
+        if not isinstance(ch, discord.TextChannel):
+            return f"channel {channel_id} not a text channel"
+
+        # Pick a member to render the embed for. Prefer the admin who clicked,
+        # else fall back to the guild owner so we always have a real Member.
+        member = None
+        if user_id and ch.guild:
+            try:
+                member = ch.guild.get_member(int(user_id)) or await ch.guild.fetch_member(int(user_id))
+            except Exception:
+                member = None
+        if member is None and ch.guild:
+            member = ch.guild.owner
+        if member is None:
+            return "no member available to render welcome embed"
+
+        # Build the embed via the welcome cog's helper, but post to the
+        # chosen channel directly so the test doesn't end up in the real
+        # WELCOME_CHANNEL_ID by accident.
+        from cogs.welcome import _build_embed  # late import to avoid cycle
+        embed = _build_embed(member)
+        await ch.send(
+            content=member.mention,
+            embed=embed,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+        return f"posted test welcome for {member} in #{ch.name}"
 
     async def _do_digest(self, force_post: bool) -> str:
         cog = self.bot.get_cog("DigestCog")
@@ -158,6 +196,25 @@ class CommandQueueCog(commands.Cog):
         for guild in self.bot.guilds:
             await cog._post_backup(guild, datetime.now(JST))
         return f"backup posted for {len(self.bot.guilds)} guild(s)"
+
+    async def _do_fuel_surcharge_refresh(self) -> str:
+        from services import fuel_surcharge
+        status = await fuel_surcharge.refresh_all()
+        parts = []
+        for carrier, info in status.items():
+            if info.get("ok"):
+                parts.append(f"{carrier}={info['pct']:.1f}%")
+            else:
+                parts.append(f"{carrier}=FAIL (kept={info.get('kept')})")
+        # Also post to the moderator-only channel so the audit trail matches
+        # the weekly auto-run.
+        cog = self.bot.get_cog("FuelSurchargeCog")
+        if cog is not None and hasattr(cog, "_post_status"):
+            try:
+                await cog._post_status(status)
+            except Exception:
+                log.exception("fuel_surcharge moderator broadcast failed")
+        return " ・ ".join(parts) or "no change"
 
     async def _do_tree_sync(self) -> str:
         guild_id = os.getenv("GUILD_ID")

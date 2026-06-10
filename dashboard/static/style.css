@@ -95,3 +95,4 @@ optgroup{font-weight:600;color:var(--muted)}
 .tab.active{color:#fff;border-bottom-color:var(--accent)}
 .tab-panel{display:none}
 .tab-panel.active{display:block}
+.tab-save-bar{margin:18px 0 8px;text-align:right;border-top:1px solid var(--line);padding-top:14px}

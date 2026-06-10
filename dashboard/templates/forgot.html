@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}パスワード再発行 — Support Bot{% endblock %}
+{% block body %}
+<div class="login">
+  <div class="login-card">
+    <div class="logo">🔑</div>
+    <h1>パスワード再発行</h1>
+    <p>登録済みのメールアドレスを入力すると、新しいパスワードがメールで届きます。</p>
+
+    {% if request.query_params.get("ok") %}
+      <div class="flash ok">✓ 入力されたアドレスが登録済みであれば、メールが届きます(数分以内)。届かない場合は迷惑メールも確認してください。</div>
+    {% endif %}
+
+    <form method="post" action="/forgot" style="text-align:left">
+      <div class="field">
+        <label style="text-align:left">📧 メールアドレス</label>
+        <input type="email" name="email" required autocomplete="email">
+      </div>
+      <button type="submit" class="btn green" style="width:100%">パスワードを再発行</button>
+    </form>
+
+    <p style="font-size:12px;margin-top:24px;margin-bottom:0">
+      <a href="/login">← ログイン画面に戻る</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

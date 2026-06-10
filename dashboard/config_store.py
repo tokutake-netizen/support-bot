@@ -45,6 +45,37 @@ def ensure_deployment(guild_id: str) -> Path:
     return d
 
 
+def _encode_value(v: str) -> str:
+    """Escape characters that would break a single .env line.
+
+    .env is line-oriented, so embedded newlines need to be encoded.
+    We use the conventional `\\n` (literal backslash-n) form. Backslashes
+    are doubled first so a user-typed literal `\\n` round-trips correctly.
+    """
+    return v.replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "")
+
+
+def _decode_value(v: str) -> str:
+    """Reverse of _encode_value. Cogs reading multiline env values should
+    apply the same decode (see decode_multiline)."""
+    out = []
+    i = 0
+    while i < len(v):
+        if v[i] == "\\" and i + 1 < len(v):
+            nxt = v[i + 1]
+            if nxt == "n":
+                out.append("\n")
+                i += 2
+                continue
+            if nxt == "\\":
+                out.append("\\")
+                i += 2
+                continue
+        out.append(v[i])
+        i += 1
+    return "".join(out)
+
+
 def read_env(guild_id: str) -> dict[str, str]:
     env_path = deployment_dir(guild_id) / ".env"
     if not env_path.exists():
@@ -55,7 +86,7 @@ def read_env(guild_id: str) -> dict[str, str]:
         if not s or s.startswith("#") or "=" not in s:
             continue
         k, _, v = s.partition("=")
-        out[k.strip()] = v.strip()
+        out[k.strip()] = _decode_value(v.strip())
     return out
 
 
@@ -80,14 +111,14 @@ def write_env(guild_id: str, updates: dict[str, str]) -> None:
         if s and not s.startswith("#") and "=" in s:
             key = s.split("=", 1)[0].strip()
             if key in updates:
-                lines_out.append(f"{key}={updates[key]}")
+                lines_out.append(f"{key}={_encode_value(updates[key])}")
                 continue
         lines_out.append(line)
 
     # Append new keys
     for k, v in updates.items():
         if k not in existing_keys:
-            lines_out.append(f"{k}={v}")
+            lines_out.append(f"{k}={_encode_value(v)}")
 
     env_path.write_text("\n".join(lines_out) + "\n", "utf-8")
 

@@ -6,8 +6,11 @@
     <div class="brand"><span class="dot"></span>Support Bot</div>
     <nav class="nav">
       <a href="/dashboard" class="active">📋 サーバー一覧</a>
+      {% if session.is_root %}
+        <a href="/admin/users">👥 ユーザー管理</a>
+      {% endif %}
       <div class="section-label">アカウント</div>
-      <a href="#" style="color:var(--muted)">👤 {{ session.username }}</a>
+      <a href="#" style="color:var(--muted)">👤 {{ session.username }}{% if session.is_root %} (root){% endif %}</a>
       <a href="/logout" style="color:var(--muted)">🚪 ログアウト</a>
     </nav>
   </aside>

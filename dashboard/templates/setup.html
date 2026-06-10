@@ -54,7 +54,7 @@
       <div style="margin-left:24px;padding-left:8px;border-left:2px solid var(--line);margin-top:6px">
         <a href="/guild/{{ guild_id }}/setup" class="active">設定</a>
         <a href="/guild/{{ guild_id }}/status">稼働状況・ログ</a>
-        <a href="/guild/{{ guild_id }}/giveaway">🎉 Giveaway</a>
+        <a href="/guild/{{ guild_id }}/giveaway">🎉 Giveaway 作成・運用</a>
         <a href="/guild/{{ guild_id }}/onboarding">🚪 オンボーディング</a>
       </div>
       <div class="section-label">アカウント</div>
@@ -64,10 +64,10 @@
   </aside>
   <main class="main">
     <h1>⚙️ {{ guild_name }} の設定</h1>
-    <p class="subtitle">機能ごとに ON/OFF・チャンネル・ロール・メッセージ文面を編集できます。保存すると BOT が自動で再起動して反映されます(約 5 秒)。</p>
+    <p class="subtitle">機能ごとに ON/OFF・チャンネル・ロール・メッセージ文面を編集できます。保存すると BOT に自動反映されます(数秒)。</p>
 
     {% if request.query_params.get("saved") %}
-      <div class="flash ok">✓ 設定を保存しました。BOT は数秒で再起動して反映されます。</div>
+      <div class="flash ok">✓ 変更を保存しました。数秒で反映されます。</div>
     {% endif %}
     {% if request.query_params.get("auth") == "ok" %}
       <div class="flash ok">✅ <b>Discord 認証成功</b> — BOT トークンが有効で、対象サーバーにアクセスできました。</div>
@@ -84,6 +84,31 @@
       </div>
     {% endif %}
 
+    {# template flash messages #}
+    {% if request.query_params.get("template_exported") %}
+      <div class="flash ok">✓ サーバー構成をテンプレートとして保存しました(カテゴリ {{ request.query_params.get("template_cats") }} 個 / チャンネル {{ request.query_params.get("template_chs") }} 個 ・ 個別チケットは除外)</div>
+    {% endif %}
+    {% if request.query_params.get("template_applied") %}
+      <div class="flash ok">✓ テンプレートを適用 — 作成: カテゴリ {{ request.query_params.get("created_cats") }} / チャンネル {{ request.query_params.get("created_chs") }} ・ 既存スキップ: {{ request.query_params.get("skipped") }}{% if request.query_params.get("errors") %} <br>⚠️ 一部エラー: {{ request.query_params.get("errors") }}{% endif %}</div>
+    {% endif %}
+
+    <h2>🗂️ サーバー構成テンプレート <span class="help">カテゴリ + チャンネル(個別チケット除く)</span></h2>
+    <div class="card">
+      <p class="section-desc">
+        現在のサーバーをテンプレートとして保存して、別サーバーに同期できます。
+        個別チケット ch(<code>TICKET_CATEGORY_ID</code> 配下の動的 ch)は除外、親カテゴリは保持。
+      </p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <form method="post" action="/guild/{{ guild_id }}/template/export" style="display:inline">
+          <button type="submit" class="btn">📋 このサーバー構成をテンプレートとして保存</button>
+        </form>
+        <form method="post" action="/guild/{{ guild_id }}/template/apply" style="display:inline" onsubmit="return confirm('保存済みテンプレートをこのサーバーに適用します。既存の同名カテゴリ/チャンネルはスキップ。続けますか?')">
+          <button type="submit" class="btn outline">🔄 テンプレートを適用(同期)</button>
+        </form>
+        <span style="color:var(--muted);font-size:12px">テンプレートは 1 つだけ保存(上書き)、Volume 永続</span>
+      </div>
+    </div>
+
     <form method="post" action="/guild/{{ guild_id }}/save" enctype="multipart/form-data">
 
       <nav class="tabs">
@@ -93,7 +118,6 @@
         <a href="#tab-welcome" class="tab" data-tab="welcome">🎊 Welcome</a>
         <a href="#tab-suggester" class="tab" data-tab="suggester">🤖 意図判定</a>
         <a href="#tab-shipping" class="tab" data-tab="shipping">📦 送料</a>
-        <a href="#tab-giveaway" class="tab" data-tab="giveaway">🎉 Giveaway</a>
         <a href="#tab-auction" class="tab" data-tab="auction">🏛️ Auction</a>
         <a href="#tab-invite" class="tab" data-tab="invite">🚪 招待</a>
       </nav>
@@ -145,6 +169,9 @@
         </div>
       </div>
 
+      <div class="tab-save-bar">
+        <button type="submit" class="btn green">💾 変更を保存</button>
+      </div>
       </div>{# /tab-api #}
 
       {% if discord_ok %}
@@ -187,6 +214,9 @@
         </div>
       </div>
 
+      <div class="tab-save-bar">
+        <button type="submit" class="btn green">💾 変更を保存</button>
+      </div>
       </div>{# /tab-translation #}
 
       <div class="tab-panel" id="tab-ticket">
@@ -222,6 +252,54 @@
         </div>
       </div>
 
+      <div class="card">
+        <h3 style="color:#fff;font-size:14px;margin-bottom:6px">📤 チケットパネルを投稿</h3>
+        <p class="section-desc">「🎫 Open ticket」ボタン付き embed を、選んだチャンネルに即時投稿します。Discord で <code>/ticket panel</code> を打つ代わりに、ここからワンクリックで設置可能。</p>
+        <div style="display:flex;gap:8px;align-items:flex-end">
+          <div class="field" style="flex:1;margin-bottom:0">
+            <label>投稿先チャンネル</label>
+            <select id="ticket-panel-channel-select">
+              <option value="">(選択してください)</option>
+              {% for cat, chs in channels_grouped %}
+                {% if cat %}<optgroup label="📂 {{ cat.name }}">{% endif %}
+                {% for c in chs %}
+                  <option value="{{ c.id }}"># {{ c.name }}</option>
+                {% endfor %}
+                {% if cat %}</optgroup>{% endif %}
+              {% endfor %}
+            </select>
+          </div>
+          <button type="button" id="post-ticket-panel-btn" class="btn green">📤 パネルを投稿</button>
+        </div>
+        <div class="hint" style="margin-top:8px">⚠️ このボタンは <b>フォーム全体の保存はしません</b>。設定を変えた場合は先に「💾 変更を保存」を押してから投稿してください。</div>
+        <div id="post-ticket-panel-result" style="margin-top:8px;font-size:13px"></div>
+      </div>
+      <script>
+        document.getElementById('post-ticket-panel-btn').addEventListener('click', async function(){
+          const sel = document.getElementById('ticket-panel-channel-select');
+          const chId = sel.value;
+          const out = document.getElementById('post-ticket-panel-result');
+          if(!chId){ out.innerHTML = '<span style="color:var(--red)">⚠️ チャンネルを選択してください</span>'; return; }
+          out.innerHTML = '<span style="color:var(--muted)">送信中…</span>';
+          const fd = new FormData();
+          fd.append('action', 'ticket_panel');
+          fd.append('channel_id', chId);
+          try {
+            const r = await fetch('/guild/{{ guild_id }}/cmd', {method:'POST', body:fd, credentials:'same-origin', redirect:'manual'});
+            if(r.type === 'opaqueredirect' || r.ok || r.status === 303){
+              out.innerHTML = '<span style="color:var(--green)">✅ キューに送信。BOT が 5 秒以内にチャンネルに投稿します。</span>';
+            } else {
+              out.innerHTML = '<span style="color:var(--red)">⚠️ 失敗 (HTTP '+r.status+')</span>';
+            }
+          } catch(e){
+            out.innerHTML = '<span style="color:var(--red)">⚠️ '+e+'</span>';
+          }
+        });
+      </script>
+
+      <div class="tab-save-bar">
+        <button type="submit" class="btn green">💾 変更を保存</button>
+      </div>
       </div>{# /tab-ticket #}
 
       <div class="tab-panel" id="tab-welcome">
@@ -281,6 +359,47 @@
         </div>
       </div>
 
+      <div class="card">
+        <h3 style="color:#fff;font-size:14px;margin-bottom:6px">📤 Welcome を投稿</h3>
+        <p class="section-desc">welcome embed を指定したチャンネルに今すぐ投稿します。デフォルトは上で設定した <code>Welcome 投稿先チャンネル</code>。新規メンバーが入室した時に自動で出る embed と同じものです(あなた自身を主役として描画)。</p>
+        <div style="display:flex;gap:8px;align-items:flex-end">
+          <div class="field" style="flex:1;margin-bottom:0">
+            <label>投稿先</label>
+            <select id="welcome-post-channel-select">
+              <option value="">(WELCOME_CHANNEL_ID にフォールバック)</option>
+              {% set welcome_default = env.get("WELCOME_CHANNEL_ID","") %}
+              {% for cat, chs in channels_grouped %}
+                {% if cat %}<optgroup label="📂 {{ cat.name }}">{% endif %}
+                {% for c in chs %}<option value="{{ c.id }}"{% if c.id == welcome_default %} selected{% endif %}># {{ c.name }}</option>{% endfor %}
+                {% if cat %}</optgroup>{% endif %}
+              {% endfor %}
+            </select>
+          </div>
+          <button type="button" id="welcome-post-btn" class="btn green">📤 Welcome を投稿</button>
+        </div>
+        <div id="welcome-post-result" style="margin-top:8px;font-size:13px"></div>
+      </div>
+      <script>
+        document.getElementById('welcome-post-btn').addEventListener('click', async function(){
+          const sel = document.getElementById('welcome-post-channel-select');
+          const out = document.getElementById('welcome-post-result');
+          if(!sel.value){ out.innerHTML='<span style="color:var(--red)">⚠️ チャンネルを選択してください</span>'; return; }
+          out.innerHTML='<span style="color:var(--muted)">送信中…</span>';
+          const fd = new FormData();
+          fd.append('action','welcome_test');
+          fd.append('channel_id', sel.value);
+          try {
+            const r = await fetch('/guild/{{ guild_id }}/cmd', {method:'POST', body:fd, credentials:'same-origin', redirect:'manual'});
+            out.innerHTML = (r.type==='opaqueredirect'||r.ok||r.status===303)
+              ? '<span style="color:var(--green)">✅ キュー送信完了。5 秒以内にチャンネルに投稿されます。</span>'
+              : '<span style="color:var(--red)">⚠️ 失敗 (HTTP '+r.status+')</span>';
+          } catch(e){ out.innerHTML='<span style="color:var(--red)">⚠️ '+e+'</span>'; }
+        });
+      </script>
+
+      <div class="tab-save-bar">
+        <button type="submit" class="btn green">💾 変更を保存</button>
+      </div>
       </div>{# /tab-welcome #}
 
       <div class="tab-panel" id="tab-suggester">
@@ -333,6 +452,9 @@
         </details>
       </div>
 
+      <div class="tab-save-bar">
+        <button type="submit" class="btn green">💾 変更を保存</button>
+      </div>
       </div>{# /tab-suggester #}
 
       <div class="tab-panel" id="tab-shipping">
@@ -373,29 +495,93 @@
             <div class="hint">配下の動的チケット ch 全部で許可。</div>
           </div>
         </div>
-      </div>
 
-      </div>{# /tab-shipping #}
+        <h3 style="color:#fff;font-size:13px;margin:20px 0 6px">⛽ 燃油サーチャージ (Fuel Surcharge)</h3>
+        <div class="help-box">
+          <div class="h"><span class="ico">💡</span>動作の優先順位</div>
+          ① <b>毎週月曜 04:00 JST</b> に FedEx 公式ページを自動取得 → 下のキャッシュに反映 → 自動値を優先利用<br>
+          ② 取得失敗時は前週値が残ったまま使われる<br>
+          ③ <b>DHL は手動入力モード</b>(SPA構造が頻繁に変わるため、ダッシュボードの DHL 手動 % を毎週更新してください)<br>
+          計算式: <code>最終料金 = base × (1 + pct/100)</code> ・ JPY 四捨五入
+        </div>
 
-      <div class="tab-panel" id="tab-giveaway">
-      {# ============ GIVEAWAY ============ #}
-      <h2>🎉 Giveaway (抽選)</h2>
-      <p class="section-desc">時間指定の参加ボタン式抽選。</p>
-      <div class="card">
+        {# ----- auto cache (read-only display) ----- #}
         <div class="row">
+          {% set fed_c = fuel_cache.get("FEDEX") %}
           <div class="field">
-            <label>抽選を実施できるチャンネル</label>
-            {{ channel_select("ALLOW_CH_GIVEAWAY", env, channels_grouped, multiple=true) }}
+            <label>📦 DHL <span style="color:var(--yellow);font-size:11px">手動モード</span></label>
+            <div style="padding:9px 10px;background:var(--bg3);border:1px solid var(--line);border-radius:6px;font-size:13px;color:var(--muted)">
+              下の「DHL 手動 %」が常に使われます
+            </div>
           </div>
           <div class="field">
-            <label>抽選を管理できるロール</label>
-            {{ role_select("GIVEAWAY_MANAGER_ROLE_IDS", env, roles, multiple=true) }}
-            <div class="hint">これらの保有者は admin 権限なしで /giveaway を操作できます。</div>
+            <label>📦 FedEx 自動取得値</label>
+            <div style="padding:9px 10px;background:var(--bg3);border:1px solid var(--line);border-radius:6px;font-size:13px">
+              {% if fed_c %}<span style="color:var(--green);font-weight:700">{{ '%.2f' % fed_c.pct }}%</span>
+                <span style="color:var(--muted);font-size:11px;margin-left:6px">最終取得: {% if fed_c.fetched_at %}<time>{{ fed_c.fetched_at | int }}</time>{% else %}—{% endif %} (source: {{ fed_c.source }})</span>
+              {% else %}<span style="color:var(--muted)">(まだ取得されていません)</span>{% endif %}
+            </div>
+          </div>
+        </div>
+        <div style="margin-bottom:14px">
+          <button type="button" id="fuel-refresh-btn" class="btn outline">🔄 今すぐ取得 (FedEx のみ自動)</button>
+          <span id="fuel-refresh-result" style="margin-left:8px;font-size:13px"></span>
+        </div>
+
+        {# ----- manual override ----- #}
+        <h4 style="color:var(--muted);font-size:12px;margin:14px 0 6px;text-transform:uppercase;letter-spacing:.6px;font-weight:600">手動オーバーライド (自動取得失敗時の保険)</h4>
+        <div class="row">
+          <div class="field">
+            <label>DHL 手動 %</label>
+            <input type="number" name="SHIPPING_DHL_FUEL_SURCHARGE_PCT" value="{{ env.get('SHIPPING_DHL_FUEL_SURCHARGE_PCT','0') }}" step="0.01" min="0">
+            <div class="hint">
+              <a href="https://mydhl.express.dhl/jp/ja/important-information/weekly-fuel-surcharge.html" target="_blank" style="color:var(--cyan)">DHL Japan Weekly Fuel Surcharge</a> 参照
+            </div>
+          </div>
+          <div class="field">
+            <label>FedEx 手動 %</label>
+            <input type="number" name="SHIPPING_FEDEX_FUEL_SURCHARGE_PCT" value="{{ env.get('SHIPPING_FEDEX_FUEL_SURCHARGE_PCT','0') }}" step="0.01" min="0">
+            <div class="hint">
+              <a href="https://www.fedex.com/ja-jp/shipping/surcharges.html" target="_blank" style="color:var(--cyan)">FedEx Japan</a> 参照
+            </div>
+          </div>
+        </div>
+
+        {# ----- arbitrary extra surcharge ----- #}
+        <h4 style="color:var(--muted);font-size:12px;margin:14px 0 6px;text-transform:uppercase;letter-spacing:.6px;font-weight:600">追加サーチャージ (任意の上乗せ)</h4>
+        <div class="row">
+          <div class="field">
+            <label>📈 追加サーチャージ (%)</label>
+            <input type="number" name="SHIPPING_EXTRA_SURCHARGE_PCT" value="{{ env.get('SHIPPING_EXTRA_SURCHARGE_PCT','0') }}" step="0.01" min="0">
+            <div class="hint">
+              全配送業者の燃油サーチャージに加算される追加 %(マージン / バッファ等)。<br>
+              例: 燃油 25.50% + 追加 5.00% = 合計 30.50% を base に乗算
+            </div>
           </div>
         </div>
       </div>
+      <script>
+        document.getElementById('fuel-refresh-btn').addEventListener('click', async function(){
+          const out = document.getElementById('fuel-refresh-result');
+          out.innerHTML='<span style="color:var(--muted)">取得中…(数秒)</span>';
+          const fd = new FormData();
+          fd.append('action','fuel_surcharge_refresh');
+          try {
+            const r = await fetch('/guild/{{ guild_id }}/cmd', {method:'POST', body:fd, credentials:'same-origin', redirect:'manual'});
+            if(r.type==='opaqueredirect'||r.ok||r.status===303){
+              out.innerHTML='<span style="color:var(--green)">✅ キュー送信完了。10 秒ほどでキャッシュ更新 → リロードで確認</span>';
+            } else {
+              out.innerHTML='<span style="color:var(--red)">⚠️ 失敗 (HTTP '+r.status+')</span>';
+            }
+          } catch(e){ out.innerHTML='<span style="color:var(--red)">⚠️ '+e+'</span>'; }
+        });
+      </script>
 
-      </div>{# /tab-giveaway #}
+      <div class="tab-save-bar">
+        <button type="submit" class="btn green">💾 変更を保存</button>
+      </div>
+      </div>{# /tab-shipping #}
+
 
       <div class="tab-panel" id="tab-auction">
       {# ============ AUCTION ============ #}
@@ -460,6 +646,165 @@
           ・通貨は JPY 固定。決済は bot 側で行わない(host が deal channel で個別調整)
         </div>
       </div>
+
+      <div class="card">
+        <h3 style="color:#fff;font-size:14px;margin-bottom:6px">🆕 Auction を作成 (画像つき + プレビュー)</h3>
+        <p class="section-desc">商品名・開始価格・期間・画像 を入力 → 右側のプレビューで見た目確認 → 「📤 投稿」で Discord に即時投稿。入札・終了・落札 channel 作成は BOT が自動。</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+          <div>
+            <div class="row">
+              <div class="field"><label>📦 商品名 <span class="req">*</span></label><input type="text" id="ac-title" placeholder="例: PSA 10 Charizard 1st Ed."></div>
+              <div class="field"><label>💴 開始価格 (JPY) <span class="req">*</span></label><input type="number" id="ac-start" placeholder="50000" min="1"></div>
+            </div>
+            <div class="row">
+              <div class="field"><label>⏱ 期間 <span class="req">*</span></label><input type="text" id="ac-duration" placeholder="1d / 12h / 6h30m"></div>
+              <div class="field"><label>📍 投稿先 ch <span class="req">*</span></label>
+                <select id="ac-channel">
+                  <option value="">(選択)</option>
+                  {% for cat, chs in channels_grouped %}
+                    {% if cat %}<optgroup label="📂 {{ cat.name }}">{% endif %}
+                    {% for c in chs %}<option value="{{ c.id }}"># {{ c.name }}</option>{% endfor %}
+                    {% if cat %}</optgroup>{% endif %}
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="row">
+              <div class="field"><label>🔒 最低落札価格 (任意)</label><input type="number" id="ac-reserve" value="0" min="0" step="100"><div class="hint">0=設定なし。未達なら落札なし。</div></div>
+              <div class="field"><label>📈 最低増分 (JPY)</label><input type="number" id="ac-minincr" value="{{ env.get('AUCTION_DEFAULT_MIN_INCREMENT','100') }}" min="1" step="100"></div>
+            </div>
+            <div class="row">
+              <div class="field"><label>🎨 画像 (ファイル)</label><input type="file" id="ac-image-file" accept="image/*"><div class="hint">推奨。Discord に永続保存。</div></div>
+              <div class="field"><label>🔗 または画像 URL</label><input type="url" id="ac-image-url" placeholder="https://..."></div>
+            </div>
+            <div class="field"><label>📝 商品説明 (任意)</label><textarea id="ac-desc" rows="3" placeholder="(任意) 状態・付属品・備考"></textarea></div>
+            <div style="display:flex;gap:8px;margin-top:6px">
+              <button type="button" id="ac-submit-btn" class="btn green">📤 オークションを投稿</button>
+              <button type="button" id="ac-preview-btn" class="btn outline">🔄 プレビュー更新</button>
+            </div>
+            <div id="ac-result" style="margin-top:8px;font-size:13px"></div>
+          </div>
+
+          <div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;font-weight:600">📺 プレビュー</div>
+            <div style="background:#313338;border:1px solid var(--line);border-radius:8px;padding:14px">
+              <div style="display:flex;gap:14px">
+                <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#5865f2,#7289da);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px">🎫</div>
+                <div style="flex:1">
+                  <div style="font-weight:600;color:#fff">Support Bot<span style="background:#5865f2;color:#fff;font-size:10px;padding:1px 5px;border-radius:3px;margin-left:6px;vertical-align:middle">BOT</span></div>
+                  <div style="border-left:4px solid #F0B232;background:#2b2d31;border-radius:4px;padding:10px 14px;margin-top:6px;max-width:520px">
+                    <div id="prev-title" style="font-weight:600;color:#fff;font-size:15px;margin-bottom:6px">🔨 AUCTION: (商品名)</div>
+                    <div id="prev-desc" style="color:#dbdee1;font-size:13px;white-space:pre-wrap;margin-bottom:8px"></div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px">
+                      <div><div style="color:var(--muted);font-size:11px">💰 Starting bid</div><div id="prev-start" style="color:#fff;font-weight:600">¥—</div></div>
+                      <div><div style="color:var(--muted);font-size:11px">👥 Bidders</div><div style="color:#fff;font-weight:600">0</div></div>
+                      <div><div style="color:var(--muted);font-size:11px">📈 Next bid</div><div id="prev-next" style="color:#fff;font-weight:600">¥—</div></div>
+                    </div>
+                    <div style="margin-top:8px;font-size:12px"><span style="color:var(--muted)">⏱ Ends</span> <span id="prev-ends" style="color:#fff">—</span></div>
+                    <div id="prev-reserve-row" style="margin-top:4px;font-size:12px;display:none"><span style="color:var(--muted)">🔒 Reserve</span> <span id="prev-reserve" style="color:#fff">¥0</span></div>
+                    <div id="prev-image-box" style="width:100%;height:140px;background:linear-gradient(135deg,#5865f2,#eb459e);border-radius:4px;margin-top:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600">🎨 画像 未指定</div>
+                  </div>
+                  <div style="display:flex;gap:8px;margin-top:8px">
+                    <div style="background:var(--accent);color:#fff;padding:6px 12px;border-radius:4px;font-size:13px;font-weight:500">💰 Place Bid</div>
+                    <div style="background:var(--bg3);color:#fff;padding:6px 12px;border-radius:4px;font-size:13px;font-weight:500">📜 Bid history</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <script>
+        (function(){
+          const $ = id => document.getElementById(id);
+          function fmt(n){ if(!n||n<1) return '¥—'; return '¥' + Number(n).toLocaleString('ja-JP'); }
+          function parseDur(s){
+            const m = (s||'').toLowerCase().match(/^\s*(?:(\d+)d)?\s*(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:(\d+)s)?\s*$/);
+            if(!m) return 0;
+            const [_, d,h,mi,sec] = m;
+            return (parseInt(d||0)*86400+parseInt(h||0)*3600+parseInt(mi||0)*60+parseInt(sec||0));
+          }
+          function refreshPreview(){
+            const title = $('ac-title').value.trim() || '(商品名)';
+            $('prev-title').textContent = '🔨 AUCTION: ' + title;
+            $('prev-desc').textContent = $('ac-desc').value.trim();
+            const start = parseInt($('ac-start').value||0);
+            const minIncr = parseInt($('ac-minincr').value||100);
+            $('prev-start').textContent = fmt(start);
+            // next = max(start+minIncr, ceil(start*1.05)) since no bids yet
+            const next = start ? Math.max(start, Math.ceil(start*1.05), start+minIncr) : 0;
+            $('prev-next').textContent = fmt(start || 0);  // before first bid, "Next bid" = starting_bid
+            const secs = parseDur($('ac-duration').value);
+            if(secs){
+              const at = new Date(Date.now() + secs*1000);
+              $('prev-ends').textContent = at.toLocaleString('ja-JP');
+            } else {
+              $('prev-ends').textContent = '—';
+            }
+            const reserve = parseInt($('ac-reserve').value||0);
+            if(reserve>0){ $('prev-reserve').textContent = fmt(reserve); $('prev-reserve-row').style.display='block'; }
+            else { $('prev-reserve-row').style.display='none'; }
+            // image preview
+            const file = $('ac-image-file').files[0];
+            const url = $('ac-image-url').value.trim();
+            const box = $('prev-image-box');
+            if(file){
+              const r = new FileReader();
+              r.onload = e => { box.style.background = 'url('+e.target.result+') center/contain no-repeat #1e1f22'; box.textContent=''; };
+              r.readAsDataURL(file);
+            } else if(url){
+              box.style.background = 'url('+url+') center/contain no-repeat #1e1f22'; box.textContent='';
+            } else {
+              box.style.background = 'linear-gradient(135deg,#5865f2,#eb459e)';
+              box.textContent = '🎨 画像 未指定';
+            }
+          }
+          ['ac-title','ac-desc','ac-start','ac-duration','ac-reserve','ac-minincr','ac-image-url'].forEach(id=>{
+            $(id).addEventListener('input', refreshPreview);
+          });
+          $('ac-image-file').addEventListener('change', refreshPreview);
+          $('ac-preview-btn').addEventListener('click', refreshPreview);
+          refreshPreview();
+
+          $('ac-submit-btn').addEventListener('click', async function(){
+            const out = $('ac-result');
+            const title = $('ac-title').value.trim();
+            const start = $('ac-start').value;
+            const duration = $('ac-duration').value.trim();
+            const channel = $('ac-channel').value;
+            if(!title || !start || !duration || !channel){
+              out.innerHTML='<span style="color:var(--red)">⚠️ 商品名・開始価格・期間・投稿先は必須です</span>';
+              return;
+            }
+            out.innerHTML='<span style="color:var(--muted)">送信中…</span>';
+            const fd = new FormData();
+            fd.append('title', title);
+            fd.append('starting_bid', start);
+            fd.append('duration', duration);
+            fd.append('channel_id', channel);
+            fd.append('reserve_price', $('ac-reserve').value || '0');
+            fd.append('min_increment', $('ac-minincr').value || '100');
+            const desc = $('ac-desc').value.trim();
+            if(desc) fd.append('description', desc);
+            const f = $('ac-image-file').files[0];
+            if(f) fd.append('image', f);
+            const u = $('ac-image-url').value.trim();
+            if(u) fd.append('image_url', u);
+            try {
+              const r = await fetch('/guild/{{ guild_id }}/auction/create', {
+                method:'POST', body:fd, credentials:'same-origin', redirect:'manual'
+              });
+              out.innerHTML = (r.type==='opaqueredirect'||r.ok||r.status===303)
+                ? '<span style="color:var(--green)">✅ オークションを投稿しました。</span>'
+                : '<span style="color:var(--red)">⚠️ 失敗 (HTTP '+r.status+')</span>';
+            } catch(e){ out.innerHTML='<span style="color:var(--red)">⚠️ '+e+'</span>'; }
+          });
+        })();
+      </script>
+
+      <div class="tab-save-bar">
+        <button type="submit" class="btn green">💾 変更を保存</button>
+      </div>
       </div>{# /tab-auction #}
 
       <div class="tab-panel" id="tab-invite">
@@ -487,12 +832,15 @@
           {{ channel_select("MODERATOR_CHANNEL_ID", env, channels_grouped) }}
         </div>
       </div>
+      <div class="tab-save-bar">
+        <button type="submit" class="btn green">💾 変更を保存</button>
+      </div>
       </div>{# /tab-invite #}
 
       {% endif %}{# discord_ok #}
 
       <div class="sticky-save">
-        <button type="submit" class="btn green">💾 保存して BOT を再起動</button>
+        <button type="submit" class="btn green">💾 変更を保存</button>
         <a href="/guild/{{ guild_id }}/status" class="btn outline">📊 稼働状況・ログを見る</a>
         <span style="margin-left:auto;color:var(--muted);font-size:12px">
           BOT: {% if bot_running %}<span style="color:var(--green)">● 稼働中</span>{% else %}<span style="color:var(--red)">○ 停止中</span>{% endif %}

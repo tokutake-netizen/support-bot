@@ -47,22 +47,17 @@ class SuggesterCog(commands.Cog):
         self.product_inquiry_ch = os.getenv("PRODUCT_INQUIRY_CHANNEL_ID", "")
         self.shipping_guide_ch = os.getenv("SHIPPING_GUIDE_CHANNEL_ID", "")
 
-        self.product_advice_ja = os.getenv("PRODUCT_ADVICE_TEXT", "").format(
-            PRODUCT_INQUIRY_CHANNEL_ID=self.product_inquiry_ch,
-            SHIPPING_GUIDE_CHANNEL_ID=self.shipping_guide_ch,
-        )
-        self.shipping_advice_ja = os.getenv("SHIPPING_ADVICE_TEXT", "").format(
-            PRODUCT_INQUIRY_CHANNEL_ID=self.product_inquiry_ch,
-            SHIPPING_GUIDE_CHANNEL_ID=self.shipping_guide_ch,
-        )
-        self.product_advice_en = os.getenv("PRODUCT_ADVICE_TEXT_EN", "").format(
-            PRODUCT_INQUIRY_CHANNEL_ID=self.product_inquiry_ch,
-            SHIPPING_GUIDE_CHANNEL_ID=self.shipping_guide_ch,
-        )
-        self.shipping_advice_en = os.getenv("SHIPPING_ADVICE_TEXT_EN", "").format(
-            PRODUCT_INQUIRY_CHANNEL_ID=self.product_inquiry_ch,
-            SHIPPING_GUIDE_CHANNEL_ID=self.shipping_guide_ch,
-        )
+        # Advice texts may contain newlines; .env stores them as literal "\n"
+        # which we decode here so the reply actually wraps in Discord.
+        def _adv(name: str) -> str:
+            return os.getenv(name, "").replace("\\n", "\n").format(
+                PRODUCT_INQUIRY_CHANNEL_ID=self.product_inquiry_ch,
+                SHIPPING_GUIDE_CHANNEL_ID=self.shipping_guide_ch,
+            )
+        self.product_advice_ja = _adv("PRODUCT_ADVICE_TEXT")
+        self.shipping_advice_ja = _adv("SHIPPING_ADVICE_TEXT")
+        self.product_advice_en = _adv("PRODUCT_ADVICE_TEXT_EN")
+        self.shipping_advice_en = _adv("SHIPPING_ADVICE_TEXT_EN")
 
         state = storage.load("suggest_state.json", default={"enabled": True, "advised": []})
         self.enabled: bool = bool(state.get("enabled", True))

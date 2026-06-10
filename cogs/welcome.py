@@ -70,12 +70,15 @@ def _build_embed(
     except Exception:
         color = 0x57F287
 
-    template = os.getenv("WELCOME_DESCRIPTION") or (
+    # WELCOME_DESCRIPTION is stored in .env with literal "\n" escapes
+    # (single-line .env values). Decode them back to real newlines before
+    # rendering so multi-line templates wrap correctly in the embed.
+    template = (os.getenv("WELCOME_DESCRIPTION") or (
         "🎉 **Welcome, {user_mention}!**\n\n"
         "・📜 Rules: {rules}\n"
         "・🙋 Introduce yourself: {intro}\n"
         "・🎫 Need help? Open a ticket in #📩ticket"
-    )
+    )).replace("\\n", "\n")
     desc = template.format(
         user_mention=member.mention,
         user_name=member.name,

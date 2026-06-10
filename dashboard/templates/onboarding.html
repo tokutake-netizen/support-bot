@@ -34,7 +34,7 @@
       <div style="margin-left:24px;padding-left:8px;border-left:2px solid var(--line);margin-top:6px">
         <a href="/guild/{{ guild_id }}/setup">設定</a>
         <a href="/guild/{{ guild_id }}/status">稼働状況・ログ</a>
-        <a href="/guild/{{ guild_id }}/giveaway">🎉 Giveaway</a>
+        <a href="/guild/{{ guild_id }}/giveaway">🎉 Giveaway 作成・運用</a>
         <a href="/guild/{{ guild_id }}/onboarding" class="active">🚪 オンボーディング</a>
       </div>
       <div class="section-label">アカウント</div>
@@ -170,7 +170,7 @@
       {% endfor %}
 
       <div class="sticky-save">
-        <button type="submit" class="btn green">💾 保存して Discord に反映</button>
+        <button type="submit" class="btn green">💾 変更を保存</button>
         <a href="/guild/{{ guild_id }}/setup" class="btn outline">設定に戻る</a>
         <span style="margin-left:auto;color:var(--muted);font-size:12px">
           オンボーディング: {% if onboarding_enabled %}<span style="color:var(--green)">● 有効</span>{% else %}<span style="color:var(--muted)">○ 無効</span>{% endif %}

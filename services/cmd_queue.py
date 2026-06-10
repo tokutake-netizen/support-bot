@@ -29,12 +29,14 @@ log = logging.getLogger(__name__)
 QUEUE_FILE = "dashboard_commands.jsonl"
 
 ALLOWED_ACTIONS = {
-    "ticket_panel",      # params: {channel_id}
-    "digest_now",        # post weekly digest to DIGEST_CHANNEL_ID
-    "digest_preview",    # post digest preview to MODERATOR_CHANNEL_ID
-    "backup_now",        # post snapshot to BACKUP_CHANNEL_ID
-    "tree_sync",         # re-sync slash command tree (no args)
-    "set_event",         # params: {name, start_ts, end_ts, ...}
+    "ticket_panel",            # params: {channel_id}
+    "welcome_test",            # params: {channel_id, user_id}
+    "digest_now",              # post weekly digest to DIGEST_CHANNEL_ID
+    "digest_preview",          # post digest preview to MODERATOR_CHANNEL_ID
+    "backup_now",              # post snapshot to BACKUP_CHANNEL_ID
+    "tree_sync",               # re-sync slash command tree (no args)
+    "set_event",               # params: {name, start_ts, end_ts, ...}
+    "fuel_surcharge_refresh",  # scrape DHL+FedEx fuel surcharge pages now
 }
 
 

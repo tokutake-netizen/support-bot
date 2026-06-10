@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}アクセス申請 — Support Bot{% endblock %}
+{% block body %}
+<div class="login">
+  <div class="login-card">
+    <div class="logo">📨</div>
+    <h1>アクセス申請</h1>
+    <p>ダッシュボードのアクセスを申請します。管理者が承認後、初期パスワードがメールで届きます。</p>
+
+    {% if request.query_params.get("ok") %}
+      <div class="flash ok">✓ 申請を受け付けました。管理者が承認すると、初期パスワードがメールで届きます。</div>
+    {% elif request.query_params.get("err") %}
+      <div class="flash warn">⚠️ {{ request.query_params.get("err") }}</div>
+    {% endif %}
+
+    <form method="post" action="/register" style="text-align:left">
+      <div class="field">
+        <label style="text-align:left">📧 メールアドレス</label>
+        <input type="email" name="email" required autocomplete="email">
+      </div>
+      <button type="submit" class="btn green" style="width:100%">申請を送信</button>
+    </form>
+
+    <p style="font-size:12px;margin-top:24px;margin-bottom:0">
+      <a href="/login">← ログイン画面に戻る</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

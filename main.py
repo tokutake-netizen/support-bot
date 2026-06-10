@@ -76,7 +76,8 @@ async def main() -> None:
             "cogs.translator", "cogs.suggester", "cogs.shipping",
             "cogs.ticket", "cogs.welcome", "cogs.giveaway",
             "cogs.invite_tracker", "cogs.auction", "cogs.events", "cogs.faq", "cogs.safety",
-            "cogs.digest", "cogs.backup", "cogs.health", "cogs.command_queue", "cogs.help",
+            "cogs.digest", "cogs.backup", "cogs.health", "cogs.command_queue",
+            "cogs.fuel_surcharge", "cogs.help",
         ):
             try:
                 await bot.load_extension(ext)
