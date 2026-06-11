@@ -123,13 +123,68 @@ def _resolve_category(panel_channel: discord.TextChannel) -> Optional[discord.Ca
     return panel_channel.category
 
 
+# Discord caps a category at 50 channels. When the ticket category fills up we
+# auto-create an overflow category ("<name> 2", "<name> 3", ...) and keep going.
+TICKET_CATEGORY_LIMIT = 50
+
+
+def _category_suffix(cat: discord.CategoryChannel, base_name: str) -> int:
+    """Ordering key: base category = 1, overflow "<base> N" = N."""
+    if cat.name == base_name:
+        return 1
+    m = re.search(r"(\d+)\s*$", cat.name)
+    return int(m.group(1)) if m else 99
+
+
+async def _get_available_category(
+    guild: discord.Guild, base: Optional[discord.CategoryChannel]
+) -> Optional[discord.CategoryChannel]:
+    """Return a ticket category that still has room, creating a new overflow
+    category when the base and all existing overflow categories are full."""
+    if base is None:
+        return None
+    base_name = base.name
+    # Candidates = base category + any overflow categories sharing its name.
+    candidates = [base] + [
+        c
+        for c in guild.categories
+        if c.id != base.id and c.name.startswith(base_name + " ")
+    ]
+    candidates.sort(key=lambda c: _category_suffix(c, base_name))
+    for cat in candidates:
+        if len(cat.channels) < TICKET_CATEGORY_LIMIT:
+            return cat
+    # Everything is full → spin up the next overflow category.
+    next_idx = max(_category_suffix(c, base_name) for c in candidates) + 1
+    new_name = f"{base_name} {next_idx}"
+    try:
+        new_cat = await guild.create_category(
+            name=new_name,
+            overwrites=base.overwrites,
+            reason="Ticket category full — auto-created overflow category",
+        )
+        log.info("created overflow ticket category %s (%s)", new_name, new_cat.id)
+        return new_cat
+    except discord.HTTPException:
+        log.exception("failed to create overflow ticket category")
+        return base  # let create_text_channel surface the real error
+
+
 def _is_ticket_channel(channel: discord.abc.GuildChannel) -> bool:
-    """A channel is a ticket if it lives under the configured ticket category."""
+    """A channel is a ticket if it lives under the configured ticket category
+    (or one of its auto-created overflow categories)."""
     if not isinstance(channel, discord.TextChannel):
         return False
     cat_id = os.getenv("TICKET_CATEGORY_ID", "")
-    if cat_id.isdigit() and channel.category_id == int(cat_id):
-        return True
+    if cat_id.isdigit():
+        if channel.category_id == int(cat_id):
+            return True
+        # Overflow categories share the base category's name prefix.
+        base = channel.guild.get_channel(int(cat_id))
+        cat = channel.category
+        if isinstance(base, discord.CategoryChannel) and cat is not None:
+            if cat.name == base.name or cat.name.startswith(base.name + " "):
+                return True
     # Backward compat: name-based check
     return channel.name.startswith("ticket-") or channel.name[:4].isdigit()
 
@@ -233,7 +288,8 @@ class TicketOpenView(discord.ui.View):
                     embed_links=True,
                 )
 
-        category = _resolve_category(panel_channel)
+        base_category = _resolve_category(panel_channel)
+        category = await _get_available_category(guild, base_category)
 
         try:
             new_channel = await guild.create_text_channel(
