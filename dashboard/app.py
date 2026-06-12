@@ -38,6 +38,7 @@ from . import (
     auth,
     bot_manager,
     config_store,
+    forward_store,
     giveaway_helpers as gh,
     auction_helpers as ah,
     users as user_store,
@@ -151,7 +152,11 @@ async def login(request: Request):
 @app.get("/oauth/start")
 async def oauth_start(response: Response):
     state = auth.gen_state()
-    url = auth.build_authorize_url(state)
+    try:
+        url = auth.build_authorize_url(state)
+    except RuntimeError:
+        # OAuth 未設定（DISCORD_CLIENT_ID 等なし）。500 で落とさずログインへ戻す。
+        return RedirectResponse("/login?err=oauth_unconfigured", status_code=303)
     resp = RedirectResponse(url)
     resp.set_cookie(
         "oauth_state",
@@ -393,6 +398,91 @@ async def dashboard(request: Request, session: Optional[str] = Cookie(None)):
         "dashboard.html",
         {"request": request, "session": sess, "guilds": admin_guilds},
     )
+
+
+# -------------------------- 画像転送ルート --------------------------
+
+@app.get("/forwarding", response_class=HTMLResponse)
+async def forwarding_page(request: Request, session: Optional[str] = Cookie(None)):
+    sess = require_session(session)
+    require_root(sess)
+
+    token = forward_store.forward_bot_token()
+    servers: list = []
+    discord_ok = False
+    if token:
+        try:
+            servers = await forward_store.list_servers_with_channels(token)
+            discord_ok = bool(servers)
+        except Exception as e:
+            log.warning("forwarding: failed to list servers: %s", e)
+
+    ch_index = forward_store.index_channels(servers)
+
+    rules = []
+    for r in forward_store.load_rules():
+        src_id = str(r.get("source"))
+        dst_id = str(r.get("dest"))
+        src = ch_index.get(src_id)
+        dst = ch_index.get(dst_id)
+        rules.append(
+            {
+                "source": src_id,
+                "dest": dst_id,
+                "source_label": f"{src['server']} ＞ #{src['channel']}" if src else f"(ID: {src_id})",
+                "dest_label": f"{dst['server']} ＞ #{dst['channel']}" if dst else f"(ID: {dst_id})",
+            }
+        )
+
+    return templates.TemplateResponse(
+        "forwarding.html",
+        {
+            "request": request,
+            "session": sess,
+            "servers": servers,
+            "rules": rules,
+            "discord_ok": discord_ok,
+            "has_token": bool(token),
+        },
+    )
+
+
+@app.post("/forwarding/add")
+async def forwarding_add(
+    request: Request,
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_root(sess)
+    form = await request.form()
+    try:
+        source = int((form.get("source_channel") or "").strip())
+        dest = int((form.get("dest_channel") or "").strip())
+    except ValueError:
+        return RedirectResponse("/forwarding?err=invalid", status_code=303)
+    if source == dest:
+        return RedirectResponse("/forwarding?err=same", status_code=303)
+    added = forward_store.add_rule(source, dest)
+    return RedirectResponse(
+        "/forwarding?ok=added" if added else "/forwarding?err=dup", status_code=303
+    )
+
+
+@app.post("/forwarding/remove")
+async def forwarding_remove(
+    request: Request,
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_root(sess)
+    form = await request.form()
+    try:
+        source = int((form.get("source") or "").strip())
+        dest = int((form.get("dest") or "").strip())
+    except ValueError:
+        return RedirectResponse("/forwarding?err=invalid", status_code=303)
+    forward_store.remove_rule(source, dest)
+    return RedirectResponse("/forwarding?ok=removed", status_code=303)
 
 
 def _bot_token_for(guild_id: str) -> Optional[str]:

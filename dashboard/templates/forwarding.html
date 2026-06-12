@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}画像転送 — Support Bot{% endblock %}
+{% block body %}
+<div class="wrap">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span>Support Bot</div>
+    <nav class="nav">
+      <a href="/dashboard">📋 サーバー一覧</a>
+      <a href="/forwarding" class="active">📦 画像転送</a>
+      {% if session.is_root %}
+        <a href="/admin/users">👥 ユーザー管理</a>
+      {% endif %}
+      <div class="section-label">アカウント</div>
+      <a href="#" style="color:var(--muted)">👤 {{ session.username }}{% if session.is_root %} (root){% endif %}</a>
+      <a href="/logout" style="color:var(--muted)">🚪 ログアウト</a>
+    </nav>
+  </aside>
+  <main class="main">
+    <h1>画像転送</h1>
+    <p class="subtitle">監視元チャンネルに投稿された画像を、別チャンネル（別サーバーでも可）へ自動転送します。梱包・発送写真をお客様向けサーバーに流すために使います。</p>
+
+    {# ---- 必要権限の明示 ---- #}
+    <div class="callout">
+      <div style="font-weight:600;color:#fff;margin-bottom:6px">⚠️ 設定に必要な権限</div>
+      この機能を設定するには、<b>2つのサーバー両方</b>での権限が必要です。
+      <ul style="margin:8px 0 0 18px;padding:0">
+        <li><b>① 監視元サーバー</b>（画像が投稿される側）— Botがチャンネルを<b>閲覧</b>できること</li>
+        <li><b>② 転送先サーバー</b>（画像を流す側）— Botが<b>メッセージ送信・ファイル添付</b>できること</li>
+      </ul>
+      <div style="margin-top:8px">
+        どちらのサーバーにも転送Botが参加し、あなた自身が<b>管理者（編集）権限</b>を持っている必要があります。
+        下のプルダウンには、Botが参加しているサーバーとチャンネルだけが表示されます。
+      </div>
+    </div>
+
+    {# ---- フラッシュ ---- #}
+    {% set ok = request.query_params.get('ok') %}
+    {% set err = request.query_params.get('err') %}
+    {% if ok == 'added' %}<div class="flash ok">✅ 転送ルールを追加しました。（Botに自動反映されます）</div>{% endif %}
+    {% if ok == 'removed' %}<div class="flash ok">🗑️ 転送ルールを削除しました。</div>{% endif %}
+    {% if err == 'dup' %}<div class="flash warn">⚠️ 同じ転送ルールが既に存在します。</div>{% endif %}
+    {% if err == 'same' %}<div class="flash warn">⚠️ 監視元と転送先に同じチャンネルは指定できません。</div>{% endif %}
+    {% if err == 'invalid' %}<div class="flash warn">⚠️ チャンネルが正しく選択されていません。</div>{% endif %}
+
+    {% if not has_token %}
+      <div class="flash warn">転送Botのトークンが見つかりません。環境変数 <code>FORWARD_BOT_TOKEN</code>、または <code>Discordbot/.env</code> の <code>DISCORD_TOKEN</code> を設定してください。</div>
+    {% elif not discord_ok %}
+      <div class="flash warn">Botが参加しているサーバーを取得できませんでした。トークンが正しいか、Botがサーバーに参加しているか確認してください。</div>
+    {% endif %}
+
+    {# ---- 新規ルール追加 ---- #}
+    <div class="card">
+      <h2 style="margin-top:0">転送ルールを追加</h2>
+      <form method="post" action="/forwarding/add">
+        <div class="row">
+          <div class="field">
+            <label>① 監視元（どこの画像を）<span class="req">*</span></label>
+            <select name="_src_server" data-target="src" required>
+              <option value="">サーバーを選択…</option>
+              {% for s in servers %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+            </select>
+            <select name="source_channel" id="src_channel" required style="margin-top:8px">
+              <option value="">先にサーバーを選択</option>
+            </select>
+            <div class="hint">画像が投稿される監視元のチャンネル</div>
+          </div>
+          <div class="field">
+            <label>② 転送先（どこへ飛ばすか）<span class="req">*</span></label>
+            <select name="_dst_server" data-target="dst" required>
+              <option value="">サーバーを選択…</option>
+              {% for s in servers %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+            </select>
+            <select name="dest_channel" id="dst_channel" required style="margin-top:8px">
+              <option value="">先にサーバーを選択</option>
+            </select>
+            <div class="hint">画像を流したい転送先のチャンネル（別サーバーでも可）</div>
+          </div>
+        </div>
+        <button type="submit" class="btn green">＋ このルールを追加</button>
+      </form>
+    </div>
+
+    {# ---- 既存ルール一覧 ---- #}
+    <div class="card" style="margin-top:16px">
+      <h2 style="margin-top:0">登録済みの転送ルール（{{ rules | length }}）</h2>
+      {% if rules %}
+        <table style="width:100%;border-collapse:collapse;font-size:14px">
+          <thead>
+            <tr style="text-align:left;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.5px">
+              <th style="padding:8px 6px">① 監視元</th>
+              <th style="padding:8px 6px"></th>
+              <th style="padding:8px 6px">② 転送先</th>
+              <th style="padding:8px 6px;text-align:right">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rules %}
+            <tr style="border-top:1px solid var(--line)">
+              <td style="padding:10px 6px">{{ r.source_label }}</td>
+              <td style="padding:10px 6px;color:var(--muted)">→</td>
+              <td style="padding:10px 6px">{{ r.dest_label }}</td>
+              <td style="padding:10px 6px;text-align:right">
+                <form method="post" action="/forwarding/remove" onsubmit="return confirm('この転送ルールを削除しますか？')">
+                  <input type="hidden" name="source" value="{{ r.source }}">
+                  <input type="hidden" name="dest" value="{{ r.dest }}">
+                  <button type="submit" class="btn red btn-sm">削除</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p style="color:var(--muted)">まだ転送ルールがありません。上のフォームから追加してください。</p>
+      {% endif %}
+    </div>
+  </main>
+</div>
+
+<script>
+  const SERVERS = {{ servers | tojson }};
+  const byId = Object.fromEntries(SERVERS.map(s => [s.id, s]));
+
+  function fillChannels(serverSelect) {
+    const target = serverSelect.dataset.target;
+    const chSel = document.getElementById(target + '_channel');
+    const server = byId[serverSelect.value];
+    chSel.innerHTML = '';
+    if (!server) {
+      chSel.innerHTML = '<option value="">先にサーバーを選択</option>';
+      return;
+    }
+    const ph = document.createElement('option');
+    ph.value = ''; ph.textContent = 'チャンネルを選択…';
+    chSel.appendChild(ph);
+    let lastCat = undefined;
+    let group = null;
+    server.channels.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = '#' + c.name;
+      if (c.category) {
+        if (c.category !== lastCat) {
+          group = document.createElement('optgroup');
+          group.label = c.category;
+          chSel.appendChild(group);
+          lastCat = c.category;
+        }
+        group.appendChild(opt);
+      } else {
+        chSel.appendChild(opt);
+        lastCat = undefined; group = null;
+      }
+    });
+  }
+
+  document.querySelectorAll('select[data-target]').forEach(sel => {
+    sel.addEventListener('change', () => fillChannels(sel));
+  });
+</script>
+{% endblock %}

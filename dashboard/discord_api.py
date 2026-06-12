@@ -27,6 +27,12 @@ class DiscordREST:
             r = await client.get(f"{DISCORD_API}/guilds/{guild_id}", headers=self._headers())
             return r.json() if r.status_code == 200 else None
 
+    async def list_my_guilds(self) -> list[dict]:
+        """このBotトークンが参加している全ギルドを返す（転送ピッカー用）。"""
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.get(f"{DISCORD_API}/users/@me/guilds", headers=self._headers())
+            return r.json() if r.status_code == 200 else []
+
     async def list_channels(self, guild_id: int | str) -> list[dict]:
         async with httpx.AsyncClient(timeout=10.0) as client:
             r = await client.get(
