@@ -1,0 +1,82 @@
+<aside class="ai-panel" id="ai-panel">
+  <div class="ai-head">
+    <span class="ai-title">✨ Gemini アシスタント</span>
+    <button class="ai-toggle" id="ai-toggle" title="折りたたみ">＞</button>
+  </div>
+  <div class="ai-body" id="ai-body">
+    <div class="ai-messages" id="ai-messages">
+      <div class="ai-msg ai-msg-bot">こんにちは！ダッシュボードの使い方や Bot の機能について何でも聞いてください。</div>
+    </div>
+    <form class="ai-form" id="ai-form">
+      <textarea id="ai-input" rows="2" placeholder="質問を入力（Enterで送信 / Shift+Enterで改行）"></textarea>
+      <button type="submit" id="ai-send">送信</button>
+    </form>
+  </div>
+</aside>
+
+<script>
+(function () {
+  const panel = document.getElementById("ai-panel");
+  const toggle = document.getElementById("ai-toggle");
+  const messagesEl = document.getElementById("ai-messages");
+  const form = document.getElementById("ai-form");
+  const input = document.getElementById("ai-input");
+  const sendBtn = document.getElementById("ai-send");
+
+  // 折りたたみ状態と会話履歴は sessionStorage に保持（ページ遷移しても残る）
+  let history = [];
+  try { history = JSON.parse(sessionStorage.getItem("ai_history") || "[]"); } catch (e) {}
+  history.forEach(m => addMsg(m.content, m.role === "assistant"));
+
+  if (sessionStorage.getItem("ai_collapsed") === "1") panel.classList.add("collapsed");
+  toggle.addEventListener("click", () => {
+    panel.classList.toggle("collapsed");
+    sessionStorage.setItem("ai_collapsed", panel.classList.contains("collapsed") ? "1" : "0");
+  });
+
+  function addMsg(text, isBot) {
+    const div = document.createElement("div");
+    div.className = "ai-msg " + (isBot ? "ai-msg-bot" : "ai-msg-user");
+    div.textContent = text;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return div;
+  }
+
+  async function send() {
+    const text = input.value.trim();
+    if (!text || sendBtn.disabled) return;
+    input.value = "";
+    addMsg(text, false);
+    history.push({ role: "user", content: text });
+
+    sendBtn.disabled = true;
+    const thinking = addMsg("…考え中…", true);
+    try {
+      const r = await fetch("/api/assistant/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: history }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        thinking.textContent = "⚠️ " + (data.detail || ("エラー (HTTP " + r.status + ")"));
+      } else {
+        thinking.textContent = data.reply;
+        history.push({ role: "assistant", content: data.reply });
+      }
+    } catch (e) {
+      thinking.textContent = "⚠️ 通信エラー: " + e;
+    } finally {
+      sendBtn.disabled = false;
+      sessionStorage.setItem("ai_history", JSON.stringify(history.slice(-40)));
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+  }
+
+  form.addEventListener("submit", (e) => { e.preventDefault(); send(); });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+})();
+</script>

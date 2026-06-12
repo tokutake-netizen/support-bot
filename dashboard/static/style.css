@@ -96,3 +96,23 @@ optgroup{font-weight:600;color:var(--muted)}
 .tab-panel{display:none}
 .tab-panel.active{display:block}
 .tab-save-bar{margin:18px 0 8px;text-align:right;border-top:1px solid var(--line);padding-top:14px}
+
+/* ---- Gemini アシスタントパネル（右枠） ---- */
+.ai-panel{width:320px;flex-shrink:0;background:var(--bg2);border-left:1px solid var(--line);display:flex;flex-direction:column;height:100vh;position:sticky;top:0}
+.ai-panel.collapsed{width:44px}
+.ai-panel.collapsed .ai-body,.ai-panel.collapsed .ai-title{display:none}
+.ai-panel.collapsed .ai-toggle{transform:rotate(180deg)}
+.ai-head{display:flex;align-items:center;justify-content:space-between;padding:14px 12px;border-bottom:1px solid var(--line)}
+.ai-title{font-weight:700;color:#fff;font-size:14px;white-space:nowrap}
+.ai-toggle{background:none;border:1px solid var(--line);color:var(--muted);border-radius:6px;width:24px;height:24px;cursor:pointer;line-height:1}
+.ai-toggle:hover{color:#fff;background:var(--bg3)}
+.ai-body{display:flex;flex-direction:column;flex:1;min-height:0}
+.ai-messages{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.ai-msg{padding:8px 10px;border-radius:10px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;max-width:95%}
+.ai-msg-bot{background:var(--bg3);color:var(--fg);align-self:flex-start}
+.ai-msg-user{background:var(--accent);color:#fff;align-self:flex-end}
+.ai-form{padding:10px;border-top:1px solid var(--line);display:flex;gap:6px}
+.ai-form textarea{flex:1;background:var(--bg3);border:1px solid var(--line);border-radius:8px;color:var(--fg);padding:8px;font-size:13px;resize:none;font-family:inherit}
+.ai-form button{background:var(--accent);border:none;color:#fff;border-radius:8px;padding:0 14px;cursor:pointer;font-size:13px}
+.ai-form button:disabled{opacity:.5;cursor:default}
+@media (max-width:1100px){.ai-panel{display:none}}

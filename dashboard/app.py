@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
+import httpx
 from fastapi import (
     Cookie,
     FastAPI,
@@ -398,6 +399,72 @@ async def dashboard(request: Request, session: Optional[str] = Cookie(None)):
         "dashboard.html",
         {"request": request, "session": sess, "guilds": admin_guilds},
     )
+
+
+# -------------------------- AIアシスタント（Gemini） --------------------------
+
+ASSISTANT_SYSTEM_PROMPT = """\
+あなたは「Support Bot ダッシュボード」に組み込まれたアシスタントです。
+スタッフ（ダッシュボード利用者）の質問に日本語で簡潔に答えてください。
+
+このダッシュボードでできること:
+- サーバー一覧: 管理している Discord サーバーごとに Bot の起動/停止/再起動、セットアップ
+- 画像転送 (/forwarding, root のみ): 梱包写真を社内チャンネルから顧客サーバーへ自動転送する
+  ルールの追加・削除。Discord 側の /forward add/list/remove コマンドでも同じルールを編集可能
+- チケット: お客様がパネルから問い合わせチケットを作成。カテゴリが50件で満杯になると
+  「Created Tickets 2」のように自動ナンバリングした新カテゴリが作られチケットはそこに入る
+- ギブアウェイ/オークション、翻訳、FAQ、ウェルカムメッセージ、招待トラッカー等の各機能設定
+- ユーザー管理 (root のみ): ダッシュボードへのログインユーザーの承認・管理
+
+運用の背景: 日本からトレーディングカードを海外顧客に販売する事業。取引の活発さを
+顧客に見せるため梱包写真を顧客サーバーに転送している。
+
+わからないことは推測せず「ダッシュボードの該当ページを確認してください」と案内してください。
+"""
+
+
+@app.post("/api/assistant/chat")
+async def assistant_chat(request: Request, session: Optional[str] = Cookie(None)):
+    require_session(session)
+    key = os.environ.get("GEMINI_API_KEY", "")
+    if not key:
+        raise HTTPException(
+            status_code=503,
+            detail="GEMINI_API_KEY が未設定です。Railway の Variables に追加してください。",
+        )
+    body = await request.json()
+    messages = body.get("messages") or []
+    contents = []
+    for m in messages[-20:]:  # 直近20往復だけ送る
+        role = "model" if m.get("role") == "assistant" else "user"
+        text = str(m.get("content", ""))[:4000]
+        if text.strip():
+            contents.append({"role": role, "parts": [{"text": text}]})
+    if not contents:
+        raise HTTPException(status_code=400, detail="メッセージが空です")
+
+    model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+    payload = {
+        "system_instruction": {"parts": [{"text": ASSISTANT_SYSTEM_PROMPT}]},
+        "contents": contents,
+        "generationConfig": {"maxOutputTokens": 1024, "temperature": 0.7},
+    }
+    async with httpx.AsyncClient(timeout=60) as client:
+        r = await client.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+            params={"key": key},
+            json=payload,
+        )
+    if r.status_code != 200:
+        log.error("gemini api error %s: %s", r.status_code, r.text[:300])
+        raise HTTPException(status_code=502, detail=f"Gemini API エラー (HTTP {r.status_code})")
+    data = r.json()
+    try:
+        reply = data["candidates"][0]["content"]["parts"][0]["text"]
+    except (KeyError, IndexError):
+        log.error("gemini unexpected response: %s", json.dumps(data)[:300])
+        raise HTTPException(status_code=502, detail="Gemini の応答を解釈できませんでした")
+    return {"reply": reply}
 
 
 # -------------------------- 画像転送ルート --------------------------
