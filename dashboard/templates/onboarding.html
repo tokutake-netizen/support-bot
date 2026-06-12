@@ -103,7 +103,7 @@
       {% for p in prompts %}
       {% set pi = loop.index0 %}
       <details {% if p.title %}open{% endif %} class="card" style="margin-bottom:14px">
-        <summary style="cursor:pointer;padding:6px 0;font-weight:600;color:#fff;display:flex;align-items:center;gap:8px">
+        <summary style="cursor:pointer;padding:6px 0;font-weight:600;color:var(--heading);display:flex;align-items:center;gap:8px">
           <span style="background:var(--bg3);padding:2px 8px;border-radius:10px;font-size:12px">設問 #{{ pi + 1 }}</span>
           {% if p.title %}{{ p.title }}{% else %}<span style="color:var(--muted);font-weight:400">(未入力 — 設問を追加するならここから)</span>{% endif %}
         </summary>
@@ -132,7 +132,7 @@
             </div>
           </div>
 
-          <h3 style="color:#fff;font-size:13px;margin:18px 0 10px">選択肢</h3>
+          <h3 style="color:var(--heading);font-size:13px;margin:18px 0 10px">選択肢</h3>
           {% for opt in p.options %}
           {% set oj = loop.index0 %}
           <details {% if opt.title %}open{% endif %} style="border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:8px">
@@ -178,5 +178,6 @@
       </div>
     </form>
   </main>
+  {% include "_assistant.html" %}
 </div>
 {% endblock %}

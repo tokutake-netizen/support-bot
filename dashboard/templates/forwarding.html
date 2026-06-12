@@ -21,7 +21,7 @@
 
     {# ---- 必要権限の明示 ---- #}
     <div class="callout">
-      <div style="font-weight:600;color:#fff;margin-bottom:6px">⚠️ 設定に必要な権限</div>
+      <div style="font-weight:600;color:var(--heading);margin-bottom:6px">⚠️ 設定に必要な権限</div>
       この機能を設定するには、<b>2つのサーバー両方</b>での権限が必要です。
       <ul style="margin:8px 0 0 18px;padding:0">
         <li><b>① 監視元サーバー</b>（画像が投稿される側）— Botがチャンネルを<b>閲覧</b>できること</li>
@@ -115,6 +115,7 @@
       {% endif %}
     </div>
   </main>
+  {% include "_assistant.html" %}
 </div>
 
 <script>

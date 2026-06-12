@@ -253,7 +253,7 @@
       </div>
 
       <div class="card">
-        <h3 style="color:#fff;font-size:14px;margin-bottom:6px">📤 チケットパネルを投稿</h3>
+        <h3 style="color:var(--heading);font-size:14px;margin-bottom:6px">📤 チケットパネルを投稿</h3>
         <p class="section-desc">「🎫 Open ticket」ボタン付き embed を、選んだチャンネルに即時投稿します。Discord で <code>/ticket panel</code> を打つ代わりに、ここからワンクリックで設置可能。</p>
         <div style="display:flex;gap:8px;align-items:flex-end">
           <div class="field" style="flex:1;margin-bottom:0">
@@ -360,7 +360,7 @@
       </div>
 
       <div class="card">
-        <h3 style="color:#fff;font-size:14px;margin-bottom:6px">📤 Welcome を投稿</h3>
+        <h3 style="color:var(--heading);font-size:14px;margin-bottom:6px">📤 Welcome を投稿</h3>
         <p class="section-desc">welcome embed を指定したチャンネルに今すぐ投稿します。デフォルトは上で設定した <code>Welcome 投稿先チャンネル</code>。新規メンバーが入室した時に自動で出る embed と同じものです(あなた自身を主役として描画)。</p>
         <div style="display:flex;gap:8px;align-items:flex-end">
           <div class="field" style="flex:1;margin-bottom:0">
@@ -496,7 +496,7 @@
           </div>
         </div>
 
-        <h3 style="color:#fff;font-size:13px;margin:20px 0 6px">⛽ 燃油サーチャージ (Fuel Surcharge)</h3>
+        <h3 style="color:var(--heading);font-size:13px;margin:20px 0 6px">⛽ 燃油サーチャージ (Fuel Surcharge)</h3>
         <div class="help-box">
           <div class="h"><span class="ico">💡</span>動作の優先順位</div>
           ① <b>毎週月曜 04:00 JST</b> に FedEx 公式ページを自動取得 → 下のキャッシュに反映 → 自動値を優先利用<br>
@@ -612,7 +612,7 @@
             <div class="hint">未設定なら <code>TICKET_CATEGORY_ID</code> を使用。落札ごとに private channel が作成されます。</div>
           </div>
         </div>
-        <h3 style="color:#fff;font-size:13px;margin:20px 0 10px">🛠️ /auction create の既定値</h3>
+        <h3 style="color:var(--heading);font-size:13px;margin:20px 0 10px">🛠️ /auction create の既定値</h3>
         <p class="section-desc">ここで設定した値は <code>/auction create</code> の引数を省略したときに使われます。各オークションで個別指定すれば上書き可能です。</p>
         <div class="row">
           <div class="field">
@@ -648,7 +648,7 @@
       </div>
 
       <div class="card">
-        <h3 style="color:#fff;font-size:14px;margin-bottom:6px">🆕 Auction を作成 (画像つき + プレビュー)</h3>
+        <h3 style="color:var(--heading);font-size:14px;margin-bottom:6px">🆕 Auction を作成 (画像つき + プレビュー)</h3>
         <p class="section-desc">商品名・開始価格・期間・画像 を入力 → 右側のプレビューで見た目確認 → 「📤 投稿」で Discord に即時投稿。入札・終了・落札 channel 作成は BOT が自動。</p>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
           <div>
@@ -848,6 +848,7 @@
       </div>
     </form>
   </main>
+  {% include "_assistant.html" %}
 </div>
 <script>
 (function(){
