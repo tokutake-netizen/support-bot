@@ -1,3 +1,4 @@
+<button class="ai-fab" id="ai-fab" title="Gemini アシスタントを開く">✨</button>
 <aside class="ai-panel" id="ai-panel">
   <div class="ai-head">
     <span class="ai-title">✨ Gemini アシスタント</span>
@@ -30,8 +31,22 @@
 
   if (sessionStorage.getItem("ai_collapsed") === "1") panel.classList.add("collapsed");
   toggle.addEventListener("click", () => {
+    // モバイルドロワー表示中は「閉じる」として動作
+    if (panel.classList.contains("mobile-open")) {
+      panel.classList.remove("mobile-open");
+      toggle.textContent = "＞";
+      return;
+    }
     panel.classList.toggle("collapsed");
     sessionStorage.setItem("ai_collapsed", panel.classList.contains("collapsed") ? "1" : "0");
+  });
+
+  const fab = document.getElementById("ai-fab");
+  fab.addEventListener("click", () => {
+    panel.classList.remove("collapsed");
+    panel.classList.add("mobile-open");
+    toggle.textContent = "✕";
+    messagesEl.scrollTop = messagesEl.scrollHeight;
   });
 
   function addMsg(text, isBot) {
