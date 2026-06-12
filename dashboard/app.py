@@ -422,6 +422,28 @@ ASSISTANT_SYSTEM_PROMPT = """\
 わからないことは推測せず「ダッシュボードの該当ページを確認してください」と案内してください。
 """
 
+TRANSLATE_EN_PROMPT = """\
+あなたは翻訳ツールです。入力された日本語を、海外のトレーディングカード顧客への
+Discordメッセージとして自然でフレンドリーかつプロフェッショナルな英語に翻訳してください。
+- 翻訳結果の英文のみを出力する（説明・前置き・引用符は不要）
+- 絵文字や記号は原文の雰囲気に合わせて適度に残す
+- カード名・PSA等級・発送用語などは業界の慣用表記（PSA 10, raw card, tracked shipping 等）に合わせる
+- 入力がすでに英語の場合は、より自然な英語に磨いて出力する
+"""
+
+TRANSLATE_JA_PROMPT = """\
+あなたは翻訳ツールです。入力された英語（海外顧客からのメッセージ等）を自然な日本語に翻訳してください。
+- 翻訳結果のみを出力する（説明・前置きは不要）
+- スラング・略語（LMK, WTB, PWE 等）は意味が伝わる日本語にする
+- 金額・カード名・等級などの固有情報は正確に保つ
+"""
+
+ASSISTANT_MODES = {
+    "chat": ASSISTANT_SYSTEM_PROMPT,
+    "en": TRANSLATE_EN_PROMPT,
+    "ja": TRANSLATE_JA_PROMPT,
+}
+
 
 @app.post("/api/assistant/chat")
 async def assistant_chat(request: Request, session: Optional[str] = Cookie(None)):
@@ -433,6 +455,8 @@ async def assistant_chat(request: Request, session: Optional[str] = Cookie(None)
             detail="GEMINI_API_KEY が未設定です。Railway の Variables に追加してください。",
         )
     body = await request.json()
+    mode = body.get("mode") or "chat"
+    system_prompt = ASSISTANT_MODES.get(mode, ASSISTANT_SYSTEM_PROMPT)
     messages = body.get("messages") or []
     contents = []
     for m in messages[-20:]:  # 直近20往復だけ送る
@@ -440,12 +464,15 @@ async def assistant_chat(request: Request, session: Optional[str] = Cookie(None)
         text = str(m.get("content", ""))[:4000]
         if text.strip():
             contents.append({"role": role, "parts": [{"text": text}]})
+    if mode != "chat":
+        # 翻訳モードでは過去の会話を混ぜず、最後の入力だけを翻訳する
+        contents = [c for c in contents if c["role"] == "user"][-1:]
     if not contents:
         raise HTTPException(status_code=400, detail="メッセージが空です")
 
     model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
     payload = {
-        "system_instruction": {"parts": [{"text": ASSISTANT_SYSTEM_PROMPT}]},
+        "system_instruction": {"parts": [{"text": system_prompt}]},
         "contents": contents,
         "generationConfig": {"maxOutputTokens": 1024, "temperature": 0.7},
     }

@@ -4,6 +4,11 @@
     <span class="ai-title">✨ Gemini アシスタント</span>
     <button class="ai-toggle" id="ai-toggle" title="閉じる">✕</button>
   </div>
+  <div class="ai-modes" id="ai-modes">
+    <button type="button" class="ai-mode active" data-mode="chat">💬 質問</button>
+    <button type="button" class="ai-mode" data-mode="en">🇺🇸 英訳</button>
+    <button type="button" class="ai-mode" data-mode="ja">🇯🇵 和訳</button>
+  </div>
   <div class="ai-body" id="ai-body">
     <div class="ai-messages" id="ai-messages">
       <div class="ai-msg ai-msg-bot">こんにちは！ダッシュボードの使い方や Bot の機能について何でも聞いてください。</div>
@@ -40,6 +45,24 @@
   fab.addEventListener("click", () => setOpen(true));
   toggle.addEventListener("click", () => setOpen(false));
 
+  // モード切替（質問 / 英訳 / 和訳）
+  const PLACEHOLDERS = {
+    chat: "質問を入力（Enterで送信 / Shift+Enterで改行）",
+    en: "英訳したい日本語を入力（Enterで送信）",
+    ja: "和訳したい英語を入力（Enterで送信）",
+  };
+  let mode = sessionStorage.getItem("ai_mode") || "chat";
+  function setMode(m) {
+    mode = m;
+    sessionStorage.setItem("ai_mode", m);
+    document.querySelectorAll("#ai-modes .ai-mode").forEach(b =>
+      b.classList.toggle("active", b.dataset.mode === m));
+    input.placeholder = PLACEHOLDERS[m] || PLACEHOLDERS.chat;
+  }
+  document.querySelectorAll("#ai-modes .ai-mode").forEach(b =>
+    b.addEventListener("click", () => setMode(b.dataset.mode)));
+  setMode(mode);
+
   function addMsg(text, isBot) {
     const div = document.createElement("div");
     div.className = "ai-msg " + (isBot ? "ai-msg-bot" : "ai-msg-user");
@@ -62,7 +85,7 @@
       const r = await fetch("/api/assistant/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history }),
+        body: JSON.stringify({ messages: history, mode: mode }),
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
