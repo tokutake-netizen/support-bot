@@ -1,8 +1,8 @@
-<button class="ai-fab" id="ai-fab" title="Gemini アシスタントを開く">✨</button>
+<button class="ai-fab" id="ai-fab" title="Gemini アシスタント">✨</button>
 <aside class="ai-panel" id="ai-panel">
   <div class="ai-head">
     <span class="ai-title">✨ Gemini アシスタント</span>
-    <button class="ai-toggle" id="ai-toggle" title="折りたたみ">＞</button>
+    <button class="ai-toggle" id="ai-toggle" title="閉じる">✕</button>
   </div>
   <div class="ai-body" id="ai-body">
     <div class="ai-messages" id="ai-messages">
@@ -18,36 +18,27 @@
 <script>
 (function () {
   const panel = document.getElementById("ai-panel");
+  const fab = document.getElementById("ai-fab");
   const toggle = document.getElementById("ai-toggle");
   const messagesEl = document.getElementById("ai-messages");
   const form = document.getElementById("ai-form");
   const input = document.getElementById("ai-input");
   const sendBtn = document.getElementById("ai-send");
 
-  // 折りたたみ状態と会話履歴は sessionStorage に保持（ページ遷移しても残る）
+  // 開閉状態と会話履歴は sessionStorage に保持（ページ遷移しても残る）
   let history = [];
   try { history = JSON.parse(sessionStorage.getItem("ai_history") || "[]"); } catch (e) {}
   history.forEach(m => addMsg(m.content, m.role === "assistant"));
 
-  if (sessionStorage.getItem("ai_collapsed") === "1") panel.classList.add("collapsed");
-  toggle.addEventListener("click", () => {
-    // モバイルドロワー表示中は「閉じる」として動作
-    if (panel.classList.contains("mobile-open")) {
-      panel.classList.remove("mobile-open");
-      toggle.textContent = "＞";
-      return;
-    }
-    panel.classList.toggle("collapsed");
-    sessionStorage.setItem("ai_collapsed", panel.classList.contains("collapsed") ? "1" : "0");
-  });
-
-  const fab = document.getElementById("ai-fab");
-  fab.addEventListener("click", () => {
-    panel.classList.remove("collapsed");
-    panel.classList.add("mobile-open");
-    toggle.textContent = "✕";
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  });
+  function setOpen(open) {
+    panel.classList.toggle("open", open);
+    fab.classList.toggle("hidden", open);
+    sessionStorage.setItem("ai_open", open ? "1" : "0");
+    if (open) messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+  if (sessionStorage.getItem("ai_open") === "1") setOpen(true);
+  fab.addEventListener("click", () => setOpen(true));
+  toggle.addEventListener("click", () => setOpen(false));
 
   function addMsg(text, isBot) {
     const div = document.createElement("div");

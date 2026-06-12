@@ -100,11 +100,10 @@ optgroup{font-weight:600;color:var(--muted)}
 .tab-panel.active{display:block}
 .tab-save-bar{margin:18px 0 8px;text-align:right;border-top:1px solid var(--line);padding-top:14px}
 
-/* ---- Gemini アシスタントパネル（右枠） ---- */
-.ai-panel{width:320px;flex-shrink:0;background:var(--bg2);border-left:1px solid var(--line);display:flex;flex-direction:column;height:100vh;position:sticky;top:0}
-.ai-panel.collapsed{width:44px}
-.ai-panel.collapsed .ai-body,.ai-panel.collapsed .ai-title{display:none}
-.ai-panel.collapsed .ai-toggle{transform:rotate(180deg)}
+/* ---- Gemini アシスタント（右下に横付けするフローティングウィンドウ） ---- */
+.ai-panel{display:none;position:fixed;right:16px;bottom:16px;z-index:100;width:360px;max-width:calc(100vw - 32px);height:min(560px,calc(100vh - 32px));background:var(--bg2);border:1px solid var(--line);border-radius:16px;flex-direction:column;box-shadow:0 12px 40px rgba(16,24,40,.22);overflow:hidden}
+.ai-panel.open{display:flex}
+.ai-fab.hidden{display:none}
 .ai-head{display:flex;align-items:center;justify-content:space-between;padding:14px 12px;border-bottom:1px solid var(--line)}
 .ai-title{font-weight:700;color:var(--heading);font-size:14px;white-space:nowrap}
 .ai-toggle{background:none;border:1px solid var(--line);color:var(--muted);border-radius:6px;width:24px;height:24px;cursor:pointer;line-height:1}
@@ -118,15 +117,10 @@ optgroup{font-weight:600;color:var(--muted)}
 .ai-form textarea{flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:8px;color:var(--fg);padding:8px;font-size:13px;resize:none;font-family:inherit}
 .ai-form button{background:var(--accent);border:none;color:#fff;border-radius:8px;padding:0 14px;cursor:pointer;font-size:13px}
 .ai-form button:disabled{opacity:.5;cursor:default}
-/* 狭い画面ではパネルを隠し、右下の✨ボタンから下部ドロワーとして開く */
-.ai-fab{display:none;position:fixed;right:16px;bottom:16px;z-index:99;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#7b6cf6);color:#fff;border:none;font-size:22px;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(88,101,242,.45)}
-@media (max-width:1100px){
-  .ai-panel{display:none}
-  .ai-fab{display:flex}
-  .ai-panel.mobile-open{display:flex;position:fixed;left:0;right:0;bottom:0;top:auto;width:100%;height:72vh;z-index:100;border-left:none;border-top:1px solid var(--line);border-radius:14px 14px 0 0;box-shadow:0 -8px 30px rgba(16,24,40,.25)}
-  .ai-panel.mobile-open .ai-body{display:flex}
-  .ai-panel.mobile-open .ai-title{display:inline}
-  .ai-panel.mobile-open .ai-toggle{transform:none}
+.ai-fab{display:flex;position:fixed;right:16px;bottom:16px;z-index:99;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#7b6cf6);color:#fff;border:none;font-size:22px;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 14px rgba(88,101,242,.45)}
+/* スマホでは下部いっぱいのドロワーとして開く */
+@media (max-width:768px){
+  .ai-panel{right:0;bottom:0;width:100%;max-width:100%;height:72vh;border-radius:14px 14px 0 0;border-left:none;border-right:none;border-bottom:none}
 }
 
 /* ---- モバイル対応（スマホ縦持ち想定） ---- */
