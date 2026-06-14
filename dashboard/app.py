@@ -401,6 +401,17 @@ async def dashboard(request: Request, session: Optional[str] = Cookie(None)):
     )
 
 
+@app.get("/guide", response_class=HTMLResponse)
+async def guide(request: Request, session: Optional[str] = Cookie(None)):
+    sess = get_session(session)
+    if not sess:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse(
+        "guide.html",
+        {"request": request, "session": sess},
+    )
+
+
 # -------------------------- AIアシスタント（Gemini） --------------------------
 
 ASSISTANT_SYSTEM_PROMPT = """\

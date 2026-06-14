@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}使い方ガイド — Support Bot{% endblock %}
+{% block body %}
+<div class="wrap">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span>Support Bot</div>
+    <nav class="nav">
+      <a href="/dashboard">📋 サーバー一覧</a>
+      {% if session.is_root %}
+        <a href="/forwarding">📦 画像転送</a>
+        <a href="/admin/users">👥 ユーザー管理</a>
+      {% endif %}
+      <a href="/guide" class="active">📖 使い方ガイド</a>
+      <div class="section-label">アカウント</div>
+      <a href="#" style="color:var(--muted)">👤 {{ session.username }}{% if session.is_root %} (root){% endif %}</a>
+      <a href="/logout" style="color:var(--muted)">🚪 ログアウト</a>
+    </nav>
+  </aside>
+  <main class="main">
+    <h1>使い方ガイド</h1>
+    <p class="subtitle">Support Bot の主な機能と、画像転送（梱包写真転送）の設定手順です。</p>
+
+    {# ============ 画像転送 ============ #}
+    <h2 style="margin-top:8px">📦 画像転送（梱包写真転送）</h2>
+    <p>監視元チャンネルに投稿された画像を、別チャンネル（別サーバーでも可）へ自動転送します。梱包・発送写真をお客様向けサーバーに流し、取引の活発さを見せて購買意欲を高めるための機能です。</p>
+
+    <div class="callout">
+      <div style="font-weight:600;color:var(--heading);margin-bottom:6px">⚠️ 設定に必要な権限</div>
+      この機能を設定するには、<b>2つのサーバー両方</b>での権限が必要です。
+      <ul style="margin:8px 0 0 18px;padding:0">
+        <li><b>① 監視元サーバー</b>（画像が投稿される側）— Botがチャンネルを<b>閲覧</b>できること</li>
+        <li><b>② 転送先サーバー</b>（画像を流す側）— Botが<b>メッセージ送信・ファイル添付</b>できること</li>
+      </ul>
+      <div style="margin-top:8px">どちらのサーバーにもBotが参加し、あなた自身が<b>管理者（編集）権限</b>を持っている必要があります。</div>
+    </div>
+
+    <h3>方法A. ダッシュボードから設定（おすすめ）</h3>
+    <ol style="margin:8px 0 0 20px;padding:0;line-height:1.9">
+      <li>左メニューの <b>📦 画像転送</b> を開く（root 権限が必要）</li>
+      <li><b>監視元</b>のチャンネルを「サーバー名 ＞ #チャンネル名」から選ぶ</li>
+      <li><b>転送先</b>のチャンネルを選ぶ</li>
+      <li><b>ルールを追加</b>を押す → Bot に自動反映されます（再起動不要）</li>
+    </ol>
+    <p style="color:var(--muted);font-size:14px">※ プルダウンには Bot が参加しているサーバー・チャンネルだけが表示されます。出てこない場合は、対象サーバーに Bot が招待されているか確認してください。</p>
+
+    <h3>方法B. Discord のコマンドから設定</h3>
+    <p>Discord 上でも同じルールを編集できます（管理者のみ）。</p>
+    <table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:14px">
+      <tr><th style="text-align:left;padding:6px;border-bottom:1px solid var(--border)">コマンド</th><th style="text-align:left;padding:6px;border-bottom:1px solid var(--border)">説明</th></tr>
+      <tr><td style="padding:6px"><code>/forward add</code></td><td style="padding:6px">このチャンネル（または指定元）→ 転送先のルールを追加</td></tr>
+      <tr><td style="padding:6px"><code>/forward list</code></td><td style="padding:6px">登録済みルール一覧</td></tr>
+      <tr><td style="padding:6px"><code>/forward remove</code></td><td style="padding:6px">番号指定でルール削除（番号は list で確認）</td></tr>
+    </table>
+    <p style="color:var(--muted);font-size:14px;margin-top:8px">ダッシュボードと Discord コマンドは<b>同じルールデータ</b>を編集します。どちらで変更しても両方に反映されます。</p>
+
+    {# ============ その他の機能 ============ #}
+    <h2 style="margin-top:28px">🛒 その他の機能</h2>
+    <p>各サーバーの細かい設定は、左メニューの <b>📋 サーバー一覧</b> から対象サーバーを開いて行います。Discord 上では <code>/guide</code> コマンドでメニュー式の機能ガイドを表示できます。</p>
+    <ul style="margin:8px 0 0 18px;padding:0;line-height:1.9">
+      <li>🌐 <b>自動翻訳</b> <code>/translate</code> — 英⇄日の双方向自動翻訳</li>
+      <li>🤖 <b>意図判定アドバイス</b> <code>/suggest</code> — 商品問合せ・配送相談を検知して誘導</li>
+      <li>📦 <b>送料計算</b> <code>/shipping</code> — DHL/FedEx の安い方を自動選択（20kg超は分割発送）</li>
+      <li>🎫 <b>チケット</b> / 🎊 <b>Welcome</b> / 🎉 <b>Giveaway</b> / 🔨 <b>オークション</b></li>
+      <li>🚪 <b>招待トラッキング</b> / 📰 <b>週次ダイジェスト</b> / 💾 <b>設定バックアップ</b></li>
+      <li>🩺 <b>ヘルスチェック</b> / ❓ <b>FAQ</b> / 🛡️ <b>Safety nets</b> / ⛽ <b>燃油サーチャージ</b></li>
+    </ul>
+
+    <div class="callout" style="margin-top:20px">
+      <div style="font-weight:600;color:var(--heading);margin-bottom:6px">💡 ヒント</div>
+      Discord 内で各機能の詳しい説明を見るには <code>/guide</code>（メニュー式）または <code>/help</code> を使ってください。
+    </div>
+  </main>
+</div>
+{% endblock %}
