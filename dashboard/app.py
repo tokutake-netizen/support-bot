@@ -192,9 +192,18 @@ async def oauth_callback(
         {"id": g["id"], "name": g["name"], "icon": g.get("icon")}
         for g in raw_guilds if auth.is_admin(g)
     ]
+    # Grant root to designated Discord accounts (comma-separated user IDs in
+    # DASHBOARD_ROOT_DISCORD_ID). Without this, Discord-OAuth logins are never
+    # root and root-only pages (e.g. 画像転送) stay hidden.
+    root_ids = {
+        s.strip()
+        for s in os.environ.get("DASHBOARD_ROOT_DISCORD_ID", "").split(",")
+        if s.strip()
+    }
     sess = {
         "user_id": user["id"],
         "username": user.get("global_name") or user.get("username"),
+        "is_root": str(user["id"]) in root_ids,
         "guilds": guilds,
     }
     resp = RedirectResponse("/dashboard")
