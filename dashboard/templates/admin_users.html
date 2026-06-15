@@ -18,6 +18,10 @@
 
     {% if request.query_params.get("added") %}
       <div class="flash ok">✓ ユーザーを追加しました</div>
+    {% elif request.query_params.get("droot_added") %}
+      <div class="flash ok">✓ Discordログインのroot権限を追加しました（対象者は一度ログアウト→Discord再ログインで反映）</div>
+    {% elif request.query_params.get("droot_removed") %}
+      <div class="flash ok">✓ Discordログインのroot権限を削除しました</div>
     {% elif request.query_params.get("removed") %}
       <div class="flash ok">✓ ユーザーを削除しました</div>
     {% elif request.query_params.get("toggled") %}
@@ -65,6 +69,54 @@
       {% endfor %}
     </div>
     {% endif %}
+
+    {# Discord login root admins #}
+    <h2>🤖 Discordログインのroot権限 <span class="help">{{ discord_roots | length }} 名</span></h2>
+    <div class="card">
+      <p class="hint">Discordアカウントでログインした人に root 権限（画像転送・ユーザー管理が使える）を付与します。ここに登録すれば <b>Railway を触らずに</b> 管理できます。<br>
+        Discord ユーザーIDの調べ方: Discord → 設定 → 詳細設定 → <b>開発者モードON</b> → 自分のアイコンを右クリック → <b>「ユーザーIDをコピー」</b>（17〜20桁の数字）。</p>
+      <form method="post" action="/admin/discord-roots/add">
+        <div class="row">
+          <div class="field">
+            <label>🆔 Discord ユーザーID</label>
+            <input type="text" name="user_id" required pattern="[0-9]{17,20}" placeholder="例: 123456789012345678">
+          </div>
+          <div class="field">
+            <label>🏷 メモ (任意・誰のIDか分かるように)</label>
+            <input type="text" name="label" placeholder="例: tokutake">
+          </div>
+        </div>
+        <button type="submit" class="btn">➕ root権限を付与</button>
+      </form>
+
+      {% if discord_roots %}
+      <div style="margin-top:14px">
+        {% for d in discord_roots %}
+        <div class="feature">
+          <div>
+            <div class="name">
+              <span style="color:var(--green)">●</span>
+              <code>{{ d.id }}</code>
+              {% if d.label %}<span class="badge info">{{ d.label }}</span>{% endif %}
+              <span class="badge running">root</span>
+            </div>
+            <div class="desc">
+              {% if d.source == "env" %}env 管理（DASHBOARD_ROOT_DISCORD_ID）{% else %}追加者: {{ d.added_by }}{% if d.created_at %} ・ {{ d.created_at }} (unix){% endif %}{% endif %}
+            </div>
+          </div>
+          {% if d.source == "stored" %}
+          <form method="post" action="/admin/discord-roots/remove" style="display:inline" onsubmit="return confirm('このDiscordアカウントのroot権限を削除しますか?')">
+            <input type="hidden" name="user_id" value="{{ d.id }}">
+            <button type="submit" class="btn btn-sm red">🗑 削除</button>
+          </form>
+          {% else %}
+          <span style="color:var(--muted);font-size:12px">env 管理(削除不可)</span>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
 
     <h2>➕ 直接追加(申請を経由しない)</h2>
     <div class="card">

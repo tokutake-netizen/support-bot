@@ -289,3 +289,100 @@ def remove_user(email: str) -> bool:
     del users[email]
     _save(users)
     return True
+
+
+# ---------- Discord-login root admins (managed in-app) ----------
+# Discord-OAuth logins are matched against this list to decide is_root, so root
+# can be granted from the dashboard instead of editing Railway env each time.
+# Bootstrap IDs in DASHBOARD_ROOT_DISCORD_ID (CSV) are always root and are shown
+# as "(env)" — they cannot be removed from the UI.
+
+def _discord_roots_path() -> Path:
+    raw = os.environ.get("DASHBOARD_DISCORD_ROOTS_FILE")
+    if raw:
+        return Path(raw)
+    return _users_path().parent / "dashboard_discord_roots.json"
+
+
+def _load_discord_roots() -> dict:
+    p = _discord_roots_path()
+    if not p.exists():
+        return {}
+    try:
+        return json.loads(p.read_text("utf-8"))
+    except json.JSONDecodeError:
+        return {}
+
+
+def _save_discord_roots(data: dict) -> None:
+    p = _discord_roots_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(data, indent=2, ensure_ascii=False), "utf-8")
+
+
+def env_discord_root_ids() -> set[str]:
+    raw = os.environ.get("DASHBOARD_ROOT_DISCORD_ID", "")
+    return {s.strip() for s in raw.split(",") if s.strip()}
+
+
+def _normalize_discord_id(user_id: str) -> str:
+    uid = (user_id or "").strip()
+    if not uid.isdigit() or not (17 <= len(uid) <= 20):
+        raise ValueError("Discord ユーザーIDは17〜20桁の数字で入力してください")
+    return uid
+
+
+def is_discord_root(user_id) -> bool:
+    uid = str(user_id)
+    return uid in env_discord_root_ids() or uid in _load_discord_roots()
+
+
+def list_discord_roots() -> list[dict]:
+    """Combined view: env bootstrap IDs first (non-removable), then stored ones."""
+    out: list[dict] = []
+    stored = _load_discord_roots()
+    for uid in sorted(env_discord_root_ids()):
+        rec = stored.get(uid, {})
+        out.append({
+            "id": uid,
+            "label": rec.get("label") or "",
+            "added_by": "(env)",
+            "created_at": rec.get("created_at"),
+            "source": "env",
+        })
+    env_ids = env_discord_root_ids()
+    for uid, rec in stored.items():
+        if uid in env_ids:
+            continue
+        out.append({
+            "id": uid,
+            "label": rec.get("label") or "",
+            "added_by": rec.get("added_by") or "",
+            "created_at": rec.get("created_at"),
+            "source": "stored",
+        })
+    return out
+
+
+def add_discord_root(user_id: str, label: str = "", added_by: str = "") -> dict:
+    uid = _normalize_discord_id(user_id)
+    roots = _load_discord_roots()
+    roots[uid] = {
+        "label": (label or "").strip(),
+        "added_by": added_by,
+        "created_at": int(time.time()),
+    }
+    _save_discord_roots(roots)
+    return {"id": uid, **roots[uid]}
+
+
+def remove_discord_root(user_id: str) -> bool:
+    uid = str(user_id).strip()
+    if uid in env_discord_root_ids():
+        return False  # env-managed, not removable from UI
+    roots = _load_discord_roots()
+    if uid not in roots:
+        return False
+    del roots[uid]
+    _save_discord_roots(roots)
+    return True

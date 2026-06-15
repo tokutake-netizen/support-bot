@@ -192,18 +192,14 @@ async def oauth_callback(
         {"id": g["id"], "name": g["name"], "icon": g.get("icon")}
         for g in raw_guilds if auth.is_admin(g)
     ]
-    # Grant root to designated Discord accounts (comma-separated user IDs in
-    # DASHBOARD_ROOT_DISCORD_ID). Without this, Discord-OAuth logins are never
-    # root and root-only pages (e.g. 画像転送) stay hidden.
-    root_ids = {
-        s.strip()
-        for s in os.environ.get("DASHBOARD_ROOT_DISCORD_ID", "").split(",")
-        if s.strip()
-    }
+    # Grant root to Discord accounts listed in the in-app root allowlist
+    # (DASHBOARD_ROOT_DISCORD_ID env bootstrap ∪ entries added from the
+    # ユーザー管理 page). Without this, Discord-OAuth logins are never root and
+    # root-only pages (e.g. 画像転送) stay hidden.
     sess = {
         "user_id": user["id"],
         "username": user.get("global_name") or user.get("username"),
-        "is_root": str(user["id"]) in root_ids,
+        "is_root": user_store.is_discord_root(user["id"]),
         "guilds": guilds,
     }
     resp = RedirectResponse("/dashboard")
@@ -310,8 +306,37 @@ async def admin_users(request: Request, session: Optional[str] = Cookie(None)):
             "request": request,
             "session": sess,
             "users": user_store.list_users(),
+            "discord_roots": user_store.list_discord_roots(),
         },
     )
+
+
+@app.post("/admin/discord-roots/add")
+async def admin_discord_roots_add(
+    user_id: str = Form(...),
+    label: str = Form(""),
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_root(sess)
+    try:
+        user_store.add_discord_root(
+            user_id, label=label, added_by=sess.get("username") or "root"
+        )
+    except ValueError as e:
+        return RedirectResponse(f"/admin/users?err={e}", status_code=303)
+    return RedirectResponse("/admin/users?droot_added=1", status_code=303)
+
+
+@app.post("/admin/discord-roots/remove")
+async def admin_discord_roots_remove(
+    user_id: str = Form(...),
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_root(sess)
+    user_store.remove_discord_root(user_id)
+    return RedirectResponse("/admin/users?droot_removed=1", status_code=303)
 
 
 @app.post("/admin/users/add")
