@@ -666,6 +666,26 @@ async def guild_setup(
             all_roles = await rest.list_roles(guild_id)
             roles = assignable_roles(all_roles)
 
+    # Message-forwarding rules whose SOURCE channel is in this guild, so each
+    # server manages its own forwarding from its settings page (not root-only).
+    ch_names = {str(c.get("id")): c.get("name") for c in channels}
+    guild_ch_ids = set(ch_names)
+    forward_rules = []
+    try:
+        for r in forward_store.load_rules():
+            src = str(r.get("source"))
+            if src not in guild_ch_ids:
+                continue
+            dst = str(r.get("dest"))
+            forward_rules.append({
+                "source": src,
+                "dest": dst,
+                "source_label": f"#{ch_names.get(src, src)}",
+                "dest_label": f"#{ch_names[dst]}" if dst in ch_names else f"(ID: {dst})",
+            })
+    except Exception:
+        log.warning("setup: failed to load forward rules", exc_info=True)
+
     return templates.TemplateResponse(
         "setup.html",
         {
@@ -682,8 +702,47 @@ async def guild_setup(
             "discord_ok": discord_ok,
             "bot_running": bot_manager.is_running(guild_id),
             "fuel_cache": fuel_cache,
+            "forward_rules": forward_rules,
         },
     )
+
+
+@app.post("/guild/{guild_id}/forwarding/add")
+async def guild_forwarding_add(
+    guild_id: str,
+    request: Request,
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    form = await request.form()
+    try:
+        source = int((form.get("source_channel") or "").strip())
+        dest = int((form.get("dest_channel") or "").strip())
+    except ValueError:
+        return JSONResponse({"ok": False, "error": "チャンネルIDが不正です"}, status_code=400)
+    if source == dest:
+        return JSONResponse({"ok": False, "error": "送信元と転送先が同じです"}, status_code=400)
+    added = forward_store.add_rule(source, dest)
+    return JSONResponse({"ok": True, "added": bool(added)})
+
+
+@app.post("/guild/{guild_id}/forwarding/remove")
+async def guild_forwarding_remove(
+    guild_id: str,
+    request: Request,
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    form = await request.form()
+    try:
+        source = int((form.get("source") or "").strip())
+        dest = int((form.get("dest") or "").strip())
+    except ValueError:
+        return JSONResponse({"ok": False, "error": "チャンネルIDが不正です"}, status_code=400)
+    forward_store.remove_rule(source, dest)
+    return JSONResponse({"ok": True})
 
 
 @app.post("/guild/{guild_id}/save")
