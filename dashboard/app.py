@@ -666,25 +666,29 @@ async def guild_setup(
             all_roles = await rest.list_roles(guild_id)
             roles = assignable_roles(all_roles)
 
-    # Message-forwarding rules whose SOURCE channel is in this guild, so each
-    # server manages its own forwarding from its settings page (not root-only).
-    ch_names = {str(c.get("id")): c.get("name") for c in channels}
-    guild_ch_ids = set(ch_names)
+    # Message forwarding: list every server the forwarding bot can reach so the
+    # source AND destination can be picked from other servers' channels (not
+    # just this guild). Mirrors the global /forwarding page, but embedded here.
+    fwd_servers: list = []
     forward_rules = []
     try:
+        fwd_token = forward_store.forward_bot_token()
+        if fwd_token:
+            fwd_servers = await forward_store.list_servers_with_channels(fwd_token)
+        ch_index = forward_store.index_channels(fwd_servers)
         for r in forward_store.load_rules():
             src = str(r.get("source"))
-            if src not in guild_ch_ids:
-                continue
             dst = str(r.get("dest"))
+            s = ch_index.get(src)
+            d = ch_index.get(dst)
             forward_rules.append({
                 "source": src,
                 "dest": dst,
-                "source_label": f"#{ch_names.get(src, src)}",
-                "dest_label": f"#{ch_names[dst]}" if dst in ch_names else f"(ID: {dst})",
+                "source_label": f"{s['server']} ＞ #{s['channel']}" if s else f"(ID: {src})",
+                "dest_label": f"{d['server']} ＞ #{d['channel']}" if d else f"(ID: {dst})",
             })
     except Exception:
-        log.warning("setup: failed to load forward rules", exc_info=True)
+        log.warning("setup: failed to load forwarding servers/rules", exc_info=True)
 
     return templates.TemplateResponse(
         "setup.html",
@@ -703,6 +707,7 @@ async def guild_setup(
             "bot_running": bot_manager.is_running(guild_id),
             "fuel_cache": fuel_cache,
             "forward_rules": forward_rules,
+            "fwd_servers": fwd_servers,
         },
     )
 

@@ -841,37 +841,41 @@
       <div class="tab-panel" id="tab-forwarding">
       {# ============ MESSAGE FORWARDING ============ #}
       <h2>📨 転送メッセージ</h2>
-      <p class="section-desc">このサーバーの監視元チャンネルに投稿された<b>画像と本文</b>を、別のチャンネル（別サーバーでも可）へ自動転送します。梱包・発送写真をお客様向けサーバーに流すのに使います。</p>
+      <p class="section-desc">監視元チャンネルに投稿された<b>画像と本文</b>を、別のチャンネル（<b>別サーバーでも可</b>）へ自動転送します。送信元・転送先はどちらも、転送Botが参加しているサーバーのチャンネルから選べます。</p>
       <div class="card">
-        <div class="hint" style="margin-bottom:10px">⚠️ 転送先が別サーバーの場合、転送Botがその<b>転送先サーバーにも参加</b>している必要があります。本文が無い画像だけの投稿は、従来の定型文で転送されます。</div>
+        <div class="hint" style="margin-bottom:10px">⚠️ ドロップダウンには<b>転送Bot（TTTCG）が参加しているサーバーとチャンネルだけ</b>が出ます。別サーバーへ転送したい場合は、そのサーバーに転送Botを招待してください。本文が無い画像だけの投稿は、従来の定型文で転送されます。</div>
 
-        <div class="row" style="align-items:flex-end">
+        {% if not fwd_servers %}
+          <div class="flash warn">転送Botが参加しているサーバーを取得できませんでした。転送Botのトークン（<code>FORWARD_BOT_TOKEN</code>）と、Botのサーバー参加状況を確認してください。</div>
+        {% endif %}
+
+        <div class="row" style="align-items:flex-start">
           <div class="field" style="flex:1;margin-bottom:0">
-            <label>送信元チャンネル（このサーバー）</label>
-            <select id="fwd-source-select">
-              <option value="">(選択してください)</option>
-              {% for cat, chs in channels_grouped %}
-                {% if cat %}<optgroup label="📂 {{ cat.name }}">{% endif %}
-                {% for c in chs %}
-                  <option value="{{ c.id }}"># {{ c.name }}</option>
-                {% endfor %}
-                {% if cat %}</optgroup>{% endif %}
-              {% endfor %}
+            <label>① 送信元（どこの投稿を）</label>
+            <select id="fwd-src-server" data-fwd="src">
+              <option value="">サーバーを選択…</option>
+              {% for s in fwd_servers %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
             </select>
+            <select id="fwd-src-channel" style="margin-top:8px"><option value="">先にサーバーを選択</option></select>
           </div>
           <div class="field" style="flex:1;margin-bottom:0">
-            <label>転送先チャンネルID</label>
-            <input type="text" id="fwd-dest-input" placeholder="例: 123456789012345678" pattern="[0-9]{17,20}">
-            <div class="hint">転送先チャンネルを右クリック →「IDをコピー」（開発者モードON時）。</div>
+            <label>② 転送先（どこへ飛ばすか・別サーバー可）</label>
+            <select id="fwd-dst-server" data-fwd="dst">
+              <option value="">サーバーを選択…</option>
+              {% for s in fwd_servers %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+            </select>
+            <select id="fwd-dst-channel" style="margin-top:8px"><option value="">先にサーバーを選択</option></select>
           </div>
-          <button type="button" id="fwd-add-btn" class="btn green" style="margin-bottom:0">➕ ルールを追加</button>
+        </div>
+        <div style="margin-top:12px">
+          <button type="button" id="fwd-add-btn" class="btn green">➕ ルールを追加</button>
         </div>
         <div id="fwd-result" style="margin-top:8px;font-size:13px"></div>
         <div class="hint" style="margin-top:6px">⚠️ このタブは「💾 変更を保存」とは別に、追加/削除した瞬間に反映されます（Botに数秒で反映）。</div>
       </div>
 
       <div class="card">
-        <h3 style="color:var(--heading);font-size:14px;margin-bottom:6px">現在の転送ルール <span class="help">送信元がこのサーバーのもの</span></h3>
+        <h3 style="color:var(--heading);font-size:14px;margin-bottom:6px">登録済みの転送ルール（{{ forward_rules | length }}）</h3>
         {% if forward_rules %}
           {% for r in forward_rules %}
           <div class="feature">
@@ -889,7 +893,28 @@
       <script>
         (function(){
           const guildId = "{{ guild_id }}";
+          const FWD_SERVERS = {{ fwd_servers | tojson }};
+          const byId = Object.fromEntries(FWD_SERVERS.map(s => [String(s.id), s]));
           const out = document.getElementById('fwd-result');
+
+          function fillChannels(serverSel){
+            const which = serverSel.dataset.fwd;
+            const chSel = document.getElementById('fwd-' + which + '-channel');
+            chSel.innerHTML = '';
+            const server = byId[serverSel.value];
+            if(!server){ chSel.innerHTML = '<option value="">先にサーバーを選択</option>'; return; }
+            const ph = document.createElement('option'); ph.value=''; ph.textContent='チャンネルを選択…'; chSel.appendChild(ph);
+            let lastCat, group=null;
+            (server.channels||[]).forEach(c => {
+              const opt = document.createElement('option'); opt.value=c.id; opt.textContent='#'+c.name;
+              if(c.category){
+                if(c.category!==lastCat){ group=document.createElement('optgroup'); group.label=c.category; chSel.appendChild(group); lastCat=c.category; }
+                group.appendChild(opt);
+              } else { chSel.appendChild(opt); lastCat=undefined; group=null; }
+            });
+          }
+          document.querySelectorAll('select[data-fwd]').forEach(sel => sel.addEventListener('change', () => fillChannels(sel)));
+
           async function post(url, data){
             const fd = new FormData();
             for(const k in data){ fd.append(k, data[k]); }
@@ -898,10 +923,10 @@
             return {ok: r.ok, body: j};
           }
           document.getElementById('fwd-add-btn').addEventListener('click', async function(){
-            const src = document.getElementById('fwd-source-select').value;
-            const dst = (document.getElementById('fwd-dest-input').value || '').trim();
-            if(!src){ out.innerHTML = '<span style="color:var(--red)">⚠️ 送信元チャンネルを選んでください</span>'; return; }
-            if(!/^[0-9]{17,20}$/.test(dst)){ out.innerHTML = '<span style="color:var(--red)">⚠️ 転送先チャンネルIDは17〜20桁の数字です</span>'; return; }
+            const src = document.getElementById('fwd-src-channel').value;
+            const dst = document.getElementById('fwd-dst-channel').value;
+            if(!src || !dst){ out.innerHTML = '<span style="color:var(--red)">⚠️ 送信元と転送先のチャンネルを両方選んでください</span>'; return; }
+            if(src === dst){ out.innerHTML = '<span style="color:var(--red)">⚠️ 送信元と転送先が同じです</span>'; return; }
             out.innerHTML = '<span style="color:var(--muted)">追加中…</span>';
             const res = await post('/guild/'+guildId+'/forwarding/add', {source_channel:src, dest_channel:dst});
             if(res.ok && res.body.ok){
