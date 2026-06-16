@@ -895,6 +895,25 @@
       </div>
 
       <div class="card">
+        <h3 style="color:var(--heading);font-size:14px;margin-bottom:6px">👀 プレビュー <span class="help">上で選んだモード／カスタム文で、転送先にどう届くか</span></h3>
+        <div class="field" style="margin-bottom:10px">
+          <label>サンプルの元メッセージ本文</label>
+          <input type="text" id="fwd-preview-sample" value="新しい入荷です！要チェック✨">
+          <div class="hint">実際に監視元へ投稿される本文の例。ここを変えると下のプレビューが変わります（画像は添付される想定）。</div>
+        </div>
+        <div style="background:#36393f;border-radius:10px;padding:14px 16px;color:#dcddde;font-size:14px;line-height:1.5;max-width:520px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="width:28px;height:28px;border-radius:50%;background:#5865f2;display:inline-flex;align-items:center;justify-content:center;font-size:14px">📦</span>
+            <span style="font-weight:600;color:#fff">TTTCG</span>
+            <span style="background:#5865f2;color:#fff;font-size:10px;border-radius:3px;padding:0 4px;font-weight:700">BOT</span>
+            <span style="color:#a3a6aa;font-size:11px">今日</span>
+          </div>
+          <div id="fwd-preview-caption" style="white-space:pre-wrap;word-break:break-word"></div>
+          <div style="margin-top:8px;width:200px;height:120px;border-radius:8px;background:#2f3136;display:flex;align-items:center;justify-content:center;color:#72767d;font-size:13px;border:1px dashed #4f545c">🖼️ 添付画像</div>
+        </div>
+      </div>
+
+      <div class="card">
         <h3 style="color:var(--heading);font-size:14px;margin-bottom:6px">登録済みの転送ルール（{{ forward_rules | length }}）</h3>
         {% if forward_rules %}
           {% for r in forward_rules %}
@@ -962,6 +981,28 @@
           const addTplWrap = document.getElementById('fwd-add-template-wrap');
           function toggleAddTpl(){ addTplWrap.style.display = (addModeSel.value==='decorated'||addModeSel.value==='custom') ? 'block' : 'none'; }
           addModeSel.addEventListener('change', toggleAddTpl); toggleAddTpl();
+
+          // ライブプレビュー（forward_config.py と同じロジックで転送先の見え方を再現）
+          const DEFAULT_MESSAGE = "📦 **Fresh from Japan — Shipment Preview!**\nHere's a look at what we've just packed up and ready to ship! 🇯🇵✨\n\n👀 See something you like? Head over to our ticket chat and let us know!\nWe'll get a deal sorted out for you right away. 🎴🔥";
+          const sampleEl = document.getElementById('fwd-preview-sample');
+          const capEl = document.getElementById('fwd-preview-caption');
+          function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+          function md(s){ return esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'); }
+          function renderPreview(){
+            const mode = addModeSel.value;
+            const tpl = (document.getElementById('fwd-add-template').value || '').trim();
+            const body = (sampleEl.value || '').trim();
+            let cap, muted=false;
+            if(mode === 'image_only'){ cap = '（テキストなし・画像のみ）'; muted=true; }
+            else if(mode === 'custom'){ if(tpl){ cap = tpl; } else { cap='（カスタム文が未入力です）'; muted=true; } }
+            else if(mode === 'decorated'){ const deco = tpl || DEFAULT_MESSAGE; cap = body ? (body + "\n\n" + deco) : deco; }
+            else { if(body){ cap = body; } else { cap='（本文なし・画像のみ）'; muted=true; } }
+            capEl.innerHTML = muted ? '<span style="color:#72767d;font-style:italic">'+esc(cap)+'</span>' : md(cap);
+          }
+          addModeSel.addEventListener('change', renderPreview);
+          document.getElementById('fwd-add-template').addEventListener('input', renderPreview);
+          sampleEl.addEventListener('input', renderPreview);
+          renderPreview();
 
           async function post(url, data){
             const fd = new FormData();
