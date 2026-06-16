@@ -36,8 +36,9 @@ CREATE TABLE IF NOT EXISTS forward_rules (
 _MIGRATE_SQL = (
     "ALTER TABLE forward_rules ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'original'",
     "ALTER TABLE forward_rules ADD COLUMN IF NOT EXISTS role_ids TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE forward_rules ADD COLUMN IF NOT EXISTS template TEXT NOT NULL DEFAULT ''",
 )
-VALID_MODES = ("original", "image_only", "decorated")
+VALID_MODES = ("original", "image_only", "decorated", "custom")
 _table_ready = False
 
 
@@ -90,13 +91,14 @@ def load_rules() -> list[dict]:
             with conn.cursor() as cur:
                 _ensure_table(cur)
                 cur.execute(
-                    "SELECT source, dest, mode, role_ids FROM forward_rules "
+                    "SELECT source, dest, mode, role_ids, template FROM forward_rules "
                     "ORDER BY source, dest"
                 )
                 rows = cur.fetchall()
             conn.commit()
         return [
-            {"source": r[0], "dest": r[1], "mode": _norm_mode(r[2]), "role_ids": _parse_roles(r[3])}
+            {"source": r[0], "dest": r[1], "mode": _norm_mode(r[2]),
+             "role_ids": _parse_roles(r[3]), "template": r[4] or ""}
             for r in rows
         ]
     p = rules_path()
@@ -109,6 +111,7 @@ def load_rules() -> list[dict]:
     for r in rules:
         r["mode"] = _norm_mode(r.get("mode"))
         r["role_ids"] = _parse_roles(r.get("role_ids"))
+        r["template"] = r.get("template") or ""
     return rules
 
 
@@ -118,18 +121,19 @@ def save_rules(rules: list[dict]) -> None:
     p.write_text(json.dumps({"rules": rules}, ensure_ascii=False, indent=2), "utf-8")
 
 
-def add_rule(source: int, dest: int, mode: str = "original", role_ids=None) -> bool:
+def add_rule(source: int, dest: int, mode: str = "original", role_ids=None, template: str = "") -> bool:
     """重複していなければ追加。追加したら True。"""
     mode = _norm_mode(mode)
     roles_csv = _csv(role_ids)
+    template = template or ""
     if using_db():
         with _pg_connect() as conn:
             with conn.cursor() as cur:
                 _ensure_table(cur)
                 cur.execute(
-                    "INSERT INTO forward_rules (source, dest, mode, role_ids) "
-                    "VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING",
-                    (source, dest, mode, roles_csv),
+                    "INSERT INTO forward_rules (source, dest, mode, role_ids, template) "
+                    "VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
+                    (source, dest, mode, roles_csv, template),
                 )
                 added = cur.rowcount > 0
             conn.commit()
@@ -137,22 +141,25 @@ def add_rule(source: int, dest: int, mode: str = "original", role_ids=None) -> b
     rules = load_rules()
     if any(r.get("source") == source and r.get("dest") == dest for r in rules):
         return False
-    rules.append({"source": source, "dest": dest, "mode": mode, "role_ids": _parse_roles(role_ids)})
+    rules.append({"source": source, "dest": dest, "mode": mode,
+                  "role_ids": _parse_roles(role_ids), "template": template})
     save_rules(rules)
     return True
 
 
-def update_rule(source: int, dest: int, mode: str = "original", role_ids=None) -> bool:
-    """既存ルール (source,dest) の mode / role_ids を更新。更新できたら True。"""
+def update_rule(source: int, dest: int, mode: str = "original", role_ids=None, template: str = "") -> bool:
+    """既存ルール (source,dest) の mode / role_ids / template を更新。更新したら True。"""
     mode = _norm_mode(mode)
     roles_csv = _csv(role_ids)
+    template = template or ""
     if using_db():
         with _pg_connect() as conn:
             with conn.cursor() as cur:
                 _ensure_table(cur)
                 cur.execute(
-                    "UPDATE forward_rules SET mode=%s, role_ids=%s WHERE source=%s AND dest=%s",
-                    (mode, roles_csv, source, dest),
+                    "UPDATE forward_rules SET mode=%s, role_ids=%s, template=%s "
+                    "WHERE source=%s AND dest=%s",
+                    (mode, roles_csv, template, source, dest),
                 )
                 updated = cur.rowcount > 0
             conn.commit()
@@ -163,6 +170,7 @@ def update_rule(source: int, dest: int, mode: str = "original", role_ids=None) -
         if r.get("source") == source and r.get("dest") == dest:
             r["mode"] = mode
             r["role_ids"] = _parse_roles(role_ids)
+            r["template"] = template
             found = True
     if found:
         save_rules(rules)

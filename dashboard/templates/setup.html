@@ -873,7 +873,8 @@
             <select id="fwd-add-mode">
               <option value="original">そのまま（原文＋画像）</option>
               <option value="image_only">画像のみ</option>
-              <option value="decorated">加工（原文＋宣伝文）</option>
+              <option value="decorated">加工（原文＋付加文）</option>
+              <option value="custom">任意テキストに置換</option>
             </select>
           </div>
           <div class="field" style="flex:1;margin-bottom:0">
@@ -881,6 +882,10 @@
             <select id="fwd-add-roles" multiple size="4"></select>
             <div class="hint">Cmd/Ctrl クリックで複数選択。<b>未選択なら全員</b>のメッセージを転送。</div>
           </div>
+        </div>
+        <div class="field" id="fwd-add-template-wrap" style="margin-top:12px;display:none">
+          <label>カスタム文（任意テキスト）</label>
+          <textarea id="fwd-add-template" rows="3" placeholder="ここに入れた文章で置き換えます（「加工」では原文の下に付け足し、「任意テキストに置換」では本文の代わりに送ります）"></textarea>
         </div>
         <div style="margin-top:12px">
           <button type="button" id="fwd-add-btn" class="btn green">➕ ルールを追加</button>
@@ -893,10 +898,10 @@
         <h3 style="color:var(--heading);font-size:14px;margin-bottom:6px">登録済みの転送ルール（{{ forward_rules | length }}）</h3>
         {% if forward_rules %}
           {% for r in forward_rules %}
-          <div class="feature fwd-rule" data-source="{{ r.source }}" data-dest="{{ r.dest }}" data-server="{{ r.source_server_id }}" data-mode="{{ r.mode }}" data-roles="{{ r.role_ids | join(',') }}">
+          <div class="feature fwd-rule" data-source="{{ r.source }}" data-dest="{{ r.dest }}" data-server="{{ r.source_server_id }}" data-mode="{{ r.mode }}" data-roles="{{ r.role_ids | join(',') }}" data-template="{{ r.template }}">
             <div style="flex:1">
               <div class="name"><code>{{ r.source_label }}</code> → <code>{{ r.dest_label }}</code></div>
-              <div class="desc">モード: {{ r.mode_label }} ・ 送信者: {% if r.role_labels %}{{ r.role_labels | join(', ') }}{% else %}全員{% endif %}</div>
+              <div class="desc">モード: {{ r.mode_label }} ・ 送信者: {% if r.role_labels %}{{ r.role_labels | join(', ') }}{% else %}全員{% endif %}{% if r.template %} ・ カスタム文: 「{{ r.template[:40] }}{% if r.template|length > 40 %}…{% endif %}」{% endif %}</div>
               <div class="fwd-editor" style="display:none;margin-top:8px"></div>
             </div>
             <div style="display:flex;gap:6px;align-items:flex-start">
@@ -952,6 +957,12 @@
           });
           document.getElementById('fwd-dst-server').addEventListener('change', function(){ fillChannels(this); });
 
+          // モードに応じてカスタム文欄を出し分け（加工 / 任意テキスト のとき表示）
+          const addModeSel = document.getElementById('fwd-add-mode');
+          const addTplWrap = document.getElementById('fwd-add-template-wrap');
+          function toggleAddTpl(){ addTplWrap.style.display = (addModeSel.value==='decorated'||addModeSel.value==='custom') ? 'block' : 'none'; }
+          addModeSel.addEventListener('change', toggleAddTpl); toggleAddTpl();
+
           async function post(url, data){
             const fd = new FormData();
             for(const k in data){ fd.append(k, data[k]); }
@@ -964,10 +975,12 @@
             const dst = document.getElementById('fwd-dst-channel').value;
             const mode = document.getElementById('fwd-add-mode').value;
             const roles = selectedVals(document.getElementById('fwd-add-roles'));
+            const template = document.getElementById('fwd-add-template').value;
             if(!src || !dst){ out.innerHTML = '<span style="color:var(--red)">⚠️ 送信元と転送先のチャンネルを両方選んでください</span>'; return; }
             if(src === dst){ out.innerHTML = '<span style="color:var(--red)">⚠️ 送信元と転送先が同じです</span>'; return; }
+            if(mode === 'custom' && !template.trim()){ out.innerHTML = '<span style="color:var(--red)">⚠️ 「任意テキストに置換」ではカスタム文を入力してください</span>'; return; }
             out.innerHTML = '<span style="color:var(--muted)">追加中…</span>';
-            const res = await post('/guild/'+guildId+'/forwarding/add', {source_channel:src, dest_channel:dst, mode:mode, role_ids:roles});
+            const res = await post('/guild/'+guildId+'/forwarding/add', {source_channel:src, dest_channel:dst, mode:mode, role_ids:roles, template:template});
             if(res.ok && res.body.ok){
               out.innerHTML = res.body.added ? '<span style="color:var(--green)">✅ 追加しました。再読み込みします…</span>' : '<span style="color:var(--yellow)">⚠️ 同じルール（送信元→転送先）が既にあります。編集で変更してください</span>';
               if(res.body.added){ setTimeout(()=>location.reload(), 700); }
@@ -996,6 +1009,11 @@
               fillRoles(rsel, row.dataset.server, curRoles);
               rf.appendChild(rsel);
               wrap.appendChild(mf); wrap.appendChild(rf); ed.appendChild(wrap);
+              const tf = document.createElement('div'); tf.className='field'; tf.style.marginTop='8px';
+              tf.innerHTML = '<label>カスタム文（加工／任意テキスト用・任意）</label>';
+              const tta = document.createElement('textarea'); tta.rows=3; tta.value = row.dataset.template || '';
+              tta.placeholder = '「加工」では原文の下に付け足し、「任意テキストに置換」では本文の代わりに送ります';
+              tf.appendChild(tta); ed.appendChild(tf);
               const bar = document.createElement('div'); bar.style.marginTop='8px';
               const save = document.createElement('button'); save.type='button'; save.className='btn btn-sm green'; save.textContent='💾 保存';
               const cancel = document.createElement('button'); cancel.type='button'; cancel.className='btn btn-sm'; cancel.textContent='キャンセル'; cancel.style.marginLeft='6px';
@@ -1003,8 +1021,9 @@
               ed.style.display='block';
               cancel.onclick = ()=>{ ed.style.display='none'; };
               save.onclick = async ()=>{
+                if(msel.value === 'custom' && !tta.value.trim()){ out.innerHTML = '<span style="color:var(--red)">⚠️ 「任意テキストに置換」ではカスタム文を入力してください</span>'; return; }
                 out.innerHTML = '<span style="color:var(--muted)">更新中…</span>';
-                const res = await post('/guild/'+guildId+'/forwarding/update', {source:row.dataset.source, dest:row.dataset.dest, mode:msel.value, role_ids:selectedVals(rsel)});
+                const res = await post('/guild/'+guildId+'/forwarding/update', {source:row.dataset.source, dest:row.dataset.dest, mode:msel.value, role_ids:selectedVals(rsel), template:tta.value});
                 if(res.ok && res.body.ok){ location.reload(); }
                 else { out.innerHTML = '<span style="color:var(--red)">⚠️ 更新に失敗しました</span>'; }
               };

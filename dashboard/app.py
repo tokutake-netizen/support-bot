@@ -674,7 +674,8 @@ async def guild_setup(
     fwd_mode_labels = {
         "original": "そのまま（原文＋画像）",
         "image_only": "画像のみ",
-        "decorated": "加工（原文＋宣伝文）",
+        "decorated": "加工（原文＋付加文）",
+        "custom": "任意テキストに置換",
     }
     try:
         fwd_token = forward_store.forward_bot_token()
@@ -699,6 +700,7 @@ async def guild_setup(
                 "mode_label": fwd_mode_labels.get(mode, mode),
                 "role_ids": role_ids,
                 "role_labels": [role_index.get(rid, rid) for rid in role_ids],
+                "template": r.get("template") or "",
             })
     except Exception:
         log.warning("setup: failed to load forwarding servers/rules", exc_info=True)
@@ -743,7 +745,8 @@ async def guild_forwarding_add(
         return JSONResponse({"ok": False, "error": "送信元と転送先が同じです"}, status_code=400)
     mode = (form.get("mode") or "original").strip()
     role_ids = [s.strip() for s in (form.get("role_ids") or "").split(",") if s.strip()]
-    added = forward_store.add_rule(source, dest, mode=mode, role_ids=role_ids)
+    template = (form.get("template") or "").strip()
+    added = forward_store.add_rule(source, dest, mode=mode, role_ids=role_ids, template=template)
     return JSONResponse({"ok": True, "added": bool(added)})
 
 
@@ -763,7 +766,8 @@ async def guild_forwarding_update(
         return JSONResponse({"ok": False, "error": "チャンネルIDが不正です"}, status_code=400)
     mode = (form.get("mode") or "original").strip()
     role_ids = [s.strip() for s in (form.get("role_ids") or "").split(",") if s.strip()]
-    updated = forward_store.update_rule(source, dest, mode=mode, role_ids=role_ids)
+    template = (form.get("template") or "").strip()
+    updated = forward_store.update_rule(source, dest, mode=mode, role_ids=role_ids, template=template)
     return JSONResponse({"ok": True, "updated": bool(updated)})
 
 
