@@ -8,6 +8,15 @@
   .steps li{margin:2px 0}
   .pt{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;font-size:13px;padding:8px 12px;border-radius:8px;margin-top:10px}
   .nav .gtab{font-size:13px}
+  .gsub{font-size:15px;color:var(--heading);font-weight:700;margin:22px 0 4px}
+  /* 取得画面モック（screenshot風） */
+  .shot{border:1px solid #d5d8e0;border-radius:10px;overflow:hidden;margin:10px 0 4px;box-shadow:0 6px 20px rgba(16,24,40,.12);max-width:600px}
+  .shot-bar{display:flex;align-items:center;gap:8px;background:#e9ecf2;padding:7px 12px;border-bottom:1px solid #d5d8e0}
+  .shot-bar .dots{display:flex;gap:5px}
+  .shot-bar .dots i{width:10px;height:10px;border-radius:50%;display:inline-block}
+  .shot-url{background:#fff;border-radius:6px;font-size:11px;color:#555;padding:3px 10px;flex:1;font-family:"SF Mono",Menlo,monospace;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .cb{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;background:#5865f2;color:#fff;font-size:11px;font-weight:700;margin-right:5px;flex-shrink:0;vertical-align:middle}
+  .shotcap{font-size:11.5px;color:var(--muted);margin:2px 0 4px}
 </style>
 {% endblock %}
 {% block body %}
@@ -47,13 +56,108 @@
 
     <div class="guide-sec card" id="g-api">
       <h2>🔑 API設定</h2>
-      <p>Botの動作に必要なキー類をまとめて設定します。<b>まず最初にここを設定</b>してください。</p>
+      <p>Botの動作に必要なキーをまとめて設定します。<b>まず最初にここを設定</b>してください。必要なキーは3つ：<b>① Discord BOTトークン</b>（必須）、<b>② DeepL APIキー</b>（翻訳）、<b>③ Anthropic APIキー</b>（意図判定・翻訳の予備）。以下、それぞれの取得画面と手順です。</p>
+
+      {# ---- ① Discord ---- #}
+      <div class="gsub">① Discord BOT トークン（必須）</div>
+      <p class="shotcap">取得先: <b>Discord Developer Portal</b>（discord.com/developers/applications）— 要ログイン</p>
+      <div class="shot">
+        <div class="shot-bar"><span class="dots"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i></span><span class="shot-url">https://discord.com/developers/applications</span></div>
+        <div style="display:flex;background:#2b2d31;color:#dbdee1;font-size:12.5px">
+          <div style="width:118px;background:#1e1f22;padding:10px 8px">
+            <div style="color:#949ba4;font-size:9.5px;margin-bottom:6px">SETTINGS</div>
+            <div style="padding:5px 8px;border-radius:5px">General</div>
+            <div style="padding:5px 8px;border-radius:5px;background:#404249;color:#fff">🤖 Bot</div>
+            <div style="padding:5px 8px;border-radius:5px">OAuth2</div>
+          </div>
+          <div style="flex:1;padding:14px 16px">
+            <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:10px">Bot</div>
+            <div style="font-size:10.5px;color:#949ba4;margin-bottom:4px">TOKEN</div>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+              <code style="background:#1e1f22;padding:6px 10px;border-radius:5px;color:#72767d">••••••••••••••••••••</code>
+              <button style="background:#5865f2;color:#fff;border:none;border-radius:5px;padding:6px 12px;font-size:12px"><span class="cb" style="background:#fff;color:#5865f2">3</span>Reset Token</button>
+            </div>
+            <div style="font-size:10.5px;color:#949ba4;margin-bottom:2px">PRIVILEGED GATEWAY INTENTS</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-top:1px solid #3f4147"><span><span class="cb" style="background:#faa61a;color:#000">4</span>MESSAGE CONTENT INTENT</span><span style="background:#3ba55d;color:#fff;font-size:10px;padding:2px 8px;border-radius:10px">ON ✓</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-top:1px solid #3f4147"><span>SERVER MEMBERS INTENT</span><span style="background:#3ba55d;color:#fff;font-size:10px;padding:2px 8px;border-radius:10px">ON ✓</span></div>
+          </div>
+        </div>
+      </div>
       <ol class="steps">
-        <li><b>Discord BOT トークン</b>を入力 → 保存。これで他タブのチャンネル/ロール一覧が自動取得されます</li>
-        <li><b>DeepL APIキー</b>（翻訳用）、<b>Anthropic APIキー</b>（意図判定・翻訳フォールバック用）を入力</li>
-        <li><b>月間予算(USD)</b>を設定（超過すると自動翻訳が一時停止）→ 保存</li>
+        <li><span class="cb">1</span>上記サイトを開き、右上の <b>New Application</b> でアプリ作成（名前は何でもOK）</li>
+        <li><span class="cb">2</span>左メニューの <b>Bot</b> を開く</li>
+        <li><span class="cb">3</span><b>Reset Token</b> → 表示されたトークンを<b>コピー</b>（この画面でしか見られないので必ず控える）</li>
+        <li><span class="cb">4</span>同じBotページ下の <b>MESSAGE CONTENT INTENT</b> と <b>SERVER MEMBERS INTENT</b> を <b>ON</b> にする（必須）</li>
       </ol>
-      <div class="pt">💡 トークン類は暗号化して保存されます。取得先: Discord Developer Portal / deepl.com/pro-api / console.anthropic.com</div>
+      <div class="pt">⚠️ MESSAGE CONTENT INTENT がOFFだと、Botがメッセージ本文を読めず翻訳・転送・意図判定が動きません（2026年は厳格化されています）。</div>
+
+      {# ---- ② DeepL ---- #}
+      <div class="gsub">② DeepL API キー（翻訳用）</div>
+      <p class="shotcap">取得先: <b>DeepL アカウント → API Keys</b>（deepl.com/your-account/keys）。無料プランで月50万文字まで</p>
+      <div class="shot">
+        <div class="shot-bar"><span class="dots"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i></span><span class="shot-url">https://www.deepl.com/your-account/keys</span></div>
+        <div style="background:#fff;padding:14px 16px;font-size:13px;color:#333">
+          <div style="display:flex;gap:16px;border-bottom:1px solid #eee;margin-bottom:12px;font-size:12px;color:#777">
+            <span style="padding-bottom:6px">プラン</span>
+            <span style="padding-bottom:6px;border-bottom:2px solid #0f2b46;color:#0f2b46;font-weight:700"><span class="cb" style="background:#0f2b46">2</span>API Keys</span>
+            <span style="padding-bottom:6px">使用状況</span>
+          </div>
+          <div style="font-weight:700;margin-bottom:6px">Authentication Key for DeepL API</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <code style="background:#f1f1ef;padding:6px 10px;border-radius:5px;flex:1;overflow:hidden;text-overflow:ellipsis">279a2e9d-83b3-c416-…-f721593e42a0:fx</code>
+            <button style="background:#0f2b46;color:#fff;border:none;border-radius:5px;padding:6px 12px;font-size:12px"><span class="cb" style="background:#fff;color:#0f2b46">3</span>コピー</button>
+          </div>
+          <div style="font-size:11px;color:#888;margin-top:6px">末尾が <b>:fx</b> = 無料版キー</div>
+        </div>
+      </div>
+      <ol class="steps">
+        <li><span class="cb">1</span>deepl.com/pro#developer から <b>DeepL API Free</b> に登録（無料）</li>
+        <li><span class="cb">2</span>アカウントの <b>API Keys</b> タブを開く</li>
+        <li><span class="cb">3</span>キー（末尾 <code>:fx</code>）を<b>コピー</b></li>
+      </ol>
+      <div class="pt">💡 DeepLを使わず Anthropic だけで翻訳することも可能（その場合このキーは空でOK・自動でClaudeにフォールバック）。</div>
+
+      {# ---- ③ Anthropic ---- #}
+      <div class="gsub">③ Anthropic API キー（意図判定・翻訳の予備）</div>
+      <p class="shotcap">取得先: <b>Anthropic Console → Settings → API keys</b>（console.anthropic.com/settings/keys）</p>
+      <div class="shot">
+        <div class="shot-bar"><span class="dots"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i></span><span class="shot-url">https://console.anthropic.com/settings/keys</span></div>
+        <div style="background:#fff;padding:14px 16px;font-size:13px;color:#333">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <span style="font-weight:700">API keys</span>
+            <button style="background:#cc6b3f;color:#fff;border:none;border-radius:6px;padding:7px 12px;font-size:12px"><span class="cb" style="background:#fff;color:#cc6b3f">2</span>+ Create Key</button>
+          </div>
+          <div style="border:1px solid #eee;border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center">
+            <div><div style="font-weight:600">Support Bot</div><code style="font-size:11px;color:#888">sk-ant-api03-••••••••••••••</code></div>
+            <button style="background:#f1f1ef;border:1px solid #ddd;border-radius:5px;padding:5px 10px;font-size:12px"><span class="cb" style="background:#888">3</span>Copy</button>
+          </div>
+          <div style="font-size:11px;color:#c0392b;margin-top:6px">⚠️ キーは作成時の1回だけ表示。すぐコピーしてください</div>
+        </div>
+      </div>
+      <ol class="steps">
+        <li><span class="cb">1</span>console.anthropic.com にログイン → 左下 <b>Settings → API keys</b></li>
+        <li><span class="cb">2</span><b>Create Key</b> を押し、名前（例: Support Bot）を付ける</li>
+        <li><span class="cb">3</span>表示された <code>sk-ant-…</code> を<b>すぐコピー</b>（再表示不可）。利用には Billing でクレジット購入が必要</li>
+      </ol>
+
+      {# ---- ④ 貼り付け ---- #}
+      <div class="gsub">④ ダッシュボードに貼り付けて保存</div>
+      <p class="shotcap">サーバー設定 → <b>🔑 API</b> タブ</p>
+      <div class="shot">
+        <div class="shot-bar"><span class="dots"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i></span><span class="shot-url">support-bot … /guild/…/setup</span></div>
+        <div style="background:#fff;padding:14px 16px;font-size:13px;color:#333">
+          <div style="margin-bottom:10px"><div style="font-weight:600;font-size:12px;margin-bottom:3px">Discord BOT トークン<span style="color:#dc2626">*</span></div><div style="border:1px solid #e3e8f0;border-radius:6px;padding:7px 10px;color:#aaa">••••••••••••••••</div></div>
+          <div style="margin-bottom:10px"><div style="font-weight:600;font-size:12px;margin-bottom:3px">DeepL API キー</div><div style="border:1px solid #e3e8f0;border-radius:6px;padding:7px 10px;color:#aaa">…:fx</div></div>
+          <div style="margin-bottom:10px"><div style="font-weight:600;font-size:12px;margin-bottom:3px">Anthropic API キー</div><div style="border:1px solid #e3e8f0;border-radius:6px;padding:7px 10px;color:#aaa">sk-ant-…</div></div>
+          <button style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600">💾 変更を保存</button>
+        </div>
+      </div>
+      <ol class="steps">
+        <li><span class="cb">1</span>まず <b>Discord BOTトークン</b>を貼って <b>💾 変更を保存</b>（これで他タブのチャンネル/ロール一覧が取得されます）</li>
+        <li><span class="cb">2</span>DeepL / Anthropic のキーを貼る</li>
+        <li><span class="cb">3</span><b>月間予算(USD)</b>を設定（超過で自動翻訳が一時停止）→ もう一度保存</li>
+      </ol>
+      <div class="pt">💡 トークン類は暗号化して保存されます。万一外部に漏れたら、各サービスの画面でキーを再発行（リセット）してください。</div>
     </div>
 
     <div class="guide-sec card" id="g-translation">
