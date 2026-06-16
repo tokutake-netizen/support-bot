@@ -1,5 +1,15 @@
 {% extends "base.html" %}
 {% block title %}使い方ガイド — Support Bot{% endblock %}
+{% block head %}
+<style>
+  .guide-sec{scroll-margin-top:16px}
+  .guide-sec h2{display:flex;align-items:center;gap:8px;margin-top:6px}
+  .steps{margin:8px 0 0 20px;padding:0;line-height:1.9}
+  .steps li{margin:2px 0}
+  .pt{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;font-size:13px;padding:8px 12px;border-radius:8px;margin-top:10px}
+  .nav .gtab{font-size:13px}
+</style>
+{% endblock %}
 {% block body %}
 <div class="wrap">
   <aside class="sidebar">
@@ -11,6 +21,16 @@
         <a href="/admin/users">👥 ユーザー管理</a>
       {% endif %}
       <a href="/guide" class="active">📖 使い方ガイド</a>
+      <div class="section-label">タブ別ガイド</div>
+      <a href="#g-api" class="gtab">🔑 API設定</a>
+      <a href="#g-translation" class="gtab">🌐 翻訳</a>
+      <a href="#g-ticket" class="gtab">🎫 チケット</a>
+      <a href="#g-welcome" class="gtab">🎊 Welcome</a>
+      <a href="#g-suggester" class="gtab">🤖 意図判定</a>
+      <a href="#g-shipping" class="gtab">📦 送料</a>
+      <a href="#g-auction" class="gtab">🏛️ Auction</a>
+      <a href="#g-invite" class="gtab">🚪 招待</a>
+      <a href="#g-forwarding" class="gtab">📨 転送メッセージ</a>
       <div class="section-label">アカウント</div>
       <a href="#" style="color:var(--muted)">👤 {{ session.username }}{% if session.is_root %} (root){% endif %}</a>
       <a href="/logout" style="color:var(--muted)">🚪 ログアウト</a>
@@ -18,56 +38,113 @@
   </aside>
   <main class="main">
     <h1>使い方ガイド</h1>
-    <p class="subtitle">Support Bot の主な機能と、画像転送（梱包写真転送）の設定手順です。</p>
-
-    {# ============ 画像転送 ============ #}
-    <h2 style="margin-top:8px">📦 画像転送（梱包写真転送）</h2>
-    <p>監視元チャンネルに投稿された画像を、別チャンネル（別サーバーでも可）へ自動転送します。梱包・発送写真をお客様向けサーバーに流し、取引の活発さを見せて購買意欲を高めるための機能です。</p>
+    <p class="subtitle">サーバー設定の各タブの使い方です。左メニューの「タブ別ガイド」から各項目に飛べます。</p>
 
     <div class="callout">
-      <div style="font-weight:600;color:var(--heading);margin-bottom:6px">⚠️ 設定に必要な権限</div>
-      この機能を設定するには、<b>2つのサーバー両方</b>での権限が必要です。
-      <ul style="margin:8px 0 0 18px;padding:0">
-        <li><b>① 監視元サーバー</b>（画像が投稿される側）— Botがチャンネルを<b>閲覧</b>できること</li>
-        <li><b>② 転送先サーバー</b>（画像を流す側）— Botが<b>メッセージ送信・ファイル添付</b>できること</li>
-      </ul>
-      <div style="margin-top:8px">どちらのサーバーにもBotが参加し、あなた自身が<b>管理者（編集）権限</b>を持っている必要があります。</div>
+      <div style="font-weight:600;color:var(--heading);margin-bottom:6px">📍 設定の開き方</div>
+      <b>📋 サーバー一覧</b> → 対象サーバーを開く → 上部のタブ（🔑API / 🌐翻訳 / 🎫チケット …）を切り替えて設定します。各タブは右下の「💾 変更を保存」で保存（転送メッセージのみ追加/編集の瞬間に反映）。
     </div>
 
-    <h3>方法A. ダッシュボードから設定（おすすめ）</h3>
-    <ol style="margin:8px 0 0 20px;padding:0;line-height:1.9">
-      <li>左メニューの <b>📦 画像転送</b> を開く（root 権限が必要）</li>
-      <li><b>監視元</b>のチャンネルを「サーバー名 ＞ #チャンネル名」から選ぶ</li>
-      <li><b>転送先</b>のチャンネルを選ぶ</li>
-      <li><b>ルールを追加</b>を押す → Bot に自動反映されます（再起動不要）</li>
-    </ol>
-    <p style="color:var(--muted);font-size:14px">※ プルダウンには Bot が参加しているサーバー・チャンネルだけが表示されます。出てこない場合は、対象サーバーに Bot が招待されているか確認してください。</p>
+    <div class="guide-sec card" id="g-api">
+      <h2>🔑 API設定</h2>
+      <p>Botの動作に必要なキー類をまとめて設定します。<b>まず最初にここを設定</b>してください。</p>
+      <ol class="steps">
+        <li><b>Discord BOT トークン</b>を入力 → 保存。これで他タブのチャンネル/ロール一覧が自動取得されます</li>
+        <li><b>DeepL APIキー</b>（翻訳用）、<b>Anthropic APIキー</b>（意図判定・翻訳フォールバック用）を入力</li>
+        <li><b>月間予算(USD)</b>を設定（超過すると自動翻訳が一時停止）→ 保存</li>
+      </ol>
+      <div class="pt">💡 トークン類は暗号化して保存されます。取得先: Discord Developer Portal / deepl.com/pro-api / console.anthropic.com</div>
+    </div>
 
-    <h3>方法B. Discord のコマンドから設定</h3>
-    <p>Discord 上でも同じルールを編集できます（管理者のみ）。</p>
-    <table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:14px">
-      <tr><th style="text-align:left;padding:6px;border-bottom:1px solid var(--border)">コマンド</th><th style="text-align:left;padding:6px;border-bottom:1px solid var(--border)">説明</th></tr>
-      <tr><td style="padding:6px"><code>/forward add</code></td><td style="padding:6px">このチャンネル（または指定元）→ 転送先のルールを追加</td></tr>
-      <tr><td style="padding:6px"><code>/forward list</code></td><td style="padding:6px">登録済みルール一覧</td></tr>
-      <tr><td style="padding:6px"><code>/forward remove</code></td><td style="padding:6px">番号指定でルール削除（番号は list で確認）</td></tr>
-    </table>
-    <p style="color:var(--muted);font-size:14px;margin-top:8px">ダッシュボードと Discord コマンドは<b>同じルールデータ</b>を編集します。どちらで変更しても両方に反映されます。</p>
+    <div class="guide-sec card" id="g-translation">
+      <h2>🌐 翻訳</h2>
+      <p>指定したチャンネルの英語・日本語の発言を、Botが自動で翻訳して返信します（英文→🇯🇵 / 日本文→🇺🇸）。</p>
+      <ol class="steps">
+        <li><b>翻訳対象チャンネル</b>を選択（複数可）。チケットカテゴリ全体を対象にもできます</li>
+        <li><b>翻訳プロバイダ</b>（DeepL推奨）と<b>既定の翻訳方向</b>（双方向/英→日/日→英）を選ぶ → 保存</li>
+      </ol>
+      <div class="pt">💡 URL・絵文字のみ・短すぎる文は無視。月間予算を超えると自動停止します。</div>
+    </div>
 
-    {# ============ その他の機能 ============ #}
-    <h2 style="margin-top:28px">🛒 その他の機能</h2>
-    <p>各サーバーの細かい設定は、左メニューの <b>📋 サーバー一覧</b> から対象サーバーを開いて行います。Discord 上では <code>/guide</code> コマンドでメニュー式の機能ガイドを表示できます。</p>
-    <ul style="margin:8px 0 0 18px;padding:0;line-height:1.9">
-      <li>🌐 <b>自動翻訳</b> <code>/translate</code> — 英⇄日の双方向自動翻訳</li>
-      <li>🤖 <b>意図判定アドバイス</b> <code>/suggest</code> — 商品問合せ・配送相談を検知して誘導</li>
-      <li>📦 <b>送料計算</b> <code>/shipping</code> — DHL/FedEx の安い方を自動選択（20kg超は分割発送）</li>
-      <li>🎫 <b>チケット</b> / 🎊 <b>Welcome</b> / 🎉 <b>Giveaway</b> / 🔨 <b>オークション</b></li>
-      <li>🚪 <b>招待トラッキング</b> / 📰 <b>週次ダイジェスト</b> / 💾 <b>設定バックアップ</b></li>
-      <li>🩺 <b>ヘルスチェック</b> / ❓ <b>FAQ</b> / 🛡️ <b>Safety nets</b> / ⛽ <b>燃油サーチャージ</b></li>
-    </ul>
+    <div class="guide-sec card" id="g-ticket">
+      <h2>🎫 チケット</h2>
+      <p>お客様が「Open ticket」ボタンを押すと、本人専用のプライベートチャンネルが自動作成されます。</p>
+      <ol class="steps">
+        <li><b>チケット親カテゴリ</b>を選択（新規チケットchがここに作られます）</li>
+        <li><b>運営スタッフロール</b>を選択（このロールの人だけがチケットを閲覧可）→ 保存</li>
+        <li>「📤 チケットパネルを投稿」で、ボタン付きパネルを任意チャンネルに設置</li>
+      </ol>
+      <div class="pt">💡 1ユーザー1チケットまで。🔒クローズで5秒後に削除されます。</div>
+    </div>
+
+    <div class="guide-sec card" id="g-welcome">
+      <h2>🎊 Welcome</h2>
+      <p>新しい人がサーバーに入った瞬間に、歓迎メッセージを自動投稿します。</p>
+      <ol class="steps">
+        <li><b>Welcome投稿先チャンネル</b>を選択</li>
+        <li>タイトル・本文・色・バナー画像をカスタマイズ → 保存</li>
+        <li>「プレビュー」で自分に見え方を確認できます</li>
+      </ol>
+      <div class="pt">💡 招待トラッキングと連動し、「どの招待で入ったか」も同時に表示できます。</div>
+    </div>
+
+    <div class="guide-sec card" id="g-suggester">
+      <h2>🤖 意図判定</h2>
+      <p>監視チャンネルの発言をAIで分類し、商品問合せ・配送相談を検知したら誘導文を返信します。</p>
+      <ol class="steps">
+        <li>監視チャンネルと誘導先（#ticket・<code>/shipping</code> 等）を設定 → 保存</li>
+        <li>ON にすると自動で動作します</li>
+      </ol>
+      <div class="pt">💡 反応は同じメッセージに1回だけ。<b>誘導テキストを送るだけ</b>で、チケット作成などの能動アクションはしません。Anthropic APIキーが必要です。</div>
+    </div>
+
+    <div class="guide-sec card" id="g-shipping">
+      <h2>📦 送料</h2>
+      <p>商品×数量×宛先国から、DHL/FedExの安い方を自動で計算します（Google Sheets連携）。</p>
+      <ol class="steps">
+        <li>スプレッドシート／サービスアカウントを設定</li>
+        <li>燃油サーチャージの最新値を確認（毎週自動取得）→ 保存</li>
+        <li>Discordで <code>/shipping</code> を実行するとカート式パネルが起動</li>
+      </ol>
+      <div class="pt">💡 商品重量＋梱包材1kg、0.5kg刻み切り上げ。20kg超は自動で分割発送して合算します。</div>
+    </div>
+
+    <div class="guide-sec card" id="g-auction">
+      <h2>🏛️ Auction</h2>
+      <p>ボタン入札式オークションの既定値を設定します（実行は Discord の <code>/auction create</code>）。</p>
+      <ol class="steps">
+        <li>最低落札価格・最小増分・アンチスナイプ（終了前の自動延長）等の既定値を設定 → 保存</li>
+        <li>Discordで <code>/auction create</code> で出品</li>
+      </ol>
+      <div class="pt">💡 入札は「現最高値＋5%以上 かつ 最小増分以上」。落札時は落札者×Host×Staffだけの取引チャンネルが自動作成されます（決済は人が調整）。</div>
+    </div>
+
+    <div class="guide-sec card" id="g-invite">
+      <h2>🚪 招待</h2>
+      <p>入室時にどの招待コードで来たかを自動判定し、Welcome embed と運営ログに記録します。</p>
+      <ol class="steps">
+        <li>判定ログの送信先、<code>/invite create</code> が使えるチャンネル/ロールを設定 → 保存</li>
+        <li>Discordで <code>/invite list</code> / <code>/invite create</code></li>
+      </ol>
+      <div class="pt">💡 複数Instagramアカウントの流入元判別に。Botに「サーバー管理」権限が必要です。</div>
+    </div>
+
+    <div class="guide-sec card" id="g-forwarding">
+      <h2>📨 転送メッセージ</h2>
+      <p>監視元チャンネルの<b>画像＋本文</b>を、別チャンネル（別サーバー可）へ自動転送します。</p>
+      <ol class="steps">
+        <li><b>① 送信元</b>・<b>② 転送先</b>のチャンネルを選ぶ（サーバー→チャンネルの順）</li>
+        <li><b>③ 送り方（モード）</b>を選ぶ: そのまま／画像のみ／加工（原文＋付加文）／任意テキストに置換</li>
+        <li><b>④ 送信者フィルタ</b>（任意）: 指定ロールの人の投稿だけ転送（未選択なら全員）</li>
+        <li>「加工」「任意テキストに置換」では<b>カスタム文</b>を入力。<b>👀 プレビュー</b>で転送先の見え方を確認</li>
+        <li>「➕ ルールを追加」で作成。既存ルールは「✏️ 編集」で変更、「🗑 削除」で削除（いずれも即反映）</li>
+      </ol>
+      <div class="pt">💡 別サーバーへ転送するには、その<b>転送先サーバーにも転送Botが参加</b>している必要があります。トリガーは「画像を含む投稿」です。</div>
+    </div>
 
     <div class="callout" style="margin-top:20px">
-      <div style="font-weight:600;color:var(--heading);margin-bottom:6px">💡 ヒント</div>
-      Discord 内で各機能の詳しい説明を見るには <code>/guide</code>（メニュー式）または <code>/help</code> を使ってください。
+      <div style="font-weight:600;color:var(--heading);margin-bottom:6px">📖 もっと詳しく</div>
+      Discord内では <code>/guide</code>（メニュー式）や <code>/help</code> でも各機能の説明を見られます。コマンド全一覧は <code>COMMANDS.md</code> を参照。
     </div>
   </main>
 </div>
