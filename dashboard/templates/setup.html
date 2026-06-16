@@ -867,23 +867,42 @@
             <select id="fwd-dst-channel" style="margin-top:8px"><option value="">先にサーバーを選択</option></select>
           </div>
         </div>
+        <div class="row" style="align-items:flex-start;margin-top:12px">
+          <div class="field" style="flex:1;margin-bottom:0">
+            <label>③ 送り方（モード）</label>
+            <select id="fwd-add-mode">
+              <option value="original">そのまま（原文＋画像）</option>
+              <option value="image_only">画像のみ</option>
+              <option value="decorated">加工（原文＋宣伝文）</option>
+            </select>
+          </div>
+          <div class="field" style="flex:1;margin-bottom:0">
+            <label>④ 送信者フィルタ（任意・送信元サーバーのロール）</label>
+            <select id="fwd-add-roles" multiple size="4"></select>
+            <div class="hint">Cmd/Ctrl クリックで複数選択。<b>未選択なら全員</b>のメッセージを転送。</div>
+          </div>
+        </div>
         <div style="margin-top:12px">
           <button type="button" id="fwd-add-btn" class="btn green">➕ ルールを追加</button>
         </div>
         <div id="fwd-result" style="margin-top:8px;font-size:13px"></div>
-        <div class="hint" style="margin-top:6px">⚠️ このタブは「💾 変更を保存」とは別に、追加/削除した瞬間に反映されます（Botに数秒で反映）。</div>
+        <div class="hint" style="margin-top:6px">⚠️ このタブは「💾 変更を保存」とは別に、追加/編集/削除した瞬間に反映されます（Botに数秒で反映）。</div>
       </div>
 
       <div class="card">
         <h3 style="color:var(--heading);font-size:14px;margin-bottom:6px">登録済みの転送ルール（{{ forward_rules | length }}）</h3>
         {% if forward_rules %}
           {% for r in forward_rules %}
-          <div class="feature">
-            <div>
+          <div class="feature fwd-rule" data-source="{{ r.source }}" data-dest="{{ r.dest }}" data-server="{{ r.source_server_id }}" data-mode="{{ r.mode }}" data-roles="{{ r.role_ids | join(',') }}">
+            <div style="flex:1">
               <div class="name"><code>{{ r.source_label }}</code> → <code>{{ r.dest_label }}</code></div>
-              <div class="desc">送信元ID: {{ r.source }} / 転送先ID: {{ r.dest }}</div>
+              <div class="desc">モード: {{ r.mode_label }} ・ 送信者: {% if r.role_labels %}{{ r.role_labels | join(', ') }}{% else %}全員{% endif %}</div>
+              <div class="fwd-editor" style="display:none;margin-top:8px"></div>
             </div>
-            <button type="button" class="btn btn-sm red fwd-remove-btn" data-source="{{ r.source }}" data-dest="{{ r.dest }}">🗑 削除</button>
+            <div style="display:flex;gap:6px;align-items:flex-start">
+              <button type="button" class="btn btn-sm fwd-edit-btn">✏️ 編集</button>
+              <button type="button" class="btn btn-sm red fwd-remove-btn">🗑 削除</button>
+            </div>
           </div>
           {% endfor %}
         {% else %}
@@ -895,6 +914,7 @@
           const guildId = "{{ guild_id }}";
           const FWD_SERVERS = {{ fwd_servers | tojson }};
           const byId = Object.fromEntries(FWD_SERVERS.map(s => [String(s.id), s]));
+          const MODE_OPTS = [["original","そのまま（原文＋画像）"],["image_only","画像のみ"],["decorated","加工（原文＋宣伝文）"]];
           const out = document.getElementById('fwd-result');
 
           function fillChannels(serverSel){
@@ -913,7 +933,24 @@
               } else { chSel.appendChild(opt); lastCat=undefined; group=null; }
             });
           }
-          document.querySelectorAll('select[data-fwd]').forEach(sel => sel.addEventListener('change', () => fillChannels(sel)));
+          function fillRoles(sel, serverId, selected){
+            sel.innerHTML = '';
+            const server = byId[String(serverId)];
+            const sset = new Set((selected||[]).map(String));
+            if(!server || !(server.roles||[]).length){
+              const o=document.createElement('option'); o.value=''; o.textContent='(このサーバーのロールなし／全員)'; o.disabled=true; sel.appendChild(o); return;
+            }
+            (server.roles||[]).forEach(r => {
+              const o=document.createElement('option'); o.value=r.id; o.textContent='@'+r.name; if(sset.has(String(r.id))) o.selected=true; sel.appendChild(o);
+            });
+          }
+          function selectedVals(sel){ return Array.from(sel.selectedOptions).map(o=>o.value).filter(Boolean).join(','); }
+
+          // 送信元サーバー変更 → チャンネルとロールを更新
+          document.getElementById('fwd-src-server').addEventListener('change', function(){
+            fillChannels(this); fillRoles(document.getElementById('fwd-add-roles'), this.value, []);
+          });
+          document.getElementById('fwd-dst-server').addEventListener('change', function(){ fillChannels(this); });
 
           async function post(url, data){
             const fd = new FormData();
@@ -925,22 +962,57 @@
           document.getElementById('fwd-add-btn').addEventListener('click', async function(){
             const src = document.getElementById('fwd-src-channel').value;
             const dst = document.getElementById('fwd-dst-channel').value;
+            const mode = document.getElementById('fwd-add-mode').value;
+            const roles = selectedVals(document.getElementById('fwd-add-roles'));
             if(!src || !dst){ out.innerHTML = '<span style="color:var(--red)">⚠️ 送信元と転送先のチャンネルを両方選んでください</span>'; return; }
             if(src === dst){ out.innerHTML = '<span style="color:var(--red)">⚠️ 送信元と転送先が同じです</span>'; return; }
             out.innerHTML = '<span style="color:var(--muted)">追加中…</span>';
-            const res = await post('/guild/'+guildId+'/forwarding/add', {source_channel:src, dest_channel:dst});
+            const res = await post('/guild/'+guildId+'/forwarding/add', {source_channel:src, dest_channel:dst, mode:mode, role_ids:roles});
             if(res.ok && res.body.ok){
-              out.innerHTML = res.body.added ? '<span style="color:var(--green)">✅ 追加しました。再読み込みします…</span>' : '<span style="color:var(--yellow)">⚠️ 同じルールが既にあります</span>';
+              out.innerHTML = res.body.added ? '<span style="color:var(--green)">✅ 追加しました。再読み込みします…</span>' : '<span style="color:var(--yellow)">⚠️ 同じルール（送信元→転送先）が既にあります。編集で変更してください</span>';
               if(res.body.added){ setTimeout(()=>location.reload(), 700); }
             } else {
               out.innerHTML = '<span style="color:var(--red)">⚠️ '+((res.body && res.body.error) || '失敗しました')+'</span>';
             }
           });
-          document.querySelectorAll('.fwd-remove-btn').forEach(function(btn){
-            btn.addEventListener('click', async function(){
+
+          // 編集
+          document.querySelectorAll('.fwd-rule').forEach(function(row){
+            const ed = row.querySelector('.fwd-editor');
+            row.querySelector('.fwd-edit-btn').addEventListener('click', function(){
+              if(ed.style.display === 'block'){ ed.style.display='none'; return; }
+              const curMode = row.dataset.mode || 'original';
+              const curRoles = (row.dataset.roles||'').split(',').filter(Boolean);
+              ed.innerHTML = '';
+              const wrap = document.createElement('div'); wrap.className='row'; wrap.style.alignItems='flex-start';
+              const mf = document.createElement('div'); mf.className='field'; mf.style.flex='1'; mf.style.marginBottom='0';
+              mf.innerHTML = '<label>送り方（モード）</label>';
+              const msel = document.createElement('select');
+              MODE_OPTS.forEach(([v,l])=>{ const o=document.createElement('option'); o.value=v; o.textContent=l; if(v===curMode) o.selected=true; msel.appendChild(o); });
+              mf.appendChild(msel);
+              const rf = document.createElement('div'); rf.className='field'; rf.style.flex='1'; rf.style.marginBottom='0';
+              rf.innerHTML = '<label>送信者フィルタ（未選択=全員）</label>';
+              const rsel = document.createElement('select'); rsel.multiple=true; rsel.size=4;
+              fillRoles(rsel, row.dataset.server, curRoles);
+              rf.appendChild(rsel);
+              wrap.appendChild(mf); wrap.appendChild(rf); ed.appendChild(wrap);
+              const bar = document.createElement('div'); bar.style.marginTop='8px';
+              const save = document.createElement('button'); save.type='button'; save.className='btn btn-sm green'; save.textContent='💾 保存';
+              const cancel = document.createElement('button'); cancel.type='button'; cancel.className='btn btn-sm'; cancel.textContent='キャンセル'; cancel.style.marginLeft='6px';
+              bar.appendChild(save); bar.appendChild(cancel); ed.appendChild(bar);
+              ed.style.display='block';
+              cancel.onclick = ()=>{ ed.style.display='none'; };
+              save.onclick = async ()=>{
+                out.innerHTML = '<span style="color:var(--muted)">更新中…</span>';
+                const res = await post('/guild/'+guildId+'/forwarding/update', {source:row.dataset.source, dest:row.dataset.dest, mode:msel.value, role_ids:selectedVals(rsel)});
+                if(res.ok && res.body.ok){ location.reload(); }
+                else { out.innerHTML = '<span style="color:var(--red)">⚠️ 更新に失敗しました</span>'; }
+              };
+            });
+            row.querySelector('.fwd-remove-btn').addEventListener('click', async function(){
               if(!confirm('この転送ルールを削除しますか?')) return;
               out.innerHTML = '<span style="color:var(--muted)">削除中…</span>';
-              const res = await post('/guild/'+guildId+'/forwarding/remove', {source:btn.dataset.source, dest:btn.dataset.dest});
+              const res = await post('/guild/'+guildId+'/forwarding/remove', {source:row.dataset.source, dest:row.dataset.dest});
               if(res.ok && res.body.ok){ location.reload(); }
               else { out.innerHTML = '<span style="color:var(--red)">⚠️ 削除に失敗しました</span>'; }
             });

@@ -32,6 +32,12 @@ CREATE TABLE IF NOT EXISTS forward_rules (
     PRIMARY KEY (source, dest)
 )
 """
+# 転送Bot側 rules_store と同じ後方互換マイグレーション（共有DB）。
+_MIGRATE_SQL = (
+    "ALTER TABLE forward_rules ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'original'",
+    "ALTER TABLE forward_rules ADD COLUMN IF NOT EXISTS role_ids TEXT NOT NULL DEFAULT ''",
+)
+VALID_MODES = ("original", "image_only", "decorated")
 _table_ready = False
 
 
@@ -48,7 +54,25 @@ def _ensure_table(cur) -> None:
     global _table_ready
     if not _table_ready:
         cur.execute(_CREATE_SQL)
+        for stmt in _MIGRATE_SQL:
+            cur.execute(stmt)
         _table_ready = True
+
+
+def _csv(role_ids) -> str:
+    return ",".join(str(int(x)) for x in (role_ids or []))
+
+
+def _parse_roles(raw) -> list:
+    if not raw:
+        return []
+    if isinstance(raw, list):
+        return [int(x) for x in raw]
+    return [int(x) for x in str(raw).split(",") if str(x).strip()]
+
+
+def _norm_mode(mode) -> str:
+    return mode if mode in VALID_MODES else "original"
 
 
 def rules_path() -> Path:
@@ -65,17 +89,27 @@ def load_rules() -> list[dict]:
         with _pg_connect() as conn:
             with conn.cursor() as cur:
                 _ensure_table(cur)
-                cur.execute("SELECT source, dest FROM forward_rules ORDER BY source, dest")
+                cur.execute(
+                    "SELECT source, dest, mode, role_ids FROM forward_rules "
+                    "ORDER BY source, dest"
+                )
                 rows = cur.fetchall()
             conn.commit()
-        return [{"source": r[0], "dest": r[1]} for r in rows]
+        return [
+            {"source": r[0], "dest": r[1], "mode": _norm_mode(r[2]), "role_ids": _parse_roles(r[3])}
+            for r in rows
+        ]
     p = rules_path()
     if not p.exists():
         return []
     try:
-        return json.loads(p.read_text("utf-8")).get("rules", [])
+        rules = json.loads(p.read_text("utf-8")).get("rules", [])
     except Exception:
         return []
+    for r in rules:
+        r["mode"] = _norm_mode(r.get("mode"))
+        r["role_ids"] = _parse_roles(r.get("role_ids"))
+    return rules
 
 
 def save_rules(rules: list[dict]) -> None:
@@ -84,16 +118,18 @@ def save_rules(rules: list[dict]) -> None:
     p.write_text(json.dumps({"rules": rules}, ensure_ascii=False, indent=2), "utf-8")
 
 
-def add_rule(source: int, dest: int) -> bool:
+def add_rule(source: int, dest: int, mode: str = "original", role_ids=None) -> bool:
     """重複していなければ追加。追加したら True。"""
+    mode = _norm_mode(mode)
+    roles_csv = _csv(role_ids)
     if using_db():
         with _pg_connect() as conn:
             with conn.cursor() as cur:
                 _ensure_table(cur)
                 cur.execute(
-                    "INSERT INTO forward_rules (source, dest) VALUES (%s, %s) "
-                    "ON CONFLICT DO NOTHING",
-                    (source, dest),
+                    "INSERT INTO forward_rules (source, dest, mode, role_ids) "
+                    "VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING",
+                    (source, dest, mode, roles_csv),
                 )
                 added = cur.rowcount > 0
             conn.commit()
@@ -101,9 +137,36 @@ def add_rule(source: int, dest: int) -> bool:
     rules = load_rules()
     if any(r.get("source") == source and r.get("dest") == dest for r in rules):
         return False
-    rules.append({"source": source, "dest": dest})
+    rules.append({"source": source, "dest": dest, "mode": mode, "role_ids": _parse_roles(role_ids)})
     save_rules(rules)
     return True
+
+
+def update_rule(source: int, dest: int, mode: str = "original", role_ids=None) -> bool:
+    """既存ルール (source,dest) の mode / role_ids を更新。更新できたら True。"""
+    mode = _norm_mode(mode)
+    roles_csv = _csv(role_ids)
+    if using_db():
+        with _pg_connect() as conn:
+            with conn.cursor() as cur:
+                _ensure_table(cur)
+                cur.execute(
+                    "UPDATE forward_rules SET mode=%s, role_ids=%s WHERE source=%s AND dest=%s",
+                    (mode, roles_csv, source, dest),
+                )
+                updated = cur.rowcount > 0
+            conn.commit()
+        return updated
+    rules = load_rules()
+    found = False
+    for r in rules:
+        if r.get("source") == source and r.get("dest") == dest:
+            r["mode"] = mode
+            r["role_ids"] = _parse_roles(role_ids)
+            found = True
+    if found:
+        save_rules(rules)
+    return found
 
 
 def remove_rule(source: int, dest: int) -> bool:
@@ -146,8 +209,9 @@ def forward_bot_token() -> Optional[str]:
 async def list_servers_with_channels(token: str) -> list[dict]:
     """転送Botが参加している各サーバーと、その送信可能チャンネルを返す。
 
-    返り値: [{"id","name","channels":[{"id","name","category"}]}]
+    返り値: [{"id","name","channels":[{"id","name","category"}],"roles":[{"id","name"}]}]
     チャンネルはカテゴリ順に並べ、ピッカーで見やすいラベルを付ける。
+    roles は送信者フィルタ用（@everyone は除外）。
     """
     rest = DiscordREST(token)
     guilds = await rest.list_my_guilds()
@@ -166,14 +230,32 @@ async def list_servers_with_channels(token: str) -> list[dict]:
                         "category": cat_name,
                     }
                 )
-        out.append({"id": gid, "name": g.get("name", gid), "channels": flat})
+        roles: list[dict] = []
+        try:
+            for r in await rest.list_roles(gid):
+                rid = str(r.get("id"))
+                if rid == gid:  # @everyone は除外
+                    continue
+                roles.append({"id": rid, "name": r.get("name", rid)})
+        except Exception:
+            pass
+        out.append({"id": gid, "name": g.get("name", gid), "channels": flat, "roles": roles})
     return out
 
 
 def index_channels(servers: list[dict]) -> dict[str, dict]:
-    """channel_id -> {"channel","server"} の逆引き表（ルール一覧の表示用）。"""
+    """channel_id -> {"channel","server","server_id"} の逆引き表（ルール表示用）。"""
     idx: dict[str, dict] = {}
     for s in servers:
         for c in s["channels"]:
-            idx[c["id"]] = {"channel": c["name"], "server": s["name"]}
+            idx[c["id"]] = {"channel": c["name"], "server": s["name"], "server_id": s["id"]}
+    return idx
+
+
+def index_roles(servers: list[dict]) -> dict[str, str]:
+    """role_id -> role_name の逆引き表（ルール一覧のフィルタ表示用）。"""
+    idx: dict[str, str] = {}
+    for s in servers:
+        for r in s.get("roles", []):
+            idx[r["id"]] = r["name"]
     return idx
