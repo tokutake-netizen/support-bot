@@ -11,6 +11,7 @@ Production (Railway): see DASHBOARD_DEPLOY.md
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import logging
 import os
@@ -81,6 +82,24 @@ async def autostart_bots() -> None:
 HERE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(HERE / "templates"))
 app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
+
+
+def _asset_version() -> str:
+    """style.css の内容ハッシュ。
+
+    StaticFiles は Cache-Control を付けないため、ブラウザはヒューリスティックに
+    キャッシュし、デプロイ後も古い CSS を再検証せず使い続けることがある
+    （実際に発生した）。URL に ?v=<ハッシュ> を付けて、中身が変わったときだけ
+    別 URL になるようにする。
+    """
+    try:
+        data = (HERE / "static" / "style.css").read_bytes()
+    except OSError:
+        return "dev"
+    return hashlib.sha256(data).hexdigest()[:10]
+
+
+templates.env.globals["asset_v"] = _asset_version()
 
 
 # -------------------------- session helpers --------------------------
