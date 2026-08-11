@@ -1,12 +1,13 @@
 {% extends "base.html" %}
-{% block title %}{{ guild_name }} のオンボーディング — Support Bot{% endblock %}
+{% import "_icons.html" as icon %}
+{% block title %}{{ guild_name }} のオンボーディング — Musubot{% endblock %}
 
 {% macro channel_select(name, channels_grouped, current="", multiple=false, placeholder="(選択)") %}
   {% if current is string %}{% set sel = [current] %}{% else %}{% set sel = current %}{% endif %}
   <select name="{{ name }}"{% if multiple %} multiple size="4"{% endif %}>
     {% if not multiple %}<option value="">{{ placeholder }}</option>{% endif %}
     {% for cat, chs in channels_grouped %}
-      {% if cat %}<optgroup label="📂 {{ cat.name }}">{% endif %}
+      {% if cat %}<optgroup label="{{ cat.name }}">{% endif %}
       {% for c in chs %}
         <option value="{{ c.id }}"{% if c.id in sel %} selected{% endif %}># {{ c.name }}</option>
       {% endfor %}
@@ -25,43 +26,28 @@
 {% endmacro %}
 
 {% block body %}
-<div class="wrap">
-  <aside class="sidebar">
-    <div class="brand"><span class="dot"></span>Support Bot</div>
-    <nav class="nav">
-      <a href="/dashboard">📋 サーバー一覧</a>
-      <a href="#" class="active">⚙️ {{ guild_name }}</a>
-      <div style="margin-left:24px;padding-left:8px;border-left:2px solid var(--line);margin-top:6px">
-        <a href="/guild/{{ guild_id }}/setup">設定</a>
-        <a href="/guild/{{ guild_id }}/status">稼働状況・ログ</a>
-        <a href="/guild/{{ guild_id }}/giveaway">🎉 Giveaway 作成・運用</a>
-        <a href="/guild/{{ guild_id }}/onboarding" class="active">🚪 オンボーディング</a>
-      </div>
-      <div class="section-label">アカウント</div>
-      <a href="#" style="color:var(--muted)">👤 {{ session.username }}</a>
-      <a href="/logout" style="color:var(--muted)">🚪 ログアウト</a>
-    </nav>
-  </aside>
-  <main class="main">
-    <h1>🚪 オンボーディング</h1>
+{% with subpage = "onboarding" %}{% include "_nav.html" %}{% endwith %}
+
+<div class="page">
+    <h1>オンボーディング</h1>
     <p class="subtitle">新規メンバーの「初回入室体験」を Discord に組み込みます。ルール表示 → アンケート(最大 {{ MAX_PROMPTS }} 問) → 各回答に応じてロール自動付与＆チャンネル公開。Discord ネイティブの Onboarding API を直接操作するため、Discord サーバー設定の「オンボーディング」と同じ動作になります。</p>
 
     {% if request.query_params.get("saved") %}
-      <div class="flash ok">✓ オンボーディング設定を保存しました。Discord 側にも即時反映されています。</div>
+      <div class="flash ok">オンボーディング設定を保存しました。Discord 側にも即時反映されています。</div>
     {% endif %}
 
     {% if not discord_ok %}
-      <div class="callout">⚠️ Discord 連携が未完了です。先に <a href="/guild/{{ guild_id }}/setup">設定ページ</a> で BOT トークンを保存してください。</div>
+      <div class="callout">Discord 連携が未完了です。先に <a href="/guild/{{ guild_id }}/setup">設定ページ</a> で BOT トークンを保存してください。</div>
     {% elif not is_community %}
       <div class="callout">
-        ⚠️ このサーバーは Discord の <b>「コミュニティ機能」が無効</b>です。オンボーディングは Community サーバーでのみ使えます。<br>
+        このサーバーは Discord の <b>「コミュニティ機能」が無効</b>です。オンボーディングは Community サーバーでのみ使えます。<br>
         Discord でサーバーを開く → サーバー設定 → 概要 → 「コミュニティを有効化」 で先に有効化してください(必要要件: 安全な DM・確認済みメール)。
       </div>
     {% endif %}
 
     <form method="post" action="/guild/{{ guild_id }}/onboarding/save">
 
-      <h2>📜 ルール設定</h2>
+      <h2>{{ icon.book(17) }} ルール設定</h2>
       <p class="section-desc">「ルール」と書かれたチャンネルを指定すると、Discord の入室画面で「ルールに同意」が表示されるようになります。</p>
       <div class="card">
         <div class="field">
@@ -71,7 +57,7 @@
         </div>
       </div>
 
-      <h2>🚪 全体設定</h2>
+      <h2>{{ icon.door(17) }} 全体設定</h2>
       <div class="card">
         <div class="feature">
           <div>
@@ -90,11 +76,11 @@
         </div>
       </div>
 
-      <h2>❓ アンケート設問(最大 {{ MAX_PROMPTS }} 問・各最大 {{ MAX_OPTIONS }} 選択肢)</h2>
+      <h2>{{ icon.question(17) }} アンケート設問(最大 {{ MAX_PROMPTS }} 問・各最大 {{ MAX_OPTIONS }} 選択肢)</h2>
       <p class="section-desc">タイトルが空欄の設問は保存時に自動的に削除されます。設問を追加したい場合は空の枠を埋めるだけ。並び順は上から順に Discord で表示されます。</p>
 
       <div class="help-box">
-        <div class="h"><span class="ico">💡</span>ヒント</div>
+        <div class="h">ヒント</div>
         ・絵文字は <code>🛒</code> のようにそのまま貼り付け、またはサーバー絵文字の <code>&lt;:name:1234&gt;</code> 形式で入力可<br>
         ・各選択肢は「付与するロール」と「公開するチャンネル」を複数指定可<br>
         ・<b>1問選択(ラジオ)</b> をオンにすると 1 つだけ選べる、オフだと複数選べる
@@ -170,14 +156,13 @@
       {% endfor %}
 
       <div class="sticky-save">
-        <button type="submit" class="btn green">💾 変更を保存</button>
+        <button type="submit" class="btn green">{{ icon.save(16) }} 変更を保存</button>
         <a href="/guild/{{ guild_id }}/setup" class="btn outline">設定に戻る</a>
         <span style="margin-left:auto;color:var(--muted);font-size:12px">
-          オンボーディング: {% if onboarding_enabled %}<span style="color:var(--green)">● 有効</span>{% else %}<span style="color:var(--muted)">○ 無効</span>{% endif %}
+          オンボーディング: {% if onboarding_enabled %}<span class="badge running">有効</span>{% else %}<span class="badge">無効</span>{% endif %}
         </span>
       </div>
     </form>
-  </main>
-  {% include "_assistant.html" %}
 </div>
+{% include "_assistant.html" %}
 {% endblock %}

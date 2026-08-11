@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% import "_icons.html" as icon %}
+{% block title %}{{ guild_name }} の定期メッセージ — Musubot{% endblock %}
+{% block head %}
+<style>
+  .sc-row{display:flex;align-items:flex-start;gap:14px;padding:16px 0;border-bottom:1px solid var(--line)}
+  .sc-row:last-child{border-bottom:none}
+  .sc-main{flex:1;min-width:0}
+  .sc-title{font-weight:700;color:var(--heading);font-size:14.5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .sc-meta{color:var(--muted);font-size:12.5px;margin-top:3px}
+  .sc-body{background:var(--bg3);border-radius:8px;padding:9px 12px;margin-top:8px;font-size:13px;white-space:pre-wrap;word-break:break-word;line-height:1.7;max-height:150px;overflow:auto}
+  .sc-actions{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+  .mode-fields{display:none}
+  .mode-fields.on{display:block}
+</style>
+{% endblock %}
+{% block body %}
+{% with subpage = "schedule" %}{% include "_nav.html" %}{% endwith %}
+
+<div class="page">
+  <h1>定期メッセージ</h1>
+  <p class="subtitle">決まった時刻・間隔で、指定チャンネルへ自動投稿します。営業案内・入荷告知・ルールの再掲などに使えます。時刻はすべて日本時間（JST）です。</p>
+
+  {% set ok = request.query_params.get('ok') %}
+  {% set err = request.query_params.get('err') %}
+  {% if ok == 'added' %}<div class="flash ok">定期メッセージを追加しました。BOT に自動反映されます。</div>{% endif %}
+  {% if ok == 'updated' %}<div class="flash ok">定期メッセージを更新しました。</div>{% endif %}
+  {% if ok == 'removed' %}<div class="flash ok">定期メッセージを削除しました。</div>{% endif %}
+  {% if ok == 'toggled' %}<div class="flash ok">有効/無効を切り替えました。</div>{% endif %}
+  {% if err %}<div class="flash warn">{{ err }}</div>{% endif %}
+
+  {% if not discord_ok %}
+    <div class="callout">
+      Discord 連携が未完了です。先に <a href="/guild/{{ guild_id }}/setup">設定ページ</a> で BOT トークンを保存してください。
+      チャンネル一覧が読み込めると、ここで投稿先を選べるようになります。
+    </div>
+  {% else %}
+
+  <h2>{{ icon.plus(17) }} 新しい定期メッセージ</h2>
+  <div class="card">
+    <div class="help-box">
+      <div class="h">仕組み</div>
+      BOT は30秒ごとに予定を確認して投稿します。BOT が停止していた時間帯の予定は、復帰しても<b>まとめ投稿されません</b>（15分以上過ぎた回は見送り）。
+    </div>
+
+    <form method="post" action="/guild/{{ guild_id }}/schedule/add">
+      <div class="row">
+        <div class="field">
+          <label>名前（管理用）</label>
+          <input type="text" name="name" placeholder="例: 毎朝の入荷案内" maxlength="60">
+          <div class="hint">この一覧に表示されるだけで、Discord には出ません。</div>
+        </div>
+        <div class="field">
+          <label>投稿先チャンネル<span class="req">*</span></label>
+          <select name="channel_id" required>
+            <option value="">（選択してください）</option>
+            {% for cat, chs in channels_grouped %}
+              {% if cat %}<optgroup label="{{ cat.name }}">{% endif %}
+              {% for c in chs %}<option value="{{ c.id }}"># {{ c.name }}</option>{% endfor %}
+              {% if cat %}</optgroup>{% endif %}
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>メッセージ本文<span class="req">*</span></label>
+        <textarea name="message" rows="4" required maxlength="1900"
+                  placeholder="投稿する文章。改行もそのまま反映されます。"></textarea>
+        <div class="hint">1900文字まで。Discord の記法（**太字**・&lt;#チャンネルID&gt;・&lt;@&amp;ロールID&gt;）が使えます。</div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label>実行タイミング<span class="req">*</span></label>
+          <select name="mode" class="mode-select" required>
+            <option value="daily">毎日</option>
+            <option value="weekly">毎週</option>
+            <option value="interval">一定間隔ごと</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="mode-fields on" data-for="daily weekly">
+            <label>時刻（JST）<span class="req">*</span></label>
+            <input type="time" name="time" value="09:00">
+          </div>
+          <div class="mode-fields" data-for="interval">
+            <label>実行間隔（分）<span class="req">*</span></label>
+            <input type="number" name="interval_minutes" value="60" min="{{ min_interval }}" step="10">
+            <div class="hint">{{ min_interval }}分以上。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field mode-fields" data-for="weekly">
+        <label>曜日<span class="req">*</span></label>
+        <select name="weekday">
+          {% for w in weekday_labels %}<option value="{{ loop.index0 }}">{{ w }}曜日</option>{% endfor %}
+        </select>
+      </div>
+
+      <button type="submit" class="btn">{{ icon.plus(16) }} 追加する</button>
+    </form>
+  </div>
+
+  <h2>{{ icon.list(17) }} 登録済み <span class="help">{{ items | length }} 件</span></h2>
+  <div class="card">
+    {% if items %}
+      {% for it in items %}
+      <div class="sc-row">
+        <div class="sc-main">
+          <div class="sc-title">
+            {{ it.name }}
+            {% if it.enabled %}<span class="badge running">有効</span>{% else %}<span class="badge">停止中</span>{% endif %}
+            <span class="badge info">{{ it.describe }}</span>
+          </div>
+          <div class="sc-meta">
+            投稿先: #{{ it.channel_name }}
+            {% if it.last_run %} ・ 最終投稿: {{ it.last_run | int | string }}（UNIX秒）{% else %} ・ まだ投稿されていません{% endif %}
+          </div>
+          <div class="sc-body">{{ it.message }}</div>
+
+          <details style="margin-top:8px">
+            <summary>編集する</summary>
+            <form method="post" action="/guild/{{ guild_id }}/schedule/update" style="margin-top:10px">
+              <input type="hidden" name="id" value="{{ it.id }}">
+              <div class="row">
+                <div class="field">
+                  <label>名前</label>
+                  <input type="text" name="name" value="{{ it.name }}" maxlength="60">
+                </div>
+                <div class="field">
+                  <label>投稿先チャンネル</label>
+                  <select name="channel_id" required>
+                    {% for cat, chs in channels_grouped %}
+                      {% if cat %}<optgroup label="{{ cat.name }}">{% endif %}
+                      {% for c in chs %}
+                        <option value="{{ c.id }}"{% if c.id|string == it.channel_id|string %} selected{% endif %}># {{ c.name }}</option>
+                      {% endfor %}
+                      {% if cat %}</optgroup>{% endif %}
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label>メッセージ本文</label>
+                <textarea name="message" rows="4" required maxlength="1900">{{ it.message }}</textarea>
+              </div>
+              <div class="row">
+                <div class="field">
+                  <label>実行タイミング</label>
+                  <select name="mode" class="mode-select" required>
+                    <option value="daily"{% if it.mode == 'daily' %} selected{% endif %}>毎日</option>
+                    <option value="weekly"{% if it.mode == 'weekly' %} selected{% endif %}>毎週</option>
+                    <option value="interval"{% if it.mode == 'interval' %} selected{% endif %}>一定間隔ごと</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <div class="mode-fields{% if it.mode != 'interval' %} on{% endif %}" data-for="daily weekly">
+                    <label>時刻（JST）</label>
+                    <input type="time" name="time" value="{{ it.time or '09:00' }}">
+                  </div>
+                  <div class="mode-fields{% if it.mode == 'interval' %} on{% endif %}" data-for="interval">
+                    <label>実行間隔（分）</label>
+                    <input type="number" name="interval_minutes" value="{{ it.interval_minutes or 60 }}" min="{{ min_interval }}" step="10">
+                  </div>
+                </div>
+              </div>
+              <div class="field mode-fields{% if it.mode == 'weekly' %} on{% endif %}" data-for="weekly">
+                <label>曜日</label>
+                <select name="weekday">
+                  {% for w in weekday_labels %}
+                    <option value="{{ loop.index0 }}"{% if it.weekday == loop.index0 %} selected{% endif %}>{{ w }}曜日</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <button type="submit" class="btn">{{ icon.save(16) }} 保存</button>
+            </form>
+          </details>
+        </div>
+
+        <div class="sc-actions">
+          <form method="post" action="/guild/{{ guild_id }}/schedule/toggle">
+            <input type="hidden" name="id" value="{{ it.id }}">
+            <input type="hidden" name="enabled" value="{{ '0' if it.enabled else '1' }}">
+            <button type="submit" class="btn outline btn-sm">{{ '停止' if it.enabled else '再開' }}</button>
+          </form>
+          <form method="post" action="/guild/{{ guild_id }}/schedule/remove"
+                onsubmit="return confirm('「{{ it.name }}」を削除しますか？')">
+            <input type="hidden" name="id" value="{{ it.id }}">
+            <button type="submit" class="btn red btn-sm">削除</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p style="color:var(--muted);margin:0">まだ定期メッセージがありません。上のフォームから追加してください。</p>
+    {% endif %}
+  </div>
+
+  {% endif %}
+</div>
+{% include "_assistant.html" %}
+
+<script>
+  // 実行タイミングの選択に応じて、関係のある入力欄だけ出す
+  function syncModeFields(select){
+    var form = select.closest('form');
+    var mode = select.value;
+    form.querySelectorAll('.mode-fields').forEach(function(box){
+      box.classList.toggle('on', box.dataset.for.split(' ').indexOf(mode) !== -1);
+    });
+  }
+  document.querySelectorAll('.mode-select').forEach(function(sel){
+    sel.addEventListener('change', function(){ syncModeFields(sel); });
+    syncModeFields(sel);
+  });
+</script>
+{% endblock %}

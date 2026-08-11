@@ -1,64 +1,192 @@
 {% extends "base.html" %}
-{% block title %}使い方ガイド — Support Bot{% endblock %}
+{% import "_icons.html" as icon %}
+{% block title %}使い方ガイド — Musubot{% endblock %}
 {% block head %}
 <style>
-  .guide-sec{scroll-margin-top:16px}
-  .guide-sec h2{display:flex;align-items:center;gap:8px;margin-top:6px}
-  .steps{margin:8px 0 0 20px;padding:0;line-height:1.9}
-  .steps li{margin:2px 0}
-  .pt{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;font-size:13px;padding:8px 12px;border-radius:8px;margin-top:10px}
-  .nav .gtab{font-size:13px}
-  .gsub{font-size:15px;color:var(--heading);font-weight:700;margin:22px 0 4px}
-  /* 取得画面モック（screenshot風） */
-  .shot{border:1px solid #d5d8e0;border-radius:10px;overflow:hidden;margin:10px 0 4px;box-shadow:0 6px 20px rgba(16,24,40,.12);max-width:600px}
-  .shot-bar{display:flex;align-items:center;gap:8px;background:#e9ecf2;padding:7px 12px;border-bottom:1px solid #d5d8e0}
+  .guide-layout{display:grid;grid-template-columns:210px 1fr;gap:32px;align-items:start}
+  .guide-toc{position:sticky;top:82px}
+  .guide-toc .lbl{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin:0 0 8px 10px}
+  .guide-toc a{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;color:var(--muted);font-size:13px;font-weight:500;margin-bottom:1px}
+  .guide-toc a:hover{background:var(--bg3);color:var(--heading);text-decoration:none}
+  .guide-toc a.active{background:var(--brand-soft);color:var(--brand);font-weight:600}
+  .guide-sec{scroll-margin-top:90px}
+  .guide-sec h2{margin-top:4px}
+  .steps{margin:10px 0 0;padding:0;list-style:none;counter-reset:s}
+  .steps li{position:relative;padding:0 0 14px 34px;line-height:1.75}
+  .steps li:not(:last-child){border-left:2px solid var(--line);margin-left:11px;padding-left:23px}
+  .steps li::before{
+    counter-increment:s;content:counter(s);
+    position:absolute;left:-13px;top:1px;width:24px;height:24px;border-radius:50%;
+    background:var(--brand);color:#fff;font-size:12px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .steps li:first-child::before{left:-13px}
+  .steps.plain li:not(:last-child){border-left:none;margin-left:0;padding-left:34px}
+  .steps.plain li::before{left:0}
+  .pt{background:var(--brand-soft);border-left:3px solid var(--brand);font-size:13px;padding:10px 14px;border-radius:8px;margin-top:12px;line-height:1.7}
+  .warn-pt{background:var(--yellow-bg);border-left:3px solid var(--yellow);font-size:13px;padding:10px 14px;border-radius:8px;margin-top:12px;line-height:1.7}
+  .gsub{font-size:15px;color:var(--heading);font-weight:700;margin:26px 0 6px}
+  /* 取得画面モック */
+  .shot{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:12px 0 4px;box-shadow:var(--shadow-md);max-width:620px}
+  .shot-bar{display:flex;align-items:center;gap:8px;background:var(--bg3);padding:8px 12px;border-bottom:1px solid var(--line)}
   .shot-bar .dots{display:flex;gap:5px}
   .shot-bar .dots i{width:10px;height:10px;border-radius:50%;display:inline-block}
-  .shot-url{background:#fff;border-radius:6px;font-size:11px;color:#555;padding:3px 10px;flex:1;font-family:"SF Mono",Menlo,monospace;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-  .cb{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;background:#5865f2;color:#fff;font-size:11px;font-weight:700;margin-right:5px;flex-shrink:0;vertical-align:middle}
-  .shotcap{font-size:11.5px;color:var(--muted);margin:2px 0 4px}
+  .shot-url{background:var(--surface);border-radius:6px;font-size:11px;color:var(--muted);padding:4px 10px;flex:1;font-family:"SF Mono",Menlo,monospace;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .cb{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;background:var(--brand);color:#fff;font-size:11px;font-weight:700;margin-right:5px;flex-shrink:0;vertical-align:middle}
+  .shotcap{font-size:12px;color:var(--muted);margin:2px 0 4px}
+  /* 導入フロー図 */
+  .flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:16px 0 4px}
+  .flow-step{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;position:relative}
+  .flow-step .n{width:22px;height:22px;border-radius:50%;background:var(--brand);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-bottom:8px}
+  .flow-step .t{font-weight:700;color:var(--heading);font-size:13.5px;line-height:1.4}
+  .flow-step .d{color:var(--muted);font-size:12px;margin-top:3px;line-height:1.6}
+  .role-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+  .role-box{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--surface)}
+  .role-box .h{font-weight:700;color:var(--heading);font-size:13.5px;margin-bottom:6px;display:flex;align-items:center;gap:7px}
+  .role-box ul{margin:0;padding-left:18px;color:var(--muted);font-size:13px;line-height:1.8}
+  @media (max-width:900px){
+    .guide-layout{grid-template-columns:1fr;gap:0}
+    .guide-toc{display:none}
+    .role-grid{grid-template-columns:1fr}
+  }
 </style>
 {% endblock %}
 {% block body %}
-<div class="wrap">
-  <aside class="sidebar">
-    <div class="brand"><span class="dot"></span>Support Bot</div>
-    <nav class="nav">
-      <a href="/dashboard">📋 サーバー一覧</a>
-      {% if session.is_root %}
-        <a href="/forwarding">📦 画像転送</a>
-        <a href="/admin/users">👥 ユーザー管理</a>
-      {% endif %}
-      <a href="/guide" class="active">📖 使い方ガイド</a>
-      <div class="section-label">タブ別ガイド</div>
-      <a href="#g-api" class="gtab">🔑 API設定</a>
-      <a href="#g-translation" class="gtab">🌐 翻訳</a>
-      <a href="#g-ticket" class="gtab">🎫 チケット</a>
-      <a href="#g-welcome" class="gtab">🎊 Welcome</a>
-      <a href="#g-suggester" class="gtab">🤖 意図判定</a>
-      <a href="#g-shipping" class="gtab">📦 送料</a>
-      <a href="#g-auction" class="gtab">🏛️ Auction</a>
-      <a href="#g-invite" class="gtab">🚪 招待</a>
-      <a href="#g-forwarding" class="gtab">📨 転送メッセージ</a>
-      <div class="section-label">アカウント</div>
-      <a href="#" style="color:var(--muted)">👤 {{ session.username }}{% if session.is_root %} (root){% endif %}</a>
-      <a href="/logout" style="color:var(--muted)">🚪 ログアウト</a>
-    </nav>
-  </aside>
-  <main class="main">
-    <h1>使い方ガイド</h1>
-    <p class="subtitle">サーバー設定の各タブの使い方です。左メニューの「タブ別ガイド」から各項目に飛べます。</p>
+{% with page = "guide" %}{% include "_nav.html" %}{% endwith %}
 
-    <div class="callout">
-      <div style="font-weight:600;color:var(--heading);margin-bottom:6px">📍 設定の開き方</div>
-      <b>📋 サーバー一覧</b> → 対象サーバーを開く → 上部のタブ（🔑API / 🌐翻訳 / 🎫チケット …）を切り替えて設定します。各タブは右下の「💾 変更を保存」で保存（転送メッセージのみ追加/編集の瞬間に反映）。
+<div class="page">
+  <h1>使い方ガイド</h1>
+  <p class="subtitle">Musubot は、Discord サーバーの運営作業（翻訳・問い合わせ対応・抽選・送料計算・画像転送など）を自動化する BOT です。設定はすべてこのダッシュボードから行い、保存すると数秒で Discord 側に反映されます。</p>
+
+  <div class="guide-layout">
+    <aside class="guide-toc">
+      <div class="lbl">目次</div>
+      <a href="#g-start" class="active">{{ icon.rocket(15) }} はじめに</a>
+      <a href="#g-api">{{ icon.key(15) }} API設定</a>
+      <a href="#g-translation">{{ icon.globe(15) }} 翻訳</a>
+      <a href="#g-ticket">{{ icon.ticket(15) }} チケット</a>
+      <a href="#g-welcome">{{ icon.sparkles(15) }} Welcome</a>
+      <a href="#g-suggester">{{ icon.sparkles(15) }} 意図判定</a>
+      <a href="#g-shipping">{{ icon.box(15) }} 送料</a>
+      <a href="#g-auction">{{ icon.gavel(15) }} Auction</a>
+      <a href="#g-giveaway">{{ icon.gift(15) }} Giveaway</a>
+      <a href="#g-invite">{{ icon.door(15) }} 招待</a>
+      <a href="#g-forwarding">{{ icon.forward(15) }} 転送メッセージ</a>
+    </aside>
+
+    <div>
+
+    {# ================= はじめに ================= #}
+    <div class="guide-sec" id="g-start">
+      <h2>{{ icon.rocket(18) }} はじめに — Musubot の全体像と動かし方</h2>
+
+      <div class="card">
+        <p style="margin-top:0">
+          Musubot は <b>「ダッシュボード」と「Discord 上の BOT」の2つ</b>でできています。
+          あなたが操作するのはこのダッシュボードだけで、Discord 側にコマンドを打ち込む必要はほとんどありません。
+        </p>
+
+        <div class="role-grid">
+          <div class="role-box">
+            <div class="h">{{ icon.layers(16) }} ダッシュボード（この画面）</div>
+            <ul>
+              <li>どの機能を使うかを ON にする</li>
+              <li>対象チャンネル・ロールを選ぶ</li>
+              <li>文面や金額などを編集する</li>
+              <li>BOT の起動 / 停止 / ログ確認</li>
+            </ul>
+          </div>
+          <div class="role-box">
+            <div class="h">{{ icon.knot(16) }} Discord 上の BOT</div>
+            <ul>
+              <li>設定どおりに自動で動く</li>
+              <li>翻訳・歓迎・転送は全自動</li>
+              <li>お客様は <code>/shipping</code> 等を使う</li>
+              <li>設定変更は数秒で自動反映</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="pt" style="margin-top:14px">
+          <b>大事な考え方：</b>「どの機能を使いたいか」はすべてこのダッシュボードで決めます。保存を押すと BOT が自動で再読み込みして Discord に反映されるので、
+          <b>Discord 側を直接いじる必要はありません</b>。設定を変えたくなったら、いつでもここに戻ってきて保存し直すだけです。
+        </div>
+      </div>
+
+      <div class="gsub">導入の流れ（初回だけ・全6ステップ）</div>
+      <div class="flow">
+        <div class="flow-step"><div class="n">1</div><div class="t">BOTを作る</div><div class="d">Discord Developer Portal でアプリとトークンを発行</div></div>
+        <div class="flow-step"><div class="n">2</div><div class="t">サーバーに招待</div><div class="d">対象サーバーに BOT を参加させる</div></div>
+        <div class="flow-step"><div class="n">3</div><div class="t">APIキーを保存</div><div class="d">API タブにトークンを貼って保存</div></div>
+        <div class="flow-step"><div class="n">4</div><div class="t">機能を設定</div><div class="d">使いたいタブだけ設定して保存</div></div>
+        <div class="flow-step"><div class="n">5</div><div class="t">BOTを起動</div><div class="d">稼働状況ページで「起動」</div></div>
+        <div class="flow-step"><div class="n">6</div><div class="t">動作確認</div><div class="d">Discord で実際に試す</div></div>
+      </div>
+
+      <div class="card" style="margin-top:18px">
+        <div class="gsub" style="margin-top:0">具体的な手順</div>
+        <ol class="steps">
+          <li>
+            <b>Discord BOT を作る</b><br>
+            <a href="https://discord.com/developers/applications" target="_blank" rel="noopener">Discord Developer Portal</a> で <b>New Application</b> → 左メニュー <b>Bot</b> → <b>Reset Token</b> でトークンをコピー。
+            同じ画面で <b>MESSAGE CONTENT INTENT</b> と <b>SERVER MEMBERS INTENT</b> を必ず ON にします。
+            <span style="color:var(--muted);font-size:12.5px">（詳細な画面つき手順は下の「API設定」にあります）</span>
+          </li>
+          <li>
+            <b>BOT をサーバーに招待する</b><br>
+            同じポータルの <b>OAuth2 → URL Generator</b> で <code>bot</code> と <code>applications.commands</code> にチェック → 権限は「管理者」または必要権限（メッセージ送信・ファイル添付・チャンネル管理・ロール管理・サーバー管理）を選択 → 生成された URL を開いて、対象サーバーに追加します。
+          </li>
+          <li>
+            <b>ダッシュボードでサーバーを開く</b><br>
+            <a href="/dashboard">ダッシュボード</a> に、あなたが管理者権限を持つサーバーが並びます。設定したいサーバーのタイルをクリックしてください。
+          </li>
+          <li>
+            <b>API タブにトークンを貼って保存</b><br>
+            まず <b>Discord BOT トークン</b>だけを貼って保存します。これが成功すると、他のタブのチャンネル一覧・ロール一覧が Discord から自動で読み込まれ、プルダウンで選べるようになります。
+            翻訳を使うなら <b>DeepL キー</b>、意図判定を使うなら <b>Anthropic キー</b>も続けて入れて保存。
+          </li>
+          <li>
+            <b>使いたい機能だけ設定する</b><br>
+            上部のタブ（API / 翻訳 / チケット / Welcome / 意図判定 / 送料 / Auction / 招待 / 転送メッセージ）を切り替えて、<b>使う機能だけ</b>設定してください。
+            使わないタブは空のままで構いません。各タブの右下「変更を保存」で保存します。
+          </li>
+          <li>
+            <b>BOT を起動して動作確認</b><br>
+            左上のサーバー名の下にある <b>稼働状況・ログ</b> を開き、<b>起動</b>を押します。「稼働中」になれば OK。
+            うまく動かないときは、同じページのログに理由が出ています。
+          </li>
+        </ol>
+      </div>
+
+      <div class="gsub">日々の使い方</div>
+      <div class="card">
+        <ul style="margin:0;padding-left:20px;line-height:2">
+          <li><b>設定を変えたい</b> → サーバー設定の該当タブを直して「変更を保存」。BOT の再起動は不要です。</li>
+          <li><b>抽選をやりたい</b> → <b>Giveaway</b> ページで賞品と期間を入れて投稿。当選発表まで全自動です。</li>
+          <li><b>調子が悪い</b> → <b>稼働状況・ログ</b> でログを確認し、必要なら「再起動」。</li>
+          <li><b>新しいサーバーを追加したい</b> → 手順1〜6をそのサーバーでもう一度。BOT トークンは同じものを使い回せます。</li>
+        </ul>
+      </div>
+
+      <div class="warn-pt">
+        <b>つまずきやすいポイント</b><br>
+        ・チャンネル一覧が空 → BOT トークンが未保存、または BOT がそのサーバーに招待されていません<br>
+        ・翻訳・転送が動かない → <b>MESSAGE CONTENT INTENT</b> が OFF になっています<br>
+        ・オンボーディングが使えない → Discord 側でサーバーの「コミュニティ機能」を有効化してください
+      </div>
     </div>
 
-    <div class="guide-sec card" id="g-api">
-      <h2>🔑 API設定</h2>
-      <p>Botの動作に必要なキーをまとめて設定します。<b>まず最初にここを設定</b>してください。必要なキーは3つ：<b>① Discord BOTトークン</b>（必須）、<b>② DeepL APIキー</b>（翻訳）、<b>③ Anthropic APIキー</b>（意図判定・翻訳の予備）。以下、それぞれの取得画面と手順です。</p>
+    <div class="callout" style="margin:28px 0">
+      <b>設定の開き方（共通）</b><br>
+      <b>サーバー一覧</b> → 対象サーバーを開く → 上部のタブを切り替えて設定 → 各タブの「変更を保存」。
+      転送メッセージだけは追加・編集した瞬間に反映されます。
+    </div>
 
-      {# ---- ① Discord ---- #}
+    {# ================= API設定 ================= #}
+    <div class="guide-sec card" id="g-api">
+      <h2>{{ icon.key(18) }} API設定</h2>
+      <p>Botの動作に必要なキーをまとめて設定します。<b>まず最初にここを設定</b>してください。必要なキーは3つ：<b>① Discord BOTトークン</b>（必須）、<b>② DeepL APIキー</b>（翻訳）、<b>③ Anthropic APIキー</b>（意図判定・翻訳の予備）。</p>
+
       <div class="gsub">① Discord BOT トークン（必須）</div>
       <p class="shotcap">取得先: <b>Discord Developer Portal</b>（discord.com/developers/applications）— 要ログイン</p>
       <div class="shot">
@@ -67,7 +195,7 @@
           <div style="width:118px;background:#1e1f22;padding:10px 8px">
             <div style="color:#949ba4;font-size:9.5px;margin-bottom:6px">SETTINGS</div>
             <div style="padding:5px 8px;border-radius:5px">General</div>
-            <div style="padding:5px 8px;border-radius:5px;background:#404249;color:#fff">🤖 Bot</div>
+            <div style="padding:5px 8px;border-radius:5px;background:#404249;color:#fff">Bot</div>
             <div style="padding:5px 8px;border-radius:5px">OAuth2</div>
           </div>
           <div style="flex:1;padding:14px 16px">
@@ -75,23 +203,22 @@
             <div style="font-size:10.5px;color:#949ba4;margin-bottom:4px">TOKEN</div>
             <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
               <code style="background:#1e1f22;padding:6px 10px;border-radius:5px;color:#72767d">••••••••••••••••••••</code>
-              <button style="background:#5865f2;color:#fff;border:none;border-radius:5px;padding:6px 12px;font-size:12px"><span class="cb" style="background:#fff;color:#5865f2">3</span>Reset Token</button>
+              <span style="background:#5865f2;color:#fff;border-radius:5px;padding:6px 12px;font-size:12px"><span class="cb" style="background:#fff;color:#5865f2">3</span>Reset Token</span>
             </div>
             <div style="font-size:10.5px;color:#949ba4;margin-bottom:2px">PRIVILEGED GATEWAY INTENTS</div>
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-top:1px solid #3f4147"><span><span class="cb" style="background:#faa61a;color:#000">4</span>MESSAGE CONTENT INTENT</span><span style="background:#3ba55d;color:#fff;font-size:10px;padding:2px 8px;border-radius:10px">ON ✓</span></div>
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-top:1px solid #3f4147"><span>SERVER MEMBERS INTENT</span><span style="background:#3ba55d;color:#fff;font-size:10px;padding:2px 8px;border-radius:10px">ON ✓</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-top:1px solid #3f4147"><span><span class="cb" style="background:#faa61a;color:#000">4</span>MESSAGE CONTENT INTENT</span><span style="background:#3ba55d;color:#fff;font-size:10px;padding:2px 8px;border-radius:10px">ON</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-top:1px solid #3f4147"><span>SERVER MEMBERS INTENT</span><span style="background:#3ba55d;color:#fff;font-size:10px;padding:2px 8px;border-radius:10px">ON</span></div>
           </div>
         </div>
       </div>
-      <ol class="steps">
-        <li><span class="cb">1</span>上記サイトを開き、右上の <b>New Application</b> でアプリ作成（名前は何でもOK）</li>
-        <li><span class="cb">2</span>左メニューの <b>Bot</b> を開く</li>
-        <li><span class="cb">3</span><b>Reset Token</b> → 表示されたトークンを<b>コピー</b>（この画面でしか見られないので必ず控える）</li>
-        <li><span class="cb">4</span>同じBotページ下の <b>MESSAGE CONTENT INTENT</b> と <b>SERVER MEMBERS INTENT</b> を <b>ON</b> にする（必須）</li>
+      <ol class="steps plain">
+        <li>上記サイトを開き、右上の <b>New Application</b> でアプリ作成（名前は何でもOK）</li>
+        <li>左メニューの <b>Bot</b> を開く</li>
+        <li><b>Reset Token</b> → 表示されたトークンを<b>コピー</b>（この画面でしか見られないので必ず控える）</li>
+        <li>同じBotページ下の <b>MESSAGE CONTENT INTENT</b> と <b>SERVER MEMBERS INTENT</b> を <b>ON</b> にする（必須）</li>
       </ol>
-      <div class="pt">⚠️ MESSAGE CONTENT INTENT がOFFだと、Botがメッセージ本文を読めず翻訳・転送・意図判定が動きません（2026年は厳格化されています）。</div>
+      <div class="warn-pt">MESSAGE CONTENT INTENT がOFFだと、Botがメッセージ本文を読めず翻訳・転送・意図判定が動きません。</div>
 
-      {# ---- ② DeepL ---- #}
       <div class="gsub">② DeepL API キー（翻訳用）</div>
       <p class="shotcap">取得先: <b>DeepL アカウント → API Keys</b>（deepl.com/your-account/keys）。無料プランで月50万文字まで</p>
       <div class="shot">
@@ -104,20 +231,19 @@
           </div>
           <div style="font-weight:700;margin-bottom:6px">Authentication Key for DeepL API</div>
           <div style="display:flex;gap:8px;align-items:center">
-            <code style="background:#f1f1ef;padding:6px 10px;border-radius:5px;flex:1;overflow:hidden;text-overflow:ellipsis">279a2e9d-83b3-c416-…-f721593e42a0:fx</code>
-            <button style="background:#0f2b46;color:#fff;border:none;border-radius:5px;padding:6px 12px;font-size:12px"><span class="cb" style="background:#fff;color:#0f2b46">3</span>コピー</button>
+            <code style="background:#f1f1ef;padding:6px 10px;border-radius:5px;flex:1;overflow:hidden;text-overflow:ellipsis;color:#333">279a2e9d-83b3-c416-…-f721593e42a0:fx</code>
+            <span style="background:#0f2b46;color:#fff;border-radius:5px;padding:6px 12px;font-size:12px"><span class="cb" style="background:#fff;color:#0f2b46">3</span>コピー</span>
           </div>
           <div style="font-size:11px;color:#888;margin-top:6px">末尾が <b>:fx</b> = 無料版キー</div>
         </div>
       </div>
-      <ol class="steps">
-        <li><span class="cb">1</span>deepl.com/pro#developer から <b>DeepL API Free</b> に登録（無料）</li>
-        <li><span class="cb">2</span>アカウントの <b>API Keys</b> タブを開く</li>
-        <li><span class="cb">3</span>キー（末尾 <code>:fx</code>）を<b>コピー</b></li>
+      <ol class="steps plain">
+        <li>deepl.com/pro#developer から <b>DeepL API Free</b> に登録（無料）</li>
+        <li>アカウントの <b>API Keys</b> タブを開く</li>
+        <li>キー（末尾 <code>:fx</code>）を<b>コピー</b></li>
       </ol>
-      <div class="pt">💡 DeepLを使わず Anthropic だけで翻訳することも可能（その場合このキーは空でOK・自動でClaudeにフォールバック）。</div>
+      <div class="pt">DeepLを使わず Anthropic だけで翻訳することも可能です（その場合このキーは空でOK・自動でClaudeにフォールバック）。</div>
 
-      {# ---- ③ Anthropic ---- #}
       <div class="gsub">③ Anthropic API キー（意図判定・翻訳の予備）</div>
       <p class="shotcap">取得先: <b>Anthropic Console → Settings → API keys</b>（console.anthropic.com/settings/keys）</p>
       <div class="shot">
@@ -125,131 +251,151 @@
         <div style="background:#fff;padding:14px 16px;font-size:13px;color:#333">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
             <span style="font-weight:700">API keys</span>
-            <button style="background:#cc6b3f;color:#fff;border:none;border-radius:6px;padding:7px 12px;font-size:12px"><span class="cb" style="background:#fff;color:#cc6b3f">2</span>+ Create Key</button>
+            <span style="background:#cc6b3f;color:#fff;border-radius:6px;padding:7px 12px;font-size:12px"><span class="cb" style="background:#fff;color:#cc6b3f">2</span>+ Create Key</span>
           </div>
           <div style="border:1px solid #eee;border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center">
-            <div><div style="font-weight:600">Support Bot</div><code style="font-size:11px;color:#888">sk-ant-api03-••••••••••••••</code></div>
-            <button style="background:#f1f1ef;border:1px solid #ddd;border-radius:5px;padding:5px 10px;font-size:12px"><span class="cb" style="background:#888">3</span>Copy</button>
+            <div><div style="font-weight:600">Musubot</div><code style="font-size:11px;color:#888;background:none">sk-ant-api03-••••••••••••••</code></div>
+            <span style="background:#f1f1ef;border:1px solid #ddd;border-radius:5px;padding:5px 10px;font-size:12px;color:#333"><span class="cb" style="background:#888">3</span>Copy</span>
           </div>
-          <div style="font-size:11px;color:#c0392b;margin-top:6px">⚠️ キーは作成時の1回だけ表示。すぐコピーしてください</div>
+          <div style="font-size:11px;color:#c0392b;margin-top:6px">キーは作成時の1回だけ表示。すぐコピーしてください</div>
         </div>
       </div>
-      <ol class="steps">
-        <li><span class="cb">1</span>console.anthropic.com にログイン → 左下 <b>Settings → API keys</b></li>
-        <li><span class="cb">2</span><b>Create Key</b> を押し、名前（例: Support Bot）を付ける</li>
-        <li><span class="cb">3</span>表示された <code>sk-ant-…</code> を<b>すぐコピー</b>（再表示不可）。利用には Billing でクレジット購入が必要</li>
+      <ol class="steps plain">
+        <li>console.anthropic.com にログイン → 左下 <b>Settings → API keys</b></li>
+        <li><b>Create Key</b> を押し、名前（例: Musubot）を付ける</li>
+        <li>表示された <code>sk-ant-…</code> を<b>すぐコピー</b>（再表示不可）。利用には Billing でクレジット購入が必要</li>
       </ol>
 
-      {# ---- ④ 貼り付け ---- #}
       <div class="gsub">④ ダッシュボードに貼り付けて保存</div>
-      <p class="shotcap">サーバー設定 → <b>🔑 API</b> タブ</p>
-      <div class="shot">
-        <div class="shot-bar"><span class="dots"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i></span><span class="shot-url">support-bot … /guild/…/setup</span></div>
-        <div style="background:#fff;padding:14px 16px;font-size:13px;color:#333">
-          <div style="margin-bottom:10px"><div style="font-weight:600;font-size:12px;margin-bottom:3px">Discord BOT トークン<span style="color:#dc2626">*</span></div><div style="border:1px solid #e3e8f0;border-radius:6px;padding:7px 10px;color:#aaa">••••••••••••••••</div></div>
-          <div style="margin-bottom:10px"><div style="font-weight:600;font-size:12px;margin-bottom:3px">DeepL API キー</div><div style="border:1px solid #e3e8f0;border-radius:6px;padding:7px 10px;color:#aaa">…:fx</div></div>
-          <div style="margin-bottom:10px"><div style="font-weight:600;font-size:12px;margin-bottom:3px">Anthropic API キー</div><div style="border:1px solid #e3e8f0;border-radius:6px;padding:7px 10px;color:#aaa">sk-ant-…</div></div>
-          <button style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600">💾 変更を保存</button>
-        </div>
-      </div>
-      <ol class="steps">
-        <li><span class="cb">1</span>まず <b>Discord BOTトークン</b>を貼って <b>💾 変更を保存</b>（これで他タブのチャンネル/ロール一覧が取得されます）</li>
-        <li><span class="cb">2</span>DeepL / Anthropic のキーを貼る</li>
-        <li><span class="cb">3</span><b>月間予算(USD)</b>を設定（超過で自動翻訳が一時停止）→ もう一度保存</li>
+      <ol class="steps plain">
+        <li>まず <b>Discord BOTトークン</b>を貼って <b>変更を保存</b>（これで他タブのチャンネル/ロール一覧が取得されます）</li>
+        <li>DeepL / Anthropic のキーを貼る</li>
+        <li><b>月間予算(USD)</b>を設定（超過で自動翻訳が一時停止）→ もう一度保存</li>
       </ol>
-      <div class="pt">💡 トークン類は暗号化して保存されます。万一外部に漏れたら、各サービスの画面でキーを再発行（リセット）してください。</div>
+      <div class="pt">トークン類は暗号化して保存されます。万一外部に漏れたら、各サービスの画面でキーを再発行（リセット）してください。</div>
     </div>
 
+    {# ================= 各機能 ================= #}
     <div class="guide-sec card" id="g-translation">
-      <h2>🌐 翻訳</h2>
-      <p>指定したチャンネルの英語・日本語の発言を、Botが自動で翻訳して返信します（英文→🇯🇵 / 日本文→🇺🇸）。</p>
-      <ol class="steps">
+      <h2>{{ icon.globe(18) }} 翻訳</h2>
+      <p>指定したチャンネルの英語・日本語の発言を、Botが自動で翻訳して返信します（英文→日本語 / 日本文→英語）。</p>
+      <ol class="steps plain">
         <li><b>翻訳対象チャンネル</b>を選択（複数可）。チケットカテゴリ全体を対象にもできます</li>
         <li><b>翻訳プロバイダ</b>（DeepL推奨）と<b>既定の翻訳方向</b>（双方向/英→日/日→英）を選ぶ → 保存</li>
       </ol>
-      <div class="pt">💡 URL・絵文字のみ・短すぎる文は無視。月間予算を超えると自動停止します。</div>
+      <div class="pt">URL・絵文字のみ・短すぎる文は無視されます。月間予算を超えると自動停止します。</div>
     </div>
 
     <div class="guide-sec card" id="g-ticket">
-      <h2>🎫 チケット</h2>
+      <h2>{{ icon.ticket(18) }} チケット</h2>
       <p>お客様が「Open ticket」ボタンを押すと、本人専用のプライベートチャンネルが自動作成されます。</p>
-      <ol class="steps">
+      <ol class="steps plain">
         <li><b>チケット親カテゴリ</b>を選択（新規チケットchがここに作られます）</li>
         <li><b>運営スタッフロール</b>を選択（このロールの人だけがチケットを閲覧可）→ 保存</li>
-        <li>「📤 チケットパネルを投稿」で、ボタン付きパネルを任意チャンネルに設置</li>
+        <li>「チケットパネルを投稿」で、ボタン付きパネルを任意チャンネルに設置</li>
       </ol>
-      <div class="pt">💡 1ユーザー1チケットまで。🔒クローズで5秒後に削除されます。</div>
+      <div class="pt">1ユーザーにつき1チケットまで。クローズすると5秒後に削除されます。</div>
     </div>
 
     <div class="guide-sec card" id="g-welcome">
-      <h2>🎊 Welcome</h2>
+      <h2>{{ icon.sparkles(18) }} Welcome</h2>
       <p>新しい人がサーバーに入った瞬間に、歓迎メッセージを自動投稿します。</p>
-      <ol class="steps">
+      <ol class="steps plain">
         <li><b>Welcome投稿先チャンネル</b>を選択</li>
         <li>タイトル・本文・色・バナー画像をカスタマイズ → 保存</li>
-        <li>「プレビュー」で自分に見え方を確認できます</li>
+        <li>「Welcome を投稿」で自分に見え方を確認できます</li>
       </ol>
-      <div class="pt">💡 招待トラッキングと連動し、「どの招待で入ったか」も同時に表示できます。</div>
+      <div class="pt">招待トラッキングと連動し、「どの招待で入ったか」も同時に表示できます。</div>
     </div>
 
     <div class="guide-sec card" id="g-suggester">
-      <h2>🤖 意図判定</h2>
+      <h2>{{ icon.sparkles(18) }} 意図判定</h2>
       <p>監視チャンネルの発言をAIで分類し、商品問合せ・配送相談を検知したら誘導文を返信します。</p>
-      <ol class="steps">
+      <ol class="steps plain">
         <li>監視チャンネルと誘導先（#ticket・<code>/shipping</code> 等）を設定 → 保存</li>
         <li>ON にすると自動で動作します</li>
       </ol>
-      <div class="pt">💡 反応は同じメッセージに1回だけ。<b>誘導テキストを送るだけ</b>で、チケット作成などの能動アクションはしません。Anthropic APIキーが必要です。</div>
+      <div class="pt">反応は同じメッセージに1回だけ。<b>誘導テキストを送るだけ</b>で、チケット作成などの能動アクションはしません。Anthropic APIキーが必要です。</div>
     </div>
 
     <div class="guide-sec card" id="g-shipping">
-      <h2>📦 送料</h2>
+      <h2>{{ icon.box(18) }} 送料</h2>
       <p>商品×数量×宛先国から、DHL/FedExの安い方を自動で計算します（Google Sheets連携）。</p>
-      <ol class="steps">
+      <ol class="steps plain">
         <li>スプレッドシート／サービスアカウントを設定</li>
         <li>燃油サーチャージの最新値を確認（毎週自動取得）→ 保存</li>
         <li>Discordで <code>/shipping</code> を実行するとカート式パネルが起動</li>
       </ol>
-      <div class="pt">💡 商品重量＋梱包材1kg、0.5kg刻み切り上げ。20kg超は自動で分割発送して合算します。</div>
+      <div class="pt">商品重量＋梱包材1kg、0.5kg刻み切り上げ。20kg超は自動で分割発送して合算します。</div>
     </div>
 
     <div class="guide-sec card" id="g-auction">
-      <h2>🏛️ Auction</h2>
+      <h2>{{ icon.gavel(18) }} Auction</h2>
       <p>ボタン入札式オークションの既定値を設定します（実行は Discord の <code>/auction create</code>）。</p>
-      <ol class="steps">
+      <ol class="steps plain">
         <li>最低落札価格・最小増分・アンチスナイプ（終了前の自動延長）等の既定値を設定 → 保存</li>
         <li>Discordで <code>/auction create</code> で出品</li>
       </ol>
-      <div class="pt">💡 入札は「現最高値＋5%以上 かつ 最小増分以上」。落札時は落札者×Host×Staffだけの取引チャンネルが自動作成されます（決済は人が調整）。</div>
+      <div class="pt">入札は「現最高値＋5%以上 かつ 最小増分以上」。落札時は落札者・Host・Staffだけの取引チャンネルが自動作成されます（決済は人が調整）。</div>
+    </div>
+
+    <div class="guide-sec card" id="g-giveaway">
+      <h2>{{ icon.gift(18) }} Giveaway</h2>
+      <p>参加ボタン付きの抽選メッセージを、Discord にコマンドを打たずにダッシュボードから作成・投稿できます。</p>
+      <ol class="steps plain">
+        <li>サーバーを開いて <b>Giveaway</b> ページへ</li>
+        <li>賞品名・当選数・期間（<code>30s</code> / <code>1h</code> / <code>1d2h</code>）・投稿先チャンネルを入力</li>
+        <li>「投稿する」を押すと即座に Discord に投稿されます</li>
+      </ol>
+      <div class="pt">期間終了時に BOT が自動で抽選・当選発表まで行います。途中でやめたい場合は「早期終了」。</div>
     </div>
 
     <div class="guide-sec card" id="g-invite">
-      <h2>🚪 招待</h2>
+      <h2>{{ icon.door(18) }} 招待</h2>
       <p>入室時にどの招待コードで来たかを自動判定し、Welcome embed と運営ログに記録します。</p>
-      <ol class="steps">
+      <ol class="steps plain">
         <li>判定ログの送信先、<code>/invite create</code> が使えるチャンネル/ロールを設定 → 保存</li>
         <li>Discordで <code>/invite list</code> / <code>/invite create</code></li>
       </ol>
-      <div class="pt">💡 複数Instagramアカウントの流入元判別に。Botに「サーバー管理」権限が必要です。</div>
+      <div class="pt">複数Instagramアカウントの流入元判別に使えます。Botに「サーバー管理」権限が必要です。</div>
     </div>
 
     <div class="guide-sec card" id="g-forwarding">
-      <h2>📨 転送メッセージ</h2>
+      <h2>{{ icon.forward(18) }} 転送メッセージ</h2>
       <p>監視元チャンネルの<b>画像＋本文</b>を、別チャンネル（別サーバー可）へ自動転送します。</p>
-      <ol class="steps">
+      <ol class="steps plain">
         <li><b>① 送信元</b>・<b>② 転送先</b>のチャンネルを選ぶ（サーバー→チャンネルの順）</li>
         <li><b>③ 送り方（モード）</b>を選ぶ: そのまま／画像のみ／加工（原文＋付加文）／任意テキストに置換</li>
         <li><b>④ 送信者フィルタ</b>（任意）: 指定ロールの人の投稿だけ転送（未選択なら全員）</li>
-        <li>「加工」「任意テキストに置換」では<b>カスタム文</b>を入力。<b>👀 プレビュー</b>で転送先の見え方を確認</li>
-        <li>「➕ ルールを追加」で作成。既存ルールは「✏️ 編集」で変更、「🗑 削除」で削除（いずれも即反映）</li>
+        <li>「加工」「任意テキストに置換」では<b>カスタム文</b>を入力。プレビューで転送先の見え方を確認</li>
+        <li>「ルールを追加」で作成。既存ルールは「編集」で変更、「削除」で削除（いずれも即反映）</li>
       </ol>
-      <div class="pt">💡 別サーバーへ転送するには、その<b>転送先サーバーにも転送Botが参加</b>している必要があります。トリガーは「画像を含む投稿」です。</div>
+      <div class="pt">別サーバーへ転送するには、その<b>転送先サーバーにも転送Botが参加</b>している必要があります。トリガーは「画像を含む投稿」です。</div>
     </div>
 
-    <div class="callout" style="margin-top:20px">
-      <div style="font-weight:600;color:var(--heading);margin-bottom:6px">📖 もっと詳しく</div>
-      Discord内では <code>/guide</code>（メニュー式）や <code>/help</code> でも各機能の説明を見られます。コマンド全一覧は <code>COMMANDS.md</code> を参照。
+    <div class="callout" style="margin-top:24px">
+      <b>もっと詳しく</b><br>
+      Discord内では <code>/guide</code>（メニュー式）や <code>/help</code> でも各機能の説明を見られます。
+      右下のアシスタントにも、使い方をそのまま質問できます。
     </div>
-  </main>
+
+    </div>
+  </div>
 </div>
+{% include "_assistant.html" %}
+
+<script>
+  // スクロール位置に応じて目次をハイライト
+  (function(){
+    var links = [].slice.call(document.querySelectorAll('.guide-toc a'));
+    var secs = links.map(function(a){ return document.querySelector(a.getAttribute('href')); });
+    function sync(){
+      var y = window.scrollY + 120, idx = 0;
+      secs.forEach(function(s, i){ if(s && s.offsetTop <= y) idx = i; });
+      links.forEach(function(a, i){ a.classList.toggle('active', i === idx); });
+    }
+    window.addEventListener('scroll', sync, {passive:true});
+    sync();
+  })();
+</script>
 {% endblock %}

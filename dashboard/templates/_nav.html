@@ -1,0 +1,47 @@
+{#
+  共通トップナビゲーション。
+  呼び出し側で page 変数（dashboard / forwarding / users / guide）を渡すとタブがアクティブになる。
+  guild_name / guild_id があれば右上にサーバー名チップ + サーバー用サブナビを出す。
+#}
+{% import "_icons.html" as icon %}
+<header class="topbar">
+  <a class="brand" href="/dashboard">
+    <span class="brand-mark">{{ icon.knot(19) }}</span>
+    <span class="brand-text">Musubot</span>
+  </a>
+  <nav class="topnav">
+    <a href="/dashboard"{% if page == "dashboard" %} class="active"{% endif %}>{{ icon.servers(16) }} サーバー一覧</a>
+    {% if session.is_root %}
+      <a href="/forwarding"{% if page == "forwarding" %} class="active"{% endif %}>{{ icon.forward(16) }} 画像転送</a>
+      <a href="/admin/users"{% if page == "users" %} class="active"{% endif %}>{{ icon.users(16) }} ユーザー管理</a>
+    {% endif %}
+    <a href="/guide"{% if page == "guide" %} class="active"{% endif %}>{{ icon.book(16) }} 使い方ガイド</a>
+  </nav>
+  <div class="topbar-right">
+    {% if guild_name %}
+      <span class="guild-chip" title="{{ guild_name }}">{{ icon.servers(14) }} {{ guild_name }}</span>
+    {% endif %}
+    <button type="button" class="icon-btn" id="theme-toggle" title="カラーモードを切り替え" aria-label="カラーモードを切り替え">
+      <span class="icon-moon">{{ icon.moon(18) }}</span>
+      <span class="icon-sun">{{ icon.sun(18) }}</span>
+    </button>
+    <span class="user-chip">
+      <span class="avatar">{{ (session.username or "?")[:1] | upper }}</span>
+      <span class="user-name">{{ session.username }}{% if session.is_root %}（管理者）{% endif %}</span>
+    </span>
+    <a href="/logout" class="btn-logout">ログアウト</a>
+  </div>
+</header>
+
+{% if guild_id %}
+<div class="subnav">
+  <div class="subnav-inner">
+    <span class="subnav-guild">{{ guild_name }}</span>
+    <a href="/guild/{{ guild_id }}/setup"{% if subpage == "setup" %} class="active"{% endif %}>ロボットを選ぶ</a>
+    <a href="/guild/{{ guild_id }}/schedule"{% if subpage == "schedule" %} class="active"{% endif %}>定期メッセージ</a>
+    <a href="/guild/{{ guild_id }}/giveaway"{% if subpage == "giveaway" %} class="active"{% endif %}>Giveaway</a>
+    <a href="/guild/{{ guild_id }}/onboarding"{% if subpage == "onboarding" %} class="active"{% endif %}>オンボーディング</a>
+    <a href="/guild/{{ guild_id }}/status"{% if subpage == "status" %} class="active"{% endif %}>稼働状況・ログ</a>
+  </div>
+</div>
+{% endif %}

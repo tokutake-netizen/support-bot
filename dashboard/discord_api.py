@@ -27,6 +27,26 @@ class DiscordREST:
             r = await client.get(f"{DISCORD_API}/guilds/{guild_id}", headers=self._headers())
             return r.json() if r.status_code == 200 else None
 
+    async def get_guild_counts(self, guild_id: int | str) -> Optional[dict]:
+        """メンバー数つきでギルドを取得。人数推移の記録に使う。
+
+        with_counts=true で approximate_member_count / approximate_presence_count
+        が付く（概算だが Discord が返す唯一の集計値）。
+        """
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            r = await client.get(
+                f"{DISCORD_API}/guilds/{guild_id}",
+                params={"with_counts": "true"},
+                headers=self._headers(),
+            )
+            if r.status_code != 200:
+                return None
+            g = r.json()
+            return {
+                "total": g.get("approximate_member_count"),
+                "online": g.get("approximate_presence_count"),
+            }
+
     async def list_my_guilds(self) -> list[dict]:
         """このBotトークンが参加している全ギルドを返す（転送ピッカー用）。"""
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -77,6 +97,43 @@ class DiscordREST:
                 r = await client.post(url, headers=hdr, json=payload)
             r.raise_for_status()
             return r.json()
+
+    async def get_me(self) -> Optional[dict]:
+        """BOT 自身のプロフィール（表示名・アバター）を取得。"""
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.get(f"{DISCORD_API}/users/@me", headers=self._headers())
+            return r.json() if r.status_code == 200 else None
+
+    async def patch_me(
+        self, username: Optional[str] = None, avatar_data_uri: Optional[str] = None
+    ) -> tuple[bool, str]:
+        """BOT の表示名・アイコンを変更する。(成功したか, メッセージ) を返す。
+
+        avatar_data_uri は "data:image/png;base64,..." 形式。Discord は
+        ユーザー名変更を厳しくレート制限する（連続変更で 429）ため、
+        呼び出し側でエラーをそのまま見せる。
+        """
+        payload: dict = {}
+        if username:
+            payload["username"] = username
+        if avatar_data_uri:
+            payload["avatar"] = avatar_data_uri
+        if not payload:
+            return False, "変更内容がありません"
+
+        hdr = {**self._headers(), "Content-Type": "application/json"}
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.patch(f"{DISCORD_API}/users/@me", headers=hdr, json=payload)
+        if r.status_code == 200:
+            return True, "更新しました"
+        if r.status_code == 429:
+            return False, "Discord のレート制限中です。しばらく待ってからもう一度お試しください"
+        try:
+            detail = r.json()
+            msg = detail.get("message") or str(detail)
+        except ValueError:
+            msg = r.text[:200]
+        return False, f"Discord がエラーを返しました（{r.status_code}）: {msg}"
 
     async def patch_message(
         self, channel_id: int | str, message_id: int | str, payload: dict

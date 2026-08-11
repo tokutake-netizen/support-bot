@@ -1,66 +1,188 @@
 {% extends "base.html" %}
-{% block title %}サーバー一覧 — Support Bot{% endblock %}
+{% import "_icons.html" as icon %}
+{% block title %}ダッシュボード — Musubot{% endblock %}
+{% block head %}
+<style>
+  .chart-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow-sm);margin-bottom:16px}
+  .chart-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+  .chart-head .name{font-weight:700;color:var(--heading);font-size:14.5px}
+  .chart-head .now{font-size:22px;font-weight:700;color:var(--heading);margin-left:auto;line-height:1}
+  .chart-head .delta{font-size:12.5px;font-weight:700}
+  .delta.up{color:var(--green)} .delta.down{color:var(--red)} .delta.flat{color:var(--muted)}
+  .chart-sub{color:var(--muted);font-size:12px;margin-bottom:10px}
+  .spark{width:100%;height:110px;display:block;overflow:visible}
+  .spark .grid{stroke:var(--line);stroke-width:1}
+  .spark .lbl{fill:var(--muted);font-size:10px}
+  .empty-chart{color:var(--muted);font-size:13px;padding:22px;text-align:center;border:1px dashed var(--line);border-radius:12px}
+</style>
+{% endblock %}
 {% block body %}
-<div class="wrap">
-  <aside class="sidebar">
-    <div class="brand"><span class="dot"></span>Support Bot</div>
-    <nav class="nav">
-      <a href="/dashboard" class="active">📋 サーバー一覧</a>
-      {% if session.is_root %}
-        <a href="/forwarding">📦 画像転送</a>
-        <a href="/admin/users">👥 ユーザー管理</a>
-      {% endif %}
-      <a href="/guide">📖 使い方ガイド</a>
-      <div class="section-label">アカウント</div>
-      <a href="#" style="color:var(--muted)">👤 {{ session.username }}{% if session.is_root %} (root){% endif %}</a>
-      <a href="/logout" style="color:var(--muted)">🚪 ログアウト</a>
-    </nav>
-  </aside>
-  <main class="main">
-    <h1>サーバー一覧</h1>
-    <p class="subtitle">あなたが Administrator として参加している Discord サーバーが表示されます。設定したいサーバーをクリックしてください。BOT が未導入のサーバーは右下から招待 URL を生成できます。</p>
+{% with page = "dashboard" %}{% include "_nav.html" %}{% endwith %}
 
-    {% set running = guilds | selectattr("bot_running") | list | length %}
-    {% set unconfigured = guilds | rejectattr("configured") | list | length %}
-    <div class="stats">
-      <div class="stat"><div class="num">{{ guilds | length }}</div><div class="lbl">サーバー数</div></div>
-      <div class="stat"><div class="num" style="color:var(--green)">{{ running }}</div><div class="lbl">BOT 稼働中</div></div>
-      <div class="stat"><div class="num" style="color:var(--yellow)">{{ unconfigured }}</div><div class="lbl">未設定</div></div>
-      <div class="stat"><div class="num">—</div><div class="lbl">今月の API 利用料</div></div>
-    </div>
+<div class="page">
+  <h1>ダッシュボード</h1>
+  <p class="subtitle">あなたが Administrator として参加している Discord サーバーが表示されます。設定したいサーバーを開いてください。</p>
 
-    {% if guilds %}
-    <div class="grid">
-      {% for g in guilds %}
-      <a class="guild-card" href="/guild/{{ g.id }}/setup">
-        <div class="guild-card-head">
-          {% if g.icon %}
-            <img class="guild-icon" src="https://cdn.discordapp.com/icons/{{ g.id }}/{{ g.icon }}.png?size=128" alt="">
-          {% else %}
-            {% set initials = (g.name | trim)[:2] | upper if g.name else "?" %}
-            <div class="guild-icon placeholder">{{ initials }}</div>
+  {% set running = guilds | selectattr("bot_running") | list | length %}
+  {% set unconfigured = guilds | rejectattr("configured") | list | length %}
+  <div class="stats">
+    <div class="stat"><div class="num">{{ guilds | length }}</div><div class="lbl">サーバー数</div></div>
+    <div class="stat"><div class="num" style="color:var(--green)">{{ running }}</div><div class="lbl">BOT 稼働中</div></div>
+    <div class="stat"><div class="num" style="color:var(--yellow)">{{ unconfigured }}</div><div class="lbl">未設定</div></div>
+    <div class="stat"><div class="num">{{ "{:,}".format(total_members) if total_members else "—" }}</div><div class="lbl">総メンバー数</div></div>
+  </div>
+
+  {# ---------- 人数推移 ---------- #}
+  {% set charted = guilds | selectattr("stats") | list %}
+  <h2>{{ icon.activity(17) }} メンバー数の推移 <span class="help">直近30日・1日1回記録</span></h2>
+  {% if charted %}
+    {% for g in charted %}
+      {% set s = g.stats %}
+      {% set pts = s.series | selectattr("total") | list %}
+      <div class="chart-card">
+        <div class="chart-head">
+          <span class="name">{{ g.name }}</span>
+          {% if s.delta is not none and s.points > 1 %}
+            {% if s.delta > 0 %}<span class="delta up">+{{ s.delta }}人</span>
+            {% elif s.delta < 0 %}<span class="delta down">{{ s.delta }}人</span>
+            {% else %}<span class="delta flat">増減なし</span>{% endif %}
           {% endif %}
-          <div class="guild-card-meta">
-            <div class="name">{{ g.name }}</div>
-            <div class="meta">id: {{ g.id }}</div>
-          </div>
+          <span class="now">{{ "{:,}".format(s.latest) if s.latest is not none else "—" }}<span style="font-size:12px;color:var(--muted);font-weight:500"> 人</span></span>
         </div>
-        {% if g.bot_running %}
-          <span class="badge running">● 稼働中</span>
-        {% elif g.configured %}
-          <span class="badge stopped">○ 停止中</span>
+
+        {% if pts | length >= 2 %}
+          {% set vals = pts | map(attribute="total") | list %}
+          {% set vmax = vals | max %}
+          {% set vmin = vals | min %}
+          {% set span = (vmax - vmin) if (vmax - vmin) > 0 else 1 %}
+          {% set n = pts | length %}
+          {% set W = 1000 %}{% set H = 100 %}{% set PAD = 8 %}
+          {% set ns = namespace(line="", area="") %}
+          {% for p in pts %}
+            {% set x = (loop.index0 * W / (n - 1)) | round(2) %}
+            {% set y = (H - PAD - ((p.total - vmin) / span) * (H - PAD * 2)) | round(2) %}
+            {% set ns.line = ns.line ~ (" " if not loop.first else "") ~ x ~ "," ~ y %}
+            {% set ns.area = ns.area ~ (("M " ~ x ~ " " ~ y) if loop.first else (" L " ~ x ~ " " ~ y)) %}
+            {% if loop.last %}{% set ns.area = ns.area ~ " L " ~ x ~ " " ~ H ~ " L 0 " ~ H ~ " Z" %}{% endif %}
+          {% endfor %}
+          <div class="chart-sub">{{ pts[0].date }} 〜 {{ pts[-1].date }}（{{ n }}点）・最小 {{ vmin }} / 最大 {{ vmax }}</div>
+          <svg class="spark" viewBox="0 0 {{ W }} {{ H }}" preserveAspectRatio="none" role="img"
+               aria-label="{{ g.name }} のメンバー数推移 {{ vmin }}人から{{ vmax }}人">
+            <defs>
+              <linearGradient id="fill-{{ g.id }}" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="var(--brand)" stop-opacity=".22"/>
+                <stop offset="100%" stop-color="var(--brand)" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <line class="grid" x1="0" y1="{{ PAD }}" x2="{{ W }}" y2="{{ PAD }}"/>
+            <line class="grid" x1="0" y1="{{ H - PAD }}" x2="{{ W }}" y2="{{ H - PAD }}"/>
+            <path d="{{ ns.area }}" fill="url(#fill-{{ g.id }})"/>
+            <polyline points="{{ ns.line }}" fill="none" stroke="var(--brand)" stroke-width="2.5"
+                      stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+          </svg>
         {% else %}
-          <span class="badge unconfigured">○ セットアップ必要</span>
+          <div class="chart-sub" style="margin:0">記録開始から{{ s.points }}日目です。グラフは2日分たまると表示されます。</div>
         {% endif %}
-      </a>
-      {% endfor %}
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty-chart">
+      まだ人数データがありません。BOT トークンを設定したサーバーについて、このダッシュボードを開くたびに1日1回スナップショットを記録します。<br>
+      翌日以降、ここに推移グラフが表示されます。
     </div>
-    {% else %}
-    <div class="card">
-      <p style="color:var(--muted)">管理者として参加しているサーバーが見つかりませんでした。Discord でこのアプリを利用するには、サーバーの「Administrator」権限が必要です。</p>
+  {% endif %}
+
+  <h2>サーバー</h2>
+  {% if guilds %}
+  <div class="tile-grid">
+    {% for g in guilds %}
+    <a class="tile" href="/guild/{{ g.id }}/setup">
+      <div class="tile-head">
+        <span class="tile-icon">
+          {% if g.icon %}
+            <img src="https://cdn.discordapp.com/icons/{{ g.id }}/{{ g.icon }}.png?size=128" alt="">
+          {% else %}
+            {{ (g.name | trim)[:2] | upper if g.name else "?" }}
+          {% endif %}
+        </span>
+        <span class="tile-title">{{ g.name }}</span>
+        <span class="tile-arrow">{{ icon.chevronRight(18) }}</span>
+      </div>
+      <div class="tile-badges">
+        {% if g.bot_running %}
+          <span class="badge running">稼働中</span>
+        {% elif g.configured %}
+          <span class="badge stopped">停止中</span>
+        {% else %}
+          <span class="badge unconfigured">セットアップ必要</span>
+        {% endif %}
+        {% if g.stats and g.stats.latest is not none %}
+          <span class="badge">{{ "{:,}".format(g.stats.latest) }} 人</span>
+        {% endif %}
+      </div>
+      <div class="tile-desc">機能設定・稼働状況・Giveaway・オンボーディング</div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="card">
+    <p style="color:var(--muted);margin:0">管理者として参加しているサーバーが見つかりませんでした。Discord でこのアプリを利用するには、サーバーの「Administrator」権限が必要です。</p>
+  </div>
+  {% endif %}
+
+  {% if session.is_root %}
+  <h2>管理</h2>
+  <div class="tile-grid">
+    <a class="tile" href="/forwarding">
+      <div class="tile-head">
+        <span class="tile-icon">{{ icon.forward(20) }}</span>
+        <span class="tile-title">画像転送</span>
+        <span class="tile-arrow">{{ icon.chevronRight(18) }}</span>
+      </div>
+      <div class="tile-desc">サーバーをまたいだ画像・メッセージの自動転送ルール</div>
+    </a>
+    <a class="tile" href="/admin/users">
+      <div class="tile-head">
+        <span class="tile-icon">{{ icon.users(20) }}</span>
+        <span class="tile-title">ユーザー管理</span>
+        <span class="tile-arrow">{{ icon.chevronRight(18) }}</span>
+      </div>
+      <div class="tile-desc">ダッシュボードにログインできる人の追加・承認</div>
+    </a>
+  </div>
+  {% endif %}
+
+  <h2>ガイド</h2>
+  <div class="mini-grid">
+    <a class="mini-card" href="/guide">
+      <span class="mini-icon">{{ icon.book(19) }}</span>
+      <span>
+        <span class="t">利用マニュアル</span>
+        <span class="d">機能の使い方と設定手順</span>
+      </span>
+    </a>
+    <a class="mini-card" href="/guide#g-start">
+      <span class="mini-icon">{{ icon.rocket(19) }}</span>
+      <span>
+        <span class="t">はじめに（導入の流れ）</span>
+        <span class="d">初回セットアップを6ステップで</span>
+      </span>
+    </a>
+    <div class="mini-card disabled">
+      <span class="mini-icon">{{ icon.play(19) }}</span>
+      <span>
+        <span class="t">マニュアル動画</span>
+        <span class="d">準備中</span>
+      </span>
     </div>
-    {% endif %}
-  </main>
-  {% include "_assistant.html" %}
+    <div class="mini-card disabled">
+      <span class="mini-icon">{{ icon.question(19) }}</span>
+      <span>
+        <span class="t">よくある質問</span>
+        <span class="d">準備中</span>
+      </span>
+    </div>
+  </div>
 </div>
+{% include "_assistant.html" %}
 {% endblock %}

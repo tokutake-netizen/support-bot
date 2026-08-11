@@ -1,0 +1,44 @@
+{#
+  SVG icon macros (lucide-style, 24x24 stroke icons).
+  Usage: {% import "_icons.html" as icon %} then {{ icon.servers(18) }}
+#}
+{% macro _svg(paths, size=18) -%}
+<svg width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ paths }}</svg>
+{%- endmacro %}
+
+{# 「結び」— 二つの輪が交わるマーク #}
+{% macro knot(size=18) %}{{ _svg('<circle cx="8.2" cy="12" r="5.2"/><circle cx="15.8" cy="12" r="5.2"/>'|safe, size) }}{% endmacro %}
+{% macro servers(size=18) %}{{ _svg('<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>'|safe, size) }}{% endmacro %}
+{% macro settings(size=18) %}{{ _svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'|safe, size) }}{% endmacro %}
+{% macro book(size=18) %}{{ _svg('<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>'|safe, size) }}{% endmacro %}
+{% macro forward(size=18) %}{{ _svg('<polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/>'|safe, size) }}{% endmacro %}
+{% macro users(size=18) %}{{ _svg('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'|safe, size) }}{% endmacro %}
+{% macro activity(size=18) %}{{ _svg('<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>'|safe, size) }}{% endmacro %}
+{% macro gift(size=18) %}{{ _svg('<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/>'|safe, size) }}{% endmacro %}
+{% macro door(size=18) %}{{ _svg('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>'|safe, size) }}{% endmacro %}
+{% macro key(size=18) %}{{ _svg('<circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 21 2"/><path d="m17 6 3 3"/>'|safe, size) }}{% endmacro %}
+{% macro globe(size=18) %}{{ _svg('<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>'|safe, size) }}{% endmacro %}
+{% macro ticket(size=18) %}{{ _svg('<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2M13 17v2M13 11v2"/>'|safe, size) }}{% endmacro %}
+{% macro sparkles(size=18) %}{{ _svg('<path d="m12 3-1.9 5.8L4 10.7l6.1 1.9L12 18.4l1.9-5.8 6.1-1.9-6.1-1.9z"/><path d="M19 3v4M21 5h-4"/>'|safe, size) }}{% endmacro %}
+{% macro box(size=18) %}{{ _svg('<path d="M21 8V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"/><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M10 12h4"/>'|safe, size) }}{% endmacro %}
+{% macro gavel(size=18) %}{{ _svg('<path d="m14 12-8.5 8.5a2.1 2.1 0 0 1-3-3L11 9"/><path d="m15 5 4 4"/><path d="m18.5 2.5 3 3"/><path d="m11.5 5.5 7 7"/><path d="M2 22h8"/>'|safe, size) }}{% endmacro %}
+{% macro mail(size=18) %}{{ _svg('<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/>'|safe, size) }}{% endmacro %}
+{% macro play(size=18) %}{{ _svg('<rect x="2" y="5" width="20" height="14" rx="2"/><polygon points="10 9 15 12 10 15" fill="currentColor"/>'|safe, size) }}{% endmacro %}
+{% macro question(size=18) %}{{ _svg('<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>'|safe, size) }}{% endmacro %}
+{% macro chevronRight(size=18) %}{{ _svg('<polyline points="9 18 15 12 9 6"/>'|safe, size) }}{% endmacro %}
+{% macro moon(size=18) %}{{ _svg('<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>'|safe, size) }}{% endmacro %}
+{% macro sun(size=18) %}{{ _svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'|safe, size) }}{% endmacro %}
+{% macro logout(size=18) %}{{ _svg('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>'|safe, size) }}{% endmacro %}
+{% macro check(size=18) %}{{ _svg('<polyline points="20 6 9 17 4 12"/>'|safe, size) }}{% endmacro %}
+{% macro save(size=18) %}{{ _svg('<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>'|safe, size) }}{% endmacro %}
+{% macro send(size=18) %}{{ _svg('<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>'|safe, size) }}{% endmacro %}
+{% macro plus(size=18) %}{{ _svg('<path d="M12 5v14M5 12h14"/>'|safe, size) }}{% endmacro %}
+{% macro trash(size=18) %}{{ _svg('<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'|safe, size) }}{% endmacro %}
+{% macro alert(size=18) %}{{ _svg('<path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3z"/><path d="M12 9v4M12 17h.01"/>'|safe, size) }}{% endmacro %}
+{% macro rocket(size=18) %}{{ _svg('<path d="M4.5 16.5c-1.5 1.3-2 5-2 5s3.7-.5 5-2c.7-.8.7-2-.1-2.8a2 2 0 0 0-2.9-.2z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.9A12.9 12.9 0 0 1 22 2c0 2.7-.8 7.7-6 11a22 22 0 0 1-4 2z"/><path d="M9 12H4s.5-2.8 2-4c1.7-1.3 5 0 5 0"/><path d="M12 15v5s2.8-.5 4-2c1.3-1.7 0-5 0-5"/>'|safe, size) }}{% endmacro %}
+{% macro list(size=18) %}{{ _svg('<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>'|safe, size) }}{% endmacro %}
+{% macro terminal(size=18) %}{{ _svg('<polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>'|safe, size) }}{% endmacro %}
+{% macro refresh(size=18) %}{{ _svg('<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>'|safe, size) }}{% endmacro %}
+{% macro stop(size=18) %}{{ _svg('<rect x="5" y="5" width="14" height="14" rx="2"/>'|safe, size) }}{% endmacro %}
+{% macro playCircle(size=18) %}{{ _svg('<circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16" fill="currentColor"/>'|safe, size) }}{% endmacro %}
+{% macro layers(size=18) %}{{ _svg('<path d="m12 2 9 5-9 5-9-5z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/>'|safe, size) }}{% endmacro %}

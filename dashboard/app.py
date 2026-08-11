@@ -10,6 +10,7 @@ Production (Railway): see DASHBOARD_DEPLOY.md
 """
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
@@ -44,6 +45,8 @@ from . import (
     auction_helpers as ah,
     users as user_store,
     mailer,
+    member_stats,
+    schedule_store,
     server_template,
 )
 from .discord_api import DiscordREST, assignable_roles, channels_grouped
@@ -56,7 +59,7 @@ from services import cmd_queue  # noqa: E402
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s :: %(message)s")
 log = logging.getLogger("dashboard")
 
-app = FastAPI(title="Support Bot Dashboard")
+app = FastAPI(title="Musubot Dashboard")
 
 
 @app.on_event("startup")
@@ -282,7 +285,8 @@ async def auth_login(
         "is_root": user.get("is_root", False),
         "guilds": guilds,
     }
-    resp = RedirectResponse("/dashboard")
+    # 303 でないと 307 が POST を引き継ぎ、GET 専用の /dashboard が 405 を返す。
+    resp = RedirectResponse("/dashboard", status_code=303)
     set_session(resp, sess)
     return resp
 
@@ -427,12 +431,61 @@ async def dashboard(request: Request, session: Optional[str] = Cookie(None)):
     admin_guilds = list(sess.get("guilds", []))
     # Annotate with bot running status
     for g in admin_guilds:
-        g["bot_running"] = bot_manager.is_running(str(g["id"]))
-        g["configured"] = (config_store.deployment_dir(str(g["id"])) / ".env").exists()
+        gid = str(g["id"])
+        g["bot_running"] = bot_manager.is_running(gid)
+        g["configured"] = (config_store.deployment_dir(gid) / ".env").exists()
+
+    await _refresh_member_counts(admin_guilds)
+    for g in admin_guilds:
+        g["stats"] = member_stats.summary(str(g["id"]), days=30)
+
+    total_members = sum(
+        (g["stats"] or {}).get("latest") or 0 for g in admin_guilds
+    )
     return templates.TemplateResponse(
         "dashboard.html",
-        {"request": request, "session": sess, "guilds": admin_guilds},
+        {
+            "request": request,
+            "session": sess,
+            "guilds": admin_guilds,
+            "total_members": total_members,
+        },
     )
+
+
+async def _refresh_member_counts(guilds: list[dict]) -> None:
+    """当日ぶん未記録のサーバーだけ Discord に人数を問い合わせて記録する。
+
+    ダッシュボード表示をブロックしないよう、失敗・タイムアウトは黙って無視し、
+    既に保存済みの推移データだけで描画する。
+    """
+    import asyncio
+
+    async def one(g: dict) -> None:
+        gid = str(g["id"])
+        if not g.get("configured") or not member_stats.should_refresh(gid):
+            return
+        env = config_store.read_env(gid)
+        token = (env.get("DISCORD_TOKEN_SUPPORT") or "").strip()
+        if not token:
+            return
+        try:
+            counts = await DiscordREST(token).get_guild_counts(gid)
+        except Exception:  # noqa: BLE001 — 人数取得の失敗で画面を落とさない
+            return
+        if counts:
+            member_stats.record(gid, counts.get("total"), counts.get("online"))
+
+    targets = [g for g in guilds if g.get("configured")]
+    if not targets:
+        return
+    try:
+        await asyncio.wait_for(
+            asyncio.gather(*(one(g) for g in targets), return_exceptions=True),
+            timeout=9.0,
+        )
+    except asyncio.TimeoutError:
+        pass
 
 
 @app.get("/guide", response_class=HTMLResponse)
@@ -656,6 +709,7 @@ async def guild_setup(
     grouped: list = []
     roles: list = []
     discord_ok = False
+    bot_profile: dict = {}
     if bot_token:
         rest = DiscordREST(bot_token)
         guild_info = await rest.get_guild(guild_id)
@@ -665,6 +719,16 @@ async def guild_setup(
             grouped = channels_grouped(channels)
             all_roles = await rest.list_roles(guild_id)
             roles = assignable_roles(all_roles)
+        me = await rest.get_me()
+        if me:
+            bot_profile = {
+                "username": me.get("username") or "",
+                "id": me.get("id") or "",
+                "avatar_url": (
+                    f"https://cdn.discordapp.com/avatars/{me['id']}/{me['avatar']}.png?size=128"
+                    if me.get("avatar") else ""
+                ),
+            }
 
     # Message forwarding: list every server the forwarding bot can reach so the
     # source AND destination can be picked from other servers' channels (not
@@ -716,6 +780,8 @@ async def guild_setup(
                 guild_id,
             ),
             "env": env_vals,
+            "bot_profile": bot_profile,
+            "avatar_presets": AVATAR_PRESETS,
             "channels_grouped": grouped,
             "roles": roles,
             "discord_ok": discord_ok,
@@ -1411,6 +1477,222 @@ def _empty_prompt() -> dict:
             for _ in range(ONBOARDING_MAX_OPTIONS)
         ],
     }
+
+
+# -------------------------- BOT の見た目（アイコン・表示名） --------------------------
+
+# Discord のアバターは 10MB まで受けるが、実用上は 1MB 以内で十分。
+MAX_AVATAR_BYTES = 2 * 1024 * 1024
+AVATAR_MIME = {
+    b"\x89PNG\r\n\x1a\n": "image/png",
+    b"\xff\xd8\xff": "image/jpeg",
+    b"GIF87a": "image/gif",
+    b"GIF89a": "image/gif",
+}
+
+
+# 用意済みの「結びロボ」アイコン。ユーザーが画像を持っていなくても選べる。
+AVATAR_PRESETS = [
+    {"key": "robo-navy", "label": "結びロボ（ネイビー）"},
+    {"key": "robo-blue", "label": "結びロボ（ブルー）"},
+    {"key": "robo-cream", "label": "結びロボ（キャラメル）"},
+    {"key": "robo-mint", "label": "結びロボ（ミント）"},
+    {"key": "knot-navy", "label": "結びマーク（濃）"},
+    {"key": "knot-white", "label": "結びマーク（白）"},
+]
+_PRESET_KEYS = {p["key"] for p in AVATAR_PRESETS}
+
+
+def _preset_bytes(key: str) -> Optional[bytes]:
+    """プリセット画像を読む。キーは許可リスト照合済みのものだけ受ける
+    （パス結合前に検証しないとディレクトリトラバーサルになる）。"""
+    if key not in _PRESET_KEYS:
+        return None
+    path = HERE / "static" / "presets" / f"{key}.png"
+    try:
+        return path.read_bytes()
+    except OSError:
+        return None
+
+
+def _sniff_image_mime(data: bytes) -> Optional[str]:
+    """拡張子ではなく中身で判定する（偽装ファイルを Discord に投げないため）。"""
+    for magic, mime in AVATAR_MIME.items():
+        if data.startswith(magic):
+            return mime
+    return None
+
+
+@app.post("/guild/{guild_id}/appearance")
+async def update_bot_appearance(
+    guild_id: str,
+    session: Optional[str] = Cookie(None),
+    bot_username: str = Form(""),
+    preset: str = Form(""),
+    avatar: Optional[UploadFile] = File(None),
+):
+    """BOT のアイコンと表示名を Discord に反映する。"""
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    token = _bot_token_for(guild_id)
+    if not token:
+        return RedirectResponse(
+            f"/guild/{guild_id}/setup?appearance_err=先にBOTトークンを保存してください#tab-appearance",
+            status_code=303,
+        )
+
+    data_uri = None
+    raw = b""
+    if avatar is not None and avatar.filename:
+        raw = await avatar.read()
+    elif preset:
+        raw = _preset_bytes(preset) or b""
+        if not raw:
+            return RedirectResponse(
+                f"/guild/{guild_id}/setup?appearance_err=プリセットが見つかりません#tab-appearance",
+                status_code=303,
+            )
+    if raw:
+        if len(raw) > MAX_AVATAR_BYTES:
+            return RedirectResponse(
+                f"/guild/{guild_id}/setup?appearance_err=画像が大きすぎます（2MBまで）#tab-appearance",
+                status_code=303,
+            )
+        mime = _sniff_image_mime(raw)
+        if not mime:
+            return RedirectResponse(
+                f"/guild/{guild_id}/setup?appearance_err=PNG・JPEG・GIF の画像を選んでください#tab-appearance",
+                status_code=303,
+            )
+        data_uri = f"data:{mime};base64," + base64.b64encode(raw).decode()
+
+    name = (bot_username or "").strip()
+    if not name and not data_uri:
+        return RedirectResponse(
+            f"/guild/{guild_id}/setup?appearance_err=変更内容がありません#tab-appearance",
+            status_code=303,
+        )
+
+    ok, msg = await DiscordREST(token).patch_me(username=name or None, avatar_data_uri=data_uri)
+    key = "appearance_ok" if ok else "appearance_err"
+    return RedirectResponse(
+        f"/guild/{guild_id}/setup?{key}={msg}#tab-appearance", status_code=303
+    )
+
+
+# -------------------------- 定期メッセージ --------------------------
+
+
+@app.get("/guild/{guild_id}/schedule", response_class=HTMLResponse)
+async def schedule_page(
+    request: Request,
+    guild_id: str,
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    bot_token = _bot_token_for(guild_id)
+
+    channels_groups: list = []
+    if bot_token:
+        chs = await DiscordREST(bot_token).list_channels(guild_id)
+        channels_groups = channels_grouped(chs)
+
+    items = schedule_store.load(guild_id)
+    ch_names = {}
+    for _cat, chs in channels_groups:
+        for c in chs:
+            ch_names[str(c["id"])] = c["name"]
+    for it in items:
+        it["describe"] = schedule_store.describe(it)
+        it["channel_name"] = ch_names.get(str(it.get("channel_id")), it.get("channel_id"))
+
+    return templates.TemplateResponse(
+        "schedule.html",
+        {
+            "request": request,
+            "session": sess,
+            "guild_id": guild_id,
+            "guild_name": _guild_name_from_session(sess, guild_id),
+            "channels_grouped": channels_groups,
+            "discord_ok": bool(bot_token and channels_groups),
+            "items": items,
+            "weekday_labels": schedule_store.WEEKDAY_LABELS,
+            "min_interval": schedule_store.MIN_INTERVAL_MINUTES,
+        },
+    )
+
+
+def _schedule_form_spec(form) -> tuple[Optional[dict], Optional[str]]:
+    return schedule_store.validate(
+        channel_id=str(form.get("channel_id") or ""),
+        message=str(form.get("message") or ""),
+        mode=str(form.get("mode") or ""),
+        time_str=str(form.get("time") or ""),
+        weekday=str(form.get("weekday") or "0"),
+        interval_minutes=str(form.get("interval_minutes") or "60"),
+    )
+
+
+@app.post("/guild/{guild_id}/schedule/add")
+async def schedule_add(
+    request: Request,
+    guild_id: str,
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    form = await request.form()
+    spec, err = _schedule_form_spec(form)
+    if err:
+        return RedirectResponse(f"/guild/{guild_id}/schedule?err={err}", status_code=303)
+    schedule_store.add(guild_id, str(form.get("name") or ""), spec)
+    return RedirectResponse(f"/guild/{guild_id}/schedule?ok=added", status_code=303)
+
+
+@app.post("/guild/{guild_id}/schedule/update")
+async def schedule_update(
+    request: Request,
+    guild_id: str,
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    form = await request.form()
+    spec, err = _schedule_form_spec(form)
+    if err:
+        return RedirectResponse(f"/guild/{guild_id}/schedule?err={err}", status_code=303)
+    ok = schedule_store.update(guild_id, str(form.get("id") or ""), str(form.get("name") or ""), spec)
+    q = "ok=updated" if ok else "err=見つかりませんでした"
+    return RedirectResponse(f"/guild/{guild_id}/schedule?{q}", status_code=303)
+
+
+@app.post("/guild/{guild_id}/schedule/toggle")
+async def schedule_toggle(
+    request: Request,
+    guild_id: str,
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    form = await request.form()
+    schedule_store.toggle(
+        guild_id, str(form.get("id") or ""), str(form.get("enabled") or "0") == "1"
+    )
+    return RedirectResponse(f"/guild/{guild_id}/schedule?ok=toggled", status_code=303)
+
+
+@app.post("/guild/{guild_id}/schedule/remove")
+async def schedule_remove(
+    request: Request,
+    guild_id: str,
+    session: Optional[str] = Cookie(None),
+):
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    form = await request.form()
+    schedule_store.remove(guild_id, str(form.get("id") or ""))
+    return RedirectResponse(f"/guild/{guild_id}/schedule?ok=removed", status_code=303)
 
 
 @app.get("/guild/{guild_id}/onboarding", response_class=HTMLResponse)

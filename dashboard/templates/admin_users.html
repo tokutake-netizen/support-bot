@@ -1,55 +1,46 @@
 {% extends "base.html" %}
-{% block title %}ユーザー管理 — Support Bot{% endblock %}
+{% import "_icons.html" as icon %}
+{% block title %}ユーザー管理 — Musubot{% endblock %}
 {% block body %}
-<div class="wrap">
-  <aside class="sidebar">
-    <div class="brand"><span class="dot"></span>Support Bot</div>
-    <nav class="nav">
-      <a href="/dashboard">📋 サーバー一覧</a>
-      <a href="/admin/users" class="active">👥 ユーザー管理</a>
-      <div class="section-label">アカウント</div>
-      <a href="#" style="color:var(--muted)">👤 {{ session.username }}{% if session.is_root %} (root){% endif %}</a>
-      <a href="/logout" style="color:var(--muted)">🚪 ログアウト</a>
-    </nav>
-  </aside>
-  <main class="main">
-    <h1>👥 ユーザー管理 (アロウリスト)</h1>
+{% with page = "users" %}{% include "_nav.html" %}{% endwith %}
+
+<div class="page">
+    <h1>ユーザー管理</h1>
     <p class="subtitle">メールアドレス + パスワードでログインできるユーザーを管理します。許可されたユーザーは全サーバー全機能にアクセス可。root admin は Railway の <code>DASHBOARD_ROOT_EMAIL</code> / <code>DASHBOARD_ROOT_PASSWORD</code> で管理されます(変更時は両方更新+再デプロイ)。</p>
 
     {% if request.query_params.get("added") %}
-      <div class="flash ok">✓ ユーザーを追加しました</div>
+      <div class="flash ok">ユーザーを追加しました</div>
     {% elif request.query_params.get("droot_added") %}
-      <div class="flash ok">✓ Discordログインのroot権限を追加しました（対象者は一度ログアウト→Discord再ログインで反映）</div>
+      <div class="flash ok">Discordログインのroot権限を追加しました（対象者は一度ログアウト→Discord再ログインで反映）</div>
     {% elif request.query_params.get("droot_removed") %}
-      <div class="flash ok">✓ Discordログインのroot権限を削除しました</div>
+      <div class="flash ok">Discordログインのroot権限を削除しました</div>
     {% elif request.query_params.get("removed") %}
-      <div class="flash ok">✓ ユーザーを削除しました</div>
+      <div class="flash ok">ユーザーを削除しました</div>
     {% elif request.query_params.get("toggled") %}
-      <div class="flash ok">✓ アクセス権を更新しました</div>
+      <div class="flash ok">アクセス権を更新しました</div>
     {% elif request.query_params.get("rejected") %}
-      <div class="flash ok">✓ 申請を却下しました</div>
+      <div class="flash ok">申請を却下しました</div>
     {% elif request.query_params.get("approved") %}
       {% if request.query_params.get("mailed") %}
-        <div class="flash ok">✓ <code>{{ request.query_params.get("approved") }}</code> を承認し、初期パスワードをメール送信しました</div>
+        <div class="flash ok"><code>{{ request.query_params.get("approved") }}</code> を承認し、初期パスワードをメール送信しました</div>
       {% elif request.query_params.get("password") %}
-        <div class="flash warn">⚠️ メール送信失敗(<code>{{ request.query_params.get("mail_err") }}</code>) — 下のパスワードを本人にコピーして手渡ししてください<br>
+        <div class="flash warn">メール送信失敗(<code>{{ request.query_params.get("mail_err") }}</code>) — 下のパスワードを本人にコピーして手渡ししてください<br>
           <b>{{ request.query_params.get("approved") }}</b> の初期パスワード: <code style="background:var(--bg3);padding:4px 8px;border-radius:4px;font-size:14px">{{ request.query_params.get("password") }}</code>
         </div>
       {% endif %}
     {% elif request.query_params.get("err") %}
-      <div class="flash warn">⚠️ {{ request.query_params.get("err") }}</div>
+      <div class="flash warn">{{ request.query_params.get("err") }}</div>
     {% endif %}
 
     {# pending requests #}
     {% set pending_users = users | selectattr("status", "equalto", "pending") | list %}
     {% if pending_users %}
-    <h2>📨 アクセス申請(承認待ち) <span class="help">{{ pending_users | length }} 件</span></h2>
+    <h2>{{ icon.mail(17) }} アクセス申請（承認待ち） <span class="help">{{ pending_users | length }} 件</span></h2>
     <div class="card">
       {% for u in pending_users %}
       <div class="feature">
         <div>
           <div class="name">
-            <span style="color:var(--yellow)">⏳</span>
             <code>{{ u.email }}</code>
             <span class="badge unconfigured">承認待ち</span>
           </div>
@@ -58,11 +49,11 @@
         <div style="display:flex;gap:6px">
           <form method="post" action="/admin/users/approve" style="display:inline">
             <input type="hidden" name="email" value="{{ u.email }}">
-            <button type="submit" class="btn btn-sm green">✅ 承認(メール送信)</button>
+            <button type="submit" class="btn btn-sm green">承認してメール送信</button>
           </form>
           <form method="post" action="/admin/users/reject" style="display:inline" onsubmit="return confirm('{{ u.email }} の申請を却下しますか?')">
             <input type="hidden" name="email" value="{{ u.email }}">
-            <button type="submit" class="btn btn-sm outline">❌ 却下</button>
+            <button type="submit" class="btn btn-sm outline">却下</button>
           </form>
         </div>
       </div>
@@ -71,22 +62,22 @@
     {% endif %}
 
     {# Discord login root admins #}
-    <h2>🤖 Discordログインのroot権限 <span class="help">{{ discord_roots | length }} 名</span></h2>
+    <h2>{{ icon.knot(17) }} Discordログインのroot権限 <span class="help">{{ discord_roots | length }} 名</span></h2>
     <div class="card">
       <p class="hint">Discordアカウントでログインした人に root 権限（画像転送・ユーザー管理が使える）を付与します。ここに登録すれば <b>Railway を触らずに</b> 管理できます。<br>
         Discord ユーザーIDの調べ方: Discord → 設定 → 詳細設定 → <b>開発者モードON</b> → 自分のアイコンを右クリック → <b>「ユーザーIDをコピー」</b>（17〜20桁の数字）。</p>
       <form method="post" action="/admin/discord-roots/add">
         <div class="row">
           <div class="field">
-            <label>🆔 Discord ユーザーID</label>
+            <label>Discord ユーザーID</label>
             <input type="text" name="user_id" required pattern="[0-9]{17,20}" placeholder="例: 123456789012345678">
           </div>
           <div class="field">
-            <label>🏷 メモ (任意・誰のIDか分かるように)</label>
+            <label>メモ（任意・誰のIDか分かるように）</label>
             <input type="text" name="label" placeholder="例: tokutake">
           </div>
         </div>
-        <button type="submit" class="btn">➕ root権限を付与</button>
+        <button type="submit" class="btn">{{ icon.plus(16) }} root権限を付与</button>
       </form>
 
       {% if discord_roots %}
@@ -95,8 +86,7 @@
         <div class="feature">
           <div>
             <div class="name">
-              <span style="color:var(--green)">●</span>
-              <code>{{ d.id }}</code>
+                <code>{{ d.id }}</code>
               {% if d.label %}<span class="badge info">{{ d.label }}</span>{% endif %}
               <span class="badge running">root</span>
             </div>
@@ -107,7 +97,7 @@
           {% if d.source == "stored" %}
           <form method="post" action="/admin/discord-roots/remove" style="display:inline" onsubmit="return confirm('このDiscordアカウントのroot権限を削除しますか?')">
             <input type="hidden" name="user_id" value="{{ d.id }}">
-            <button type="submit" class="btn btn-sm red">🗑 削除</button>
+            <button type="submit" class="btn btn-sm red">削除</button>
           </form>
           {% else %}
           <span style="color:var(--muted);font-size:12px">env 管理(削除不可)</span>
@@ -118,33 +108,32 @@
       {% endif %}
     </div>
 
-    <h2>➕ 直接追加(申請を経由しない)</h2>
+    <h2>{{ icon.plus(17) }} 直接追加（申請を経由しない）</h2>
     <div class="card">
       <p class="hint">通常は <code>/register</code> 経由で申請してもらってから承認するのが推奨です。緊急時用の直接追加:</p>
       <form method="post" action="/admin/users/add">
         <div class="row">
           <div class="field">
-            <label>📧 メールアドレス</label>
+            <label>メールアドレス</label>
             <input type="email" name="email" required>
           </div>
           <div class="field">
-            <label>🔑 初期パスワード (8文字以上)</label>
+            <label>初期パスワード（8文字以上）</label>
             <input type="text" name="password" required minlength="8" placeholder="任意の文字列">
             <div class="hint">追加時に画面に表示されるのはこの 1 回だけ。手動でコピーして渡してください。</div>
           </div>
         </div>
-        <button type="submit" class="btn">➕ 追加してアクセス許可</button>
+        <button type="submit" class="btn">{{ icon.plus(16) }} 追加してアクセス許可</button>
       </form>
     </div>
 
-    <h2>📋 承認済みユーザー <span class="help">{{ users | rejectattr("status", "equalto", "pending") | list | length }} 名</span></h2>
+    <h2>{{ icon.users(17) }} 承認済みユーザー <span class="help">{{ users | rejectattr("status", "equalto", "pending") | list | length }} 名</span></h2>
     <div class="card">
       {% for u in users %}
       {% if u.status != "pending" %}
       <div class="feature">
         <div>
           <div class="name">
-            {% if u.allowed %}<span style="color:var(--green)">●</span>{% else %}<span style="color:var(--red)">○</span>{% endif %}
             <code>{{ u.email }}</code>
             {% if u.is_root %}<span class="badge info">root</span>{% endif %}
             {% if u.allowed %}<span class="badge running">許可</span>{% else %}<span class="badge stopped">無効</span>{% endif %}
@@ -160,18 +149,18 @@
             <form method="post" action="/admin/users/toggle" style="display:inline">
               <input type="hidden" name="email" value="{{ u.email }}">
               <input type="hidden" name="allowed" value="0">
-              <button type="submit" class="btn btn-sm outline">⏸ 無効化</button>
+              <button type="submit" class="btn btn-sm outline">無効化</button>
             </form>
           {% else %}
             <form method="post" action="/admin/users/toggle" style="display:inline">
               <input type="hidden" name="email" value="{{ u.email }}">
               <input type="hidden" name="allowed" value="1">
-              <button type="submit" class="btn btn-sm green">▶ 再有効化</button>
+              <button type="submit" class="btn btn-sm green">再有効化</button>
             </form>
           {% endif %}
           <form method="post" action="/admin/users/remove" style="display:inline" onsubmit="return confirm('{{ u.email }} を削除しますか?')">
             <input type="hidden" name="email" value="{{ u.email }}">
-            <button type="submit" class="btn btn-sm red">🗑 削除</button>
+            <button type="submit" class="btn btn-sm red">削除</button>
           </form>
         </div>
         {% else %}
@@ -181,7 +170,6 @@
       {% endif %}
       {% endfor %}
     </div>
-  </main>
-  {% include "_assistant.html" %}
 </div>
+{% include "_assistant.html" %}
 {% endblock %}

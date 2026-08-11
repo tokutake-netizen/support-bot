@@ -1,28 +1,16 @@
 {% extends "base.html" %}
-{% block title %}画像転送 — Support Bot{% endblock %}
+{% import "_icons.html" as icon %}
+{% block title %}画像転送 — Musubot{% endblock %}
 {% block body %}
-<div class="wrap">
-  <aside class="sidebar">
-    <div class="brand"><span class="dot"></span>Support Bot</div>
-    <nav class="nav">
-      <a href="/dashboard">📋 サーバー一覧</a>
-      <a href="/forwarding" class="active">📦 画像転送</a>
-      {% if session.is_root %}
-        <a href="/admin/users">👥 ユーザー管理</a>
-      {% endif %}
-      <a href="/guide">📖 使い方ガイド</a>
-      <div class="section-label">アカウント</div>
-      <a href="#" style="color:var(--muted)">👤 {{ session.username }}{% if session.is_root %} (root){% endif %}</a>
-      <a href="/logout" style="color:var(--muted)">🚪 ログアウト</a>
-    </nav>
-  </aside>
-  <main class="main">
+{% with page = "forwarding" %}{% include "_nav.html" %}{% endwith %}
+
+<div class="page">
     <h1>画像転送</h1>
     <p class="subtitle">監視元チャンネルに投稿された画像を、別チャンネル（別サーバーでも可）へ自動転送します。梱包・発送写真をお客様向けサーバーに流すために使います。</p>
 
     {# ---- 必要権限の明示 ---- #}
     <div class="callout">
-      <div style="font-weight:600;color:var(--heading);margin-bottom:6px">⚠️ 設定に必要な権限</div>
+      <div style="font-weight:700;color:var(--heading);margin-bottom:6px">設定に必要な権限</div>
       この機能を設定するには、<b>2つのサーバー両方</b>での権限が必要です。
       <ul style="margin:8px 0 0 18px;padding:0">
         <li><b>① 監視元サーバー</b>（画像が投稿される側）— Botがチャンネルを<b>閲覧</b>できること</li>
@@ -37,11 +25,11 @@
     {# ---- フラッシュ ---- #}
     {% set ok = request.query_params.get('ok') %}
     {% set err = request.query_params.get('err') %}
-    {% if ok == 'added' %}<div class="flash ok">✅ 転送ルールを追加しました。（Botに自動反映されます）</div>{% endif %}
-    {% if ok == 'removed' %}<div class="flash ok">🗑️ 転送ルールを削除しました。</div>{% endif %}
-    {% if err == 'dup' %}<div class="flash warn">⚠️ 同じ転送ルールが既に存在します。</div>{% endif %}
-    {% if err == 'same' %}<div class="flash warn">⚠️ 監視元と転送先に同じチャンネルは指定できません。</div>{% endif %}
-    {% if err == 'invalid' %}<div class="flash warn">⚠️ チャンネルが正しく選択されていません。</div>{% endif %}
+    {% if ok == 'added' %}<div class="flash ok">転送ルールを追加しました。（Botに自動反映されます）</div>{% endif %}
+    {% if ok == 'removed' %}<div class="flash ok">転送ルールを削除しました。</div>{% endif %}
+    {% if err == 'dup' %}<div class="flash warn">同じ転送ルールが既に存在します。</div>{% endif %}
+    {% if err == 'same' %}<div class="flash warn">監視元と転送先に同じチャンネルは指定できません。</div>{% endif %}
+    {% if err == 'invalid' %}<div class="flash warn">チャンネルが正しく選択されていません。</div>{% endif %}
 
     {% if not has_token %}
       <div class="flash warn">転送Botのトークンが見つかりません。環境変数 <code>FORWARD_BOT_TOKEN</code>、または <code>Discordbot/.env</code> の <code>DISCORD_TOKEN</code> を設定してください。</div>
@@ -77,7 +65,7 @@
             <div class="hint">画像を流したい転送先のチャンネル（別サーバーでも可）</div>
           </div>
         </div>
-        <button type="submit" class="btn green">＋ このルールを追加</button>
+        <button type="submit" class="btn">{{ icon.plus(16) }} このルールを追加</button>
       </form>
     </div>
 
@@ -115,9 +103,8 @@
         <p style="color:var(--muted)">まだ転送ルールがありません。上のフォームから追加してください。</p>
       {% endif %}
     </div>
-  </main>
-  {% include "_assistant.html" %}
 </div>
+{% include "_assistant.html" %}
 
 <script>
   const SERVERS = {{ servers | tojson }};

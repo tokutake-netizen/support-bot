@@ -1,13 +1,37 @@
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-theme="light">
 <head>
 <meta charset="utf-8">
-<title>{% block title %}Support Bot ダッシュボード{% endblock %}</title>
+<title>{% block title %}Musubot ダッシュボード{% endblock %}</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+<script>
+  // テーマはCSS適用前に確定させ、切替時のちらつきを防ぐ
+  (function(){
+    try{
+      var t = localStorage.getItem("musubot_theme");
+      if(!t) t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.setAttribute("data-theme", t);
+    }catch(e){}
+  })();
+</script>
 {% block head %}{% endblock %}
 </head>
 <body>
 {% block body %}{% endblock %}
+<script>
+  (function(){
+    var btn = document.getElementById("theme-toggle");
+    if(!btn) return;
+    btn.addEventListener("click", function(){
+      var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      try{ localStorage.setItem("musubot_theme", next); }catch(e){}
+    });
+  })();
+</script>
 </body>
 </html>

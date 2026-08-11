@@ -1,17 +1,19 @@
-<button class="ai-fab" id="ai-fab" title="Gemini アシスタント">✨</button>
+<button class="ai-fab" id="ai-fab" title="アシスタント" aria-label="アシスタントを開く">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8L4 10.7l6.1 1.9L12 18.4l1.9-5.8 6.1-1.9-6.1-1.9z"/><path d="M19 3v4M21 5h-4"/></svg>
+</button>
 <aside class="ai-panel" id="ai-panel">
   <div class="ai-head">
-    <span class="ai-title">✨ Gemini アシスタント</span>
+    <span class="ai-title">アシスタント</span>
     <button class="ai-toggle" id="ai-toggle" title="閉じる">✕</button>
   </div>
   <div class="ai-modes" id="ai-modes">
-    <button type="button" class="ai-mode active" data-mode="chat">💬 質問</button>
-    <button type="button" class="ai-mode" data-mode="en">🇺🇸 英訳</button>
-    <button type="button" class="ai-mode" data-mode="ja">🇯🇵 和訳</button>
+    <button type="button" class="ai-mode active" data-mode="chat">質問</button>
+    <button type="button" class="ai-mode" data-mode="en">英訳</button>
+    <button type="button" class="ai-mode" data-mode="ja">和訳</button>
   </div>
   <div class="ai-body" id="ai-body">
     <div class="ai-messages" id="ai-messages">
-      <div class="ai-msg ai-msg-bot">こんにちは！ダッシュボードの使い方や Bot の機能について何でも聞いてください。</div>
+      <div class="ai-msg ai-msg-bot">こんにちは。ダッシュボードの使い方や BOT の機能について、何でも聞いてください。</div>
     </div>
     <form class="ai-form" id="ai-form">
       <textarea id="ai-input" rows="2" placeholder="質問を入力（Enterで送信 / Shift+Enterで改行）"></textarea>
@@ -89,13 +91,13 @@
       });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
-        thinking.textContent = "⚠️ " + (data.detail || ("エラー (HTTP " + r.status + ")"));
+        thinking.textContent = (data.detail || ("エラー (HTTP " + r.status + ")"));
       } else {
         thinking.textContent = data.reply;
         history.push({ role: "assistant", content: data.reply });
       }
     } catch (e) {
-      thinking.textContent = "⚠️ 通信エラー: " + e;
+      thinking.textContent = "通信エラー: " + e;
     } finally {
       sendBtn.disabled = false;
       sessionStorage.setItem("ai_history", JSON.stringify(history.slice(-40)));
