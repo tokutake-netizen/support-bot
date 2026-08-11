@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% import "_icons.html" as icon %}
+{% import "_form_macros.html" as f %}
+{% block title %}お迎えロボ — {{ guild_name }} — Musubot{% endblock %}
+{% block body %}
+{% with subpage = "robot" %}{% include "_nav.html" %}{% endwith %}
+
+<div class="page">
+  <a href="/guild/{{ guild_id }}" class="back-link">{{ icon.chevronLeft(15) }} ロボット一覧へ戻る</a>
+  <h1>お迎えロボ</h1>
+  <p class="subtitle">新しく入った人に、歓迎メッセージを自動で投稿します。</p>
+
+  {% if request.query_params.get("saved") %}
+    <div class="flash ok">変更を保存しました。数秒で反映されます。</div>
+  {% endif %}
+  {% if not discord_ok %}
+    <div class="callout">
+      Discord 連携が未完了です。先に <a href="/guild/{{ guild_id }}/settings">基盤設定</a> で BOT トークンを保存してください。
+    </div>
+  {% else %}
+
+  <form method="post" action="/guild/{{ guild_id }}/save" enctype="multipart/form-data">
+    <input type="hidden" name="_next" value="/guild/{{ guild_id }}/robot/welcome">
+    <input type="hidden" name="_present" value="WELCOME_AUTOROLE_IDS">
+  {# ============ WELCOME ============ #}
+  <h2>{{ icon.sparkles(17) }} Welcome メッセージ</h2>
+  <p class="section-desc">新しい人がサーバーに入った瞬間に、welcome チャンネルへ歓迎メッセージを自動投稿。招待元も同時に表示されます。</p>
+  <div class="card">
+    <div class="row">
+      <div class="field">
+        <label>Welcome 投稿先チャンネル</label>
+        {{ f.channel_select("WELCOME_CHANNEL_ID", env, channels_grouped) }}
+      </div>
+      <div class="field">
+        <label>入室時に自動付与するロール</label>
+        {{ f.role_select("WELCOME_AUTOROLE_IDS", env, roles, multiple=true) }}
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>タイトル</label>
+        <input type="text" name="WELCOME_TITLE" value="{{ env.get('WELCOME_TITLE','Welcome to the server!') }}">
+      </div>
+      <div class="field">
+        <label>左バーの色 (16進)</label>
+        <input type="text" name="WELCOME_COLOR" value="{{ env.get('WELCOME_COLOR','0x57F287') }}">
+      </div>
+    </div>
+    <div class="field">
+      <label>本文テンプレート</label>
+      <textarea name="WELCOME_DESCRIPTION" rows="5">{{ env.get('WELCOME_DESCRIPTION','') }}</textarea>
+      <div class="hint">
+        使えるプレースホルダ:
+        <span class="chip">{user_mention}</span><span class="chip">{user_name}</span><span class="chip">{guild_name}</span><span class="chip">{member_count}</span><span class="chip">{rules}</span><span class="chip">{intro}</span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>ルール案内 ch</label>
+        {{ f.channel_select("WELCOME_RULES_CHANNEL_ID", env, channels_grouped) }}
+      </div>
+      <div class="field">
+        <label>自己紹介 ch</label>
+        {{ f.channel_select("WELCOME_INTRO_CHANNEL_ID", env, channels_grouped) }}
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>バナー画像 URL</label>
+        <input type="url" name="WELCOME_BANNER_URL" value="{{ env.get('WELCOME_BANNER_URL','') }}">
+        <div class="hint">embed の下に表示される大きな画像。</div>
+      </div>
+      <div class="field">
+        <label>サムネ画像 URL (任意)</label>
+        <input type="url" name="WELCOME_THUMBNAIL_URL" value="{{ env.get('WELCOME_THUMBNAIL_URL','') }}">
+        <div class="hint">空欄ならユーザーアイコンが使われます。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="color:var(--heading);font-size:14px;margin-bottom:6px">{{ icon.send(16) }} Welcome を投稿</h3>
+    <p class="section-desc">welcome embed を指定したチャンネルに今すぐ投稿します。デフォルトは上で設定した <code>Welcome 投稿先チャンネル</code>。新規メンバーが入室した時に自動で出る embed と同じものです(あなた自身を主役として描画)。</p>
+    <div style="display:flex;gap:8px;align-items:flex-end">
+      <div class="field" style="flex:1;margin-bottom:0">
+        <label>投稿先</label>
+        <select id="welcome-post-channel-select">
+          <option value="">(WELCOME_CHANNEL_ID にフォールバック)</option>
+          {% set welcome_default = env.get("WELCOME_CHANNEL_ID","") %}
+          {% for cat, chs in channels_grouped %}
+            {% if cat %}<optgroup label="{{ cat.name }}">{% endif %}
+            {% for c in chs %}<option value="{{ c.id }}"{% if c.id == welcome_default %} selected{% endif %}># {{ c.name }}</option>{% endfor %}
+            {% if cat %}</optgroup>{% endif %}
+          {% endfor %}
+        </select>
+      </div>
+      <button type="button" id="welcome-post-btn" class="btn green">{{ icon.send(16) }} Welcome を投稿</button>
+    </div>
+    <div id="welcome-post-result" style="margin-top:8px;font-size:13px"></div>
+  </div>
+  <script>
+    document.getElementById('welcome-post-btn').addEventListener('click', async function(){
+      const sel = document.getElementById('welcome-post-channel-select');
+      const out = document.getElementById('welcome-post-result');
+      if(!sel.value){ out.innerHTML='<span style="color:var(--red)">チャンネルを選択してください</span>'; return; }
+      out.innerHTML='<span style="color:var(--muted)">送信中…</span>';
+      const fd = new FormData();
+      fd.append('action','welcome_test');
+      fd.append('channel_id', sel.value);
+      try {
+        const r = await fetch('/guild/{{ guild_id }}/cmd', {method:'POST', body:fd, credentials:'same-origin', redirect:'manual'});
+        out.innerHTML = (r.type==='opaqueredirect'||r.ok||r.status===303)
+          ? '<span style="color:var(--green)">キュー送信完了。5 秒以内にチャンネルに投稿されます。</span>'
+          : '<span style="color:var(--red)">失敗 (HTTP '+r.status+')</span>';
+      } catch(e){ out.innerHTML='<span style="color:var(--red)">'+e+'</span>'; }
+    });
+  </script>
+
+    <div class="sticky-save">
+      <button type="submit" class="btn">{{ icon.save(16) }} 変更を保存</button>
+      <a href="/guild/{{ guild_id }}" class="btn outline">戻る</a>
+    </div>
+  </form>
+
+  {% endif %}
+</div>
+{% include "_assistant.html" %}
+{% endblock %}

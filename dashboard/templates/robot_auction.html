@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% import "_icons.html" as icon %}
+{% import "_form_macros.html" as f %}
+{% block title %}競りロボ — {{ guild_name }} — Musubot{% endblock %}
+{% block body %}
+{% with subpage = "robot" %}{% include "_nav.html" %}{% endwith %}
+
+<div class="page">
+  <a href="/guild/{{ guild_id }}" class="back-link">{{ icon.chevronLeft(15) }} ロボット一覧へ戻る</a>
+  <h1>競りロボ</h1>
+  <p class="subtitle">ボタン入札式オークションの既定値を設定します。出品は Discord の /auction create から。</p>
+
+  {% if request.query_params.get("saved") %}
+    <div class="flash ok">変更を保存しました。数秒で反映されます。</div>
+  {% endif %}
+  {% if not discord_ok %}
+    <div class="callout">
+      Discord 連携が未完了です。先に <a href="/guild/{{ guild_id }}/settings">基盤設定</a> で BOT トークンを保存してください。
+    </div>
+  {% else %}
+
+  <form method="post" action="/guild/{{ guild_id }}/save" enctype="multipart/form-data">
+    <input type="hidden" name="_next" value="/guild/{{ guild_id }}/robot/auction">
+    <input type="hidden" name="_present" value="AUCTION_MANAGER_ROLE_IDS">
+    <input type="hidden" name="_present" value="ALLOW_CH_AUCTION">
+    <input type="hidden" name="_present" value="ALLOW_CAT_AUCTION">
+  {# ============ AUCTION ============ #}
+  <h2>Auction (入札式オークション)</h2>
+  <p class="section-desc">入札ボタン式の非同期オークション。Forum または Text Channel どちらでも投稿可能。落札時は当選者×Host×Staff 専用の "deal channel" が自動作成されます(決済は手動)。</p>
+  <div class="card">
+    <div class="row">
+      <div class="field">
+        <label>オークションを実施できるチャンネル</label>
+        {{ f.channel_select("ALLOW_CH_AUCTION", env, channels_grouped, multiple=true) }}
+        <div class="hint">空欄なら任意 ch で実行可。Forum 推奨。</div>
+      </div>
+      <div class="field">
+        <label>許可するカテゴリ全体</label>
+        {{ f.category_select("ALLOW_CAT_AUCTION", env, channels_grouped, multiple=true) }}
+        <div class="hint">配下の ch 全部で許可するならカテゴリ単位で。</div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>オークションを管理できるロール</label>
+        {{ f.role_select("AUCTION_MANAGER_ROLE_IDS", env, roles, multiple=true) }}
+        <div class="hint">これらの保有者は admin 権限なしで /auction を運用可。空欄なら admin 限定。</div>
+      </div>
+      <div class="field">
+        <label>落札後の "deal channel" 配置先カテゴリ</label>
+        {{ f.category_select("AUCTION_TICKET_CATEGORY_ID", env, channels_grouped, placeholder="(チケットカテゴリにフォールバック)") }}
+        <div class="hint">未設定なら <code>TICKET_CATEGORY_ID</code> を使用。落札ごとに private channel が作成されます。</div>
+      </div>
+    </div>
+    <h3 style="color:var(--heading);font-size:13px;margin:20px 0 10px">/auction create の既定値</h3>
+    <p class="section-desc">ここで設定した値は <code>/auction create</code> の引数を省略したときに使われます。各オークションで個別指定すれば上書き可能です。</p>
+    <div class="row">
+      <div class="field">
+        <label>最低落札価格 (reserve_price) の既定</label>
+        <input type="number" name="AUCTION_DEFAULT_RESERVE_PRICE" value="{{ env.get('AUCTION_DEFAULT_RESERVE_PRICE','0') }}" min="0" step="100">
+        <div class="hint">最高入札がこの額に満たない場合は <b>落札なし</b>。`0` = 最低落札価格なし(常に落札)。</div>
+      </div>
+      <div class="field">
+        <label>最低入札増分 (min_increment) の既定 (JPY)</label>
+        <input type="number" name="AUCTION_DEFAULT_MIN_INCREMENT" value="{{ env.get('AUCTION_DEFAULT_MIN_INCREMENT','100') }}" min="1" step="100">
+        <div class="hint">5% ルールと両立。両方の高い方が次の必要額になります。</div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>アンチスナイプ判定秒数 (anti_snipe_window)</label>
+        <input type="number" name="AUCTION_DEFAULT_ANTI_SNIPE_WINDOW" value="{{ env.get('AUCTION_DEFAULT_ANTI_SNIPE_WINDOW','300') }}" min="0" step="30">
+        <div class="hint">終了 N 秒前以内に入札があれば延長を発動 (既定: 300秒 = 5分)</div>
+      </div>
+      <div class="field">
+        <label>アンチスナイプ延長秒数 (anti_snipe_extend)</label>
+        <input type="number" name="AUCTION_DEFAULT_ANTI_SNIPE_EXTEND" value="{{ env.get('AUCTION_DEFAULT_ANTI_SNIPE_EXTEND','30') }}" min="0" step="10">
+        <div class="hint">スナイプ時に追加される秒数 (既定: 30秒)</div>
+      </div>
+    </div>
+    <div class="help-box">
+      <div class="h">入札ルール</div>
+      ・次の入札は <b>現最高値 ×1.05 以上</b> かつ <b>min_increment 以上の上乗せ</b> の両方を満たす必要あり<br>
+      ・例: 現最高値 ¥10,000 / min_increment=100 → 次の必要額は <code>max(10100, ceil(10000×1.05)) = 10,500</code><br>
+      ・終了 anti_snipe_window 秒以内の入札は自動で anti_snipe_extend 秒延長(繰り返し可)<br>
+      ・通貨は JPY 固定。決済は bot 側で行わない(host が deal channel で個別調整)
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="color:var(--heading);font-size:14px;margin-bottom:6px">Auction を作成 (画像つき + プレビュー)</h3>
+    <p class="section-desc">商品名・開始価格・期間・画像 を入力 → 右側のプレビューで見た目確認 → 「投稿」で Discord に即時投稿。入札・終了・落札 channel 作成は BOT が自動。</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div>
+        <div class="row">
+          <div class="field"><label>商品名 <span class="req">*</span></label><input type="text" id="ac-title" placeholder="例: PSA 10 Charizard 1st Ed."></div>
+          <div class="field"><label>開始価格 (JPY) <span class="req">*</span></label><input type="number" id="ac-start" placeholder="50000" min="1"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>期間 <span class="req">*</span></label><input type="text" id="ac-duration" placeholder="1d / 12h / 6h30m"></div>
+          <div class="field"><label>投稿先 ch <span class="req">*</span></label>
+            <select id="ac-channel">
+              <option value="">(選択)</option>
+              {% for cat, chs in channels_grouped %}
+                {% if cat %}<optgroup label="{{ cat.name }}">{% endif %}
+                {% for c in chs %}<option value="{{ c.id }}"># {{ c.name }}</option>{% endfor %}
+                {% if cat %}</optgroup>{% endif %}
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field"><label>最低落札価格 (任意)</label><input type="number" id="ac-reserve" value="0" min="0" step="100"><div class="hint">0=設定なし。未達なら落札なし。</div></div>
+          <div class="field"><label>最低増分 (JPY)</label><input type="number" id="ac-minincr" value="{{ env.get('AUCTION_DEFAULT_MIN_INCREMENT','100') }}" min="1" step="100"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>画像 (ファイル)</label><input type="file" id="ac-image-file" accept="image/*"><div class="hint">推奨。Discord に永続保存。</div></div>
+          <div class="field"><label>または画像 URL</label><input type="url" id="ac-image-url" placeholder="https://..."></div>
+        </div>
+        <div class="field"><label>商品説明 (任意)</label><textarea id="ac-desc" rows="3" placeholder="(任意) 状態・付属品・備考"></textarea></div>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <button type="button" id="ac-submit-btn" class="btn green">オークションを投稿</button>
+          <button type="button" id="ac-preview-btn" class="btn outline">プレビュー更新</button>
+        </div>
+        <div id="ac-result" style="margin-top:8px;font-size:13px"></div>
+      </div>
+
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px;font-weight:600">プレビュー</div>
+        <div style="background:#313338;border:1px solid var(--line);border-radius:8px;padding:14px">
+          <div style="display:flex;gap:14px">
+            <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#5865f2,#7289da);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px"></div>
+            <div style="flex:1">
+              <div style="font-weight:600;color:#fff">Support Bot<span style="background:#5865f2;color:#fff;font-size:10px;padding:1px 5px;border-radius:3px;margin-left:6px;vertical-align:middle">BOT</span></div>
+              <div style="border-left:4px solid #F0B232;background:#2b2d31;border-radius:4px;padding:10px 14px;margin-top:6px;max-width:520px">
+                <div id="prev-title" style="font-weight:600;color:#fff;font-size:15px;margin-bottom:6px">AUCTION: (商品名)</div>
+                <div id="prev-desc" style="color:#dbdee1;font-size:13px;white-space:pre-wrap;margin-bottom:8px"></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px">
+                  <div><div style="color:var(--muted);font-size:11px">Starting bid</div><div id="prev-start" style="color:#fff;font-weight:600">¥—</div></div>
+                  <div><div style="color:var(--muted);font-size:11px">Bidders</div><div style="color:#fff;font-weight:600">0</div></div>
+                  <div><div style="color:var(--muted);font-size:11px">Next bid</div><div id="prev-next" style="color:#fff;font-weight:600">¥—</div></div>
+                </div>
+                <div style="margin-top:8px;font-size:12px"><span style="color:var(--muted)">Ends</span> <span id="prev-ends" style="color:#fff">—</span></div>
+                <div id="prev-reserve-row" style="margin-top:4px;font-size:12px;display:none"><span style="color:var(--muted)">Reserve</span> <span id="prev-reserve" style="color:#fff">¥0</span></div>
+                <div id="prev-image-box" style="width:100%;height:140px;background:linear-gradient(135deg,#5865f2,#eb459e);border-radius:4px;margin-top:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600">画像 未指定</div>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <div style="background:var(--accent);color:#fff;padding:6px 12px;border-radius:4px;font-size:13px;font-weight:500">Place Bid</div>
+                <div style="background:var(--bg3);color:#fff;padding:6px 12px;border-radius:4px;font-size:13px;font-weight:500">Bid history</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function(){
+      const $ = id => document.getElementById(id);
+      function fmt(n){ if(!n||n<1) return '¥—'; return '¥' + Number(n).toLocaleString('ja-JP'); }
+      function parseDur(s){
+        const m = (s||'').toLowerCase().match(/^\s*(?:(\d+)d)?\s*(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:(\d+)s)?\s*$/);
+        if(!m) return 0;
+        const [_, d,h,mi,sec] = m;
+        return (parseInt(d||0)*86400+parseInt(h||0)*3600+parseInt(mi||0)*60+parseInt(sec||0));
+      }
+      function refreshPreview(){
+        const title = $('ac-title').value.trim() || '(商品名)';
+        $('prev-title').textContent = 'AUCTION: ' + title;
+        $('prev-desc').textContent = $('ac-desc').value.trim();
+        const start = parseInt($('ac-start').value||0);
+        const minIncr = parseInt($('ac-minincr').value||100);
+        $('prev-start').textContent = fmt(start);
+        // next = max(start+minIncr, ceil(start*1.05)) since no bids yet
+        const next = start ? Math.max(start, Math.ceil(start*1.05), start+minIncr) : 0;
+        $('prev-next').textContent = fmt(start || 0);  // before first bid, "Next bid" = starting_bid
+        const secs = parseDur($('ac-duration').value);
+        if(secs){
+          const at = new Date(Date.now() + secs*1000);
+          $('prev-ends').textContent = at.toLocaleString('ja-JP');
+        } else {
+          $('prev-ends').textContent = '—';
+        }
+        const reserve = parseInt($('ac-reserve').value||0);
+        if(reserve>0){ $('prev-reserve').textContent = fmt(reserve); $('prev-reserve-row').style.display='block'; }
+        else { $('prev-reserve-row').style.display='none'; }
+        // image preview
+        const file = $('ac-image-file').files[0];
+        const url = $('ac-image-url').value.trim();
+        const box = $('prev-image-box');
+        if(file){
+          const r = new FileReader();
+          r.onload = e => { box.style.background = 'url('+e.target.result+') center/contain no-repeat #1e1f22'; box.textContent=''; };
+          r.readAsDataURL(file);
+        } else if(url){
+          box.style.background = 'url('+url+') center/contain no-repeat #1e1f22'; box.textContent='';
+        } else {
+          box.style.background = 'linear-gradient(135deg,#5865f2,#eb459e)';
+          box.textContent = '画像 未指定';
+        }
+      }
+      ['ac-title','ac-desc','ac-start','ac-duration','ac-reserve','ac-minincr','ac-image-url'].forEach(id=>{
+        $(id).addEventListener('input', refreshPreview);
+      });
+      $('ac-image-file').addEventListener('change', refreshPreview);
+      $('ac-preview-btn').addEventListener('click', refreshPreview);
+      refreshPreview();
+
+      $('ac-submit-btn').addEventListener('click', async function(){
+        const out = $('ac-result');
+        const title = $('ac-title').value.trim();
+        const start = $('ac-start').value;
+        const duration = $('ac-duration').value.trim();
+        const channel = $('ac-channel').value;
+        if(!title || !start || !duration || !channel){
+          out.innerHTML='<span style="color:var(--red)">商品名・開始価格・期間・投稿先は必須です</span>';
+          return;
+        }
+        out.innerHTML='<span style="color:var(--muted)">送信中…</span>';
+        const fd = new FormData();
+        fd.append('title', title);
+        fd.append('starting_bid', start);
+        fd.append('duration', duration);
+        fd.append('channel_id', channel);
+        fd.append('reserve_price', $('ac-reserve').value || '0');
+        fd.append('min_increment', $('ac-minincr').value || '100');
+        const desc = $('ac-desc').value.trim();
+        if(desc) fd.append('description', desc);
+        const f = $('ac-image-file').files[0];
+        if(f) fd.append('image', f);
+        const u = $('ac-image-url').value.trim();
+        if(u) fd.append('image_url', u);
+        try {
+          const r = await fetch('/guild/{{ guild_id }}/auction/create', {
+            method:'POST', body:fd, credentials:'same-origin', redirect:'manual'
+          });
+          out.innerHTML = (r.type==='opaqueredirect'||r.ok||r.status===303)
+            ? '<span style="color:var(--green)">オークションを投稿しました。</span>'
+            : '<span style="color:var(--red)">失敗 (HTTP '+r.status+')</span>';
+        } catch(e){ out.innerHTML='<span style="color:var(--red)">'+e+'</span>'; }
+      });
+    })();
+  </script>
+
+    <div class="sticky-save">
+      <button type="submit" class="btn">{{ icon.save(16) }} 変更を保存</button>
+      <a href="/guild/{{ guild_id }}" class="btn outline">戻る</a>
+    </div>
+  </form>
+
+  {% endif %}
+</div>
+{% include "_assistant.html" %}
+{% endblock %}

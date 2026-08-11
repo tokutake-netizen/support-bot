@@ -37,10 +37,8 @@
 <div class="subnav">
   <div class="subnav-inner">
     <span class="subnav-guild">{{ guild_name }}</span>
-    <a href="/guild/{{ guild_id }}/setup"{% if subpage == "setup" %} class="active"{% endif %}>ロボットを選ぶ</a>
-    <a href="/guild/{{ guild_id }}/schedule"{% if subpage == "schedule" %} class="active"{% endif %}>定期メッセージ</a>
-    <a href="/guild/{{ guild_id }}/giveaway"{% if subpage == "giveaway" %} class="active"{% endif %}>Giveaway</a>
-    <a href="/guild/{{ guild_id }}/onboarding"{% if subpage == "onboarding" %} class="active"{% endif %}>オンボーディング</a>
+    <a href="/guild/{{ guild_id }}"{% if subpage in ("home", "robot", "schedule", "giveaway", "onboarding") %} class="active"{% endif %}>ロボット一覧</a>
+    <a href="/guild/{{ guild_id }}/settings"{% if subpage == "settings" %} class="active"{% endif %}>基盤設定</a>
     <a href="/guild/{{ guild_id }}/status"{% if subpage == "status" %} class="active"{% endif %}>稼働状況・ログ</a>
   </div>
 </div>

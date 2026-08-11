@@ -37,7 +37,7 @@
     {% endif %}
 
     {% if not discord_ok %}
-      <div class="callout">Discord 連携が未完了です。先に <a href="/guild/{{ guild_id }}/setup">設定ページ</a> で BOT トークンを保存してください。</div>
+      <div class="callout">Discord 連携が未完了です。先に <a href="/guild/{{ guild_id }}/settings">基盤設定</a> で BOT トークンを保存してください。</div>
     {% elif not is_community %}
       <div class="callout">
         このサーバーは Discord の <b>「コミュニティ機能」が無効</b>です。オンボーディングは Community サーバーでのみ使えます。<br>
@@ -157,7 +157,7 @@
 
       <div class="sticky-save">
         <button type="submit" class="btn green">{{ icon.save(16) }} 変更を保存</button>
-        <a href="/guild/{{ guild_id }}/setup" class="btn outline">設定に戻る</a>
+        <a href="/guild/{{ guild_id }}" class="btn outline">ロボット一覧へ戻る</a>
         <span style="margin-left:auto;color:var(--muted);font-size:12px">
           オンボーディング: {% if onboarding_enabled %}<span class="badge running">有効</span>{% else %}<span class="badge">無効</span>{% endif %}
         </span>

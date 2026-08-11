@@ -701,7 +701,350 @@ def _bot_token_for(guild_id: str) -> Optional[str]:
     return env.get("DISCORD_TOKEN_SUPPORT") or os.environ.get("DISCORD_TOKEN_DEFAULT")
 
 
+# -------------------------- ロボット（機能）の定義 --------------------------
+#
+# 「サーバーを選ぶ → ロボットを選ぶ → そのロボットだけを設定する」という導線の
+# 単一の情報源。ハブ画面・各設定ページ・状態バッジがすべてここを参照する。
+#
+#   key      : URL とテンプレート名に使う識別子
+#   name/desc: 画面に出す名前と一行説明
+#   icon     : _icons.html のマクロ名
+#   url      : リンク先（{gid} を guild_id に置換）
+#   active_if: このキーのいずれかが非空なら「派遣中」
+#   needs    : 動作に必須の追加キー。active なのにこれが空なら「設定不足」
+#   summary  : ハブのカードに出す要約 [(ラベル, envキー, 種別)]
+#              種別は "channel" / "category" / "role" / "text"
+ROBOTS = [
+    dict(
+        key="translation", name="翻訳ロボ", desc="英語と日本語を自動で通訳", icon="globe",
+        url="/guild/{gid}/robot/translation",
+        active_if=["TRANSLATE_CHANNEL_IDS", "TICKET_CATEGORY_IDS"],
+        needs=[], summary=[("担当", "TRANSLATE_CHANNEL_IDS", "channel")],
+    ),
+    dict(
+        key="ticket", name="受付ロボ", desc="お客様専用の問い合わせ部屋を用意", icon="ticket",
+        url="/guild/{gid}/robot/ticket",
+        active_if=["TICKET_CATEGORY_ID"],
+        needs=["TICKET_STAFF_ROLE_IDS"],
+        summary=[("カテゴリ", "TICKET_CATEGORY_ID", "category"),
+                 ("スタッフ", "TICKET_STAFF_ROLE_IDS", "role")],
+    ),
+    dict(
+        key="welcome", name="お迎えロボ", desc="新しく入った人を歓迎して案内", icon="sparkles",
+        url="/guild/{gid}/robot/welcome",
+        active_if=["WELCOME_CHANNEL_ID"], needs=[],
+        summary=[("投稿先", "WELCOME_CHANNEL_ID", "channel")],
+    ),
+    dict(
+        key="suggester", name="気配りロボ", desc="会話を読んで最適な窓口へ案内", icon="sparkles",
+        url="/guild/{gid}/robot/suggester",
+        active_if=["COMMUNITY_CHANNEL_ID"], needs=["ANTHROPIC_API_KEY"],
+        summary=[("監視", "COMMUNITY_CHANNEL_ID", "channel")],
+    ),
+    dict(
+        key="shipping", name="送料ロボ", desc="宛先と重さから送料を即計算", icon="box",
+        url="/guild/{gid}/robot/shipping",
+        active_if=["SHIPPING_SHEET_ID"], needs=[],
+        summary=[("許可", "ALLOW_CH_SHIPPING", "channel")],
+    ),
+    dict(
+        key="auction", name="競りロボ", desc="ボタン入札のオークションを進行", icon="gavel",
+        url="/guild/{gid}/robot/auction",
+        active_if=["ALLOW_CH_AUCTION", "ALLOW_CAT_AUCTION", "AUCTION_MANAGER_ROLE_IDS"],
+        needs=[], summary=[("許可", "ALLOW_CH_AUCTION", "channel")],
+    ),
+    dict(
+        key="invite", name="案内ロボ", desc="どの招待から来たかを記録", icon="door",
+        url="/guild/{gid}/robot/invite",
+        active_if=["INVITE_LOG_CHANNEL_ID", "ALLOW_CH_INVITE"], needs=[],
+        summary=[("ログ", "INVITE_LOG_CHANNEL_ID", "channel")],
+    ),
+    dict(
+        key="forwarding", name="運び屋ロボ", desc="画像を別のチャンネルへ届ける", icon="forward",
+        url="/guild/{gid}/robot/forwarding",
+        active_if=[], needs=[], summary=[],   # 件数で判定するため env は見ない
+    ),
+    dict(
+        key="schedule", name="お知らせロボ", desc="決まった時刻にメッセージを投稿", icon="mail",
+        url="/guild/{gid}/schedule",
+        active_if=[], needs=[], summary=[],
+    ),
+    dict(
+        key="giveaway", name="抽選ロボ", desc="参加ボタン付きの抽選を開催", icon="gift",
+        url="/guild/{gid}/giveaway",
+        active_if=[], needs=[], summary=[],
+    ),
+    dict(
+        key="onboarding", name="道しるべロボ", desc="入室時のアンケートとロール付与", icon="layers",
+        url="/guild/{gid}/onboarding",
+        active_if=[], needs=[], summary=[],
+    ),
+]
+ROBOTS_BY_KEY = {r["key"]: r for r in ROBOTS}
+
+
+def _name_index(channels_groups: list) -> tuple[dict, dict]:
+    """チャンネルIDとカテゴリIDから表示名を引くための索引。"""
+    ch, cat = {}, {}
+    for c, chs in channels_groups:
+        if c:
+            cat[str(c["id"])] = c.get("name", "")
+        for x in chs:
+            ch[str(x["id"])] = x.get("name", "")
+    return ch, cat
+
+
+def _summarize(robot: dict, env: dict, ch_names: dict, cat_names: dict, roles: list) -> str:
+    """カードに出す「担当: #general ほか2ch」のような一行。"""
+    role_names = {str(r["id"]): r.get("name", "") for r in roles}
+    parts = []
+    for label, key, kind in robot.get("summary", []):
+        raw = [v for v in (env.get(key) or "").split(",") if v.strip()]
+        if not raw:
+            continue
+        table = {"channel": ch_names, "category": cat_names, "role": role_names}.get(kind, {})
+        first = table.get(raw[0].strip())
+        if not first:
+            # トークン未設定などで名前を引けないときは、件数だけ伝える
+            parts.append(f"{label}: {len(raw)}件")
+            continue
+        prefix = "#" if kind == "channel" else ""
+        more = f" ほか{len(raw) - 1}件" if len(raw) > 1 else ""
+        parts.append(f"{label}: {prefix}{first}{more}")
+    return " ・ ".join(parts)
+
+
+def robot_state(
+    robot: dict, env: dict, *, forward_rule_count: int = 0, schedule_count: int = 0
+) -> tuple[str, str]:
+    """(状態キー, 表示ラベル) を返す。
+
+    状態は active（派遣中）/ incomplete（設定不足）/ unconfigured（未設定）。
+    転送とスケジュールは env に現れないため、件数で判定する。
+    """
+    key = robot["key"]
+    if key == "forwarding":
+        return ("active", "派遣中") if forward_rule_count else ("unconfigured", "未設定")
+    if key == "schedule":
+        return ("active", "派遣中") if schedule_count else ("unconfigured", "未設定")
+    if key in ("giveaway", "onboarding"):
+        return ("neutral", "")          # 常時使える。状態という概念がない
+    if not any((env.get(k) or "").strip() for k in robot["active_if"]):
+        return ("unconfigured", "未設定")
+    missing = [k for k in robot["needs"] if not (env.get(k) or "").strip()]
+    return ("incomplete", "設定不足") if missing else ("active", "派遣中")
+
+
+async def _guild_page_ctx(request: Request, sess: dict, guild_id: str) -> dict:
+    """ロボット設定ページ共通のテンプレート変数。
+
+    Discord からチャンネルとロールだけを取る軽量版。転送先サーバー一覧や
+    BOT プロフィールのような重い取得は、必要なページだけで個別に行う。
+    """
+    config_store.ensure_deployment(guild_id)
+    env = config_store.read_env(guild_id)
+    token = _bot_token_for(guild_id)
+
+    grouped: list = []
+    roles: list = []
+    discord_ok = False
+    if token:
+        rest = DiscordREST(token)
+        if await rest.get_guild(guild_id):
+            discord_ok = True
+            grouped = channels_grouped(await rest.list_channels(guild_id))
+            roles = assignable_roles(await rest.list_roles(guild_id))
+
+    return {
+        "request": request,
+        "session": sess,
+        "guild_id": guild_id,
+        "guild_name": _guild_name_from_session(sess, guild_id),
+        "env": env,
+        "channels_grouped": grouped,
+        "roles": roles,
+        "discord_ok": discord_ok,
+        "bot_running": bot_manager.is_running(guild_id),
+    }
+
+
+@app.get("/guild/{guild_id}", response_class=HTMLResponse)
+async def guild_home(
+    request: Request,
+    guild_id: str,
+    session: Optional[str] = Cookie(None),
+):
+    """サーバーのホーム。派遣するロボットをここから選ぶ。"""
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+
+    ctx = await _guild_page_ctx(request, sess, guild_id)
+    env = ctx["env"]
+    ch_names, cat_names = _name_index(ctx["channels_grouped"])
+
+    # env に現れない機能は件数で状態を出す
+    try:
+        fwd_count = len(forward_store.load_rules())
+    except Exception:  # noqa: BLE001 — 件数が取れなくてもハブは表示する
+        log.warning("guild_home: 転送ルールを読めませんでした", exc_info=True)
+        fwd_count = 0
+    schedules = schedule_store.load(guild_id)
+    sched_count = sum(1 for s in schedules if s.get("enabled", True))
+
+    cards = []
+    for r in ROBOTS:
+        state, label = robot_state(
+            r, env, forward_rule_count=fwd_count, schedule_count=sched_count
+        )
+        summary = _summarize(r, env, ch_names, cat_names, ctx["roles"])
+        if r["key"] == "forwarding" and fwd_count:
+            summary = f"転送ルール {fwd_count} 件"
+        elif r["key"] == "schedule" and sched_count:
+            summary = f"有効なお知らせ {sched_count} 件"
+        cards.append({
+            **r,
+            "href": r["url"].format(gid=guild_id),
+            "state": state,
+            "state_label": label,
+            "summary": summary,
+        })
+
+    ctx.update({"cards": cards, "subpage": "home"})
+    return templates.TemplateResponse("guild_home.html", ctx)
+
+
+@app.get("/guild/{guild_id}/settings", response_class=HTMLResponse)
+async def guild_settings(
+    request: Request,
+    guild_id: str,
+    session: Optional[str] = Cookie(None),
+):
+    """APIキー・BOTの見た目・サーバー構成テンプレート。ロボット共通の土台。"""
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+
+    ctx = await _guild_page_ctx(request, sess, guild_id)
+    token = _bot_token_for(guild_id)
+
+    bot_profile: dict = {}
+    if token:
+        me = await DiscordREST(token).get_me()
+        if me:
+            bot_profile = {
+                "username": me.get("username") or "",
+                "id": me.get("id") or "",
+                "avatar_url": (
+                    f"https://cdn.discordapp.com/avatars/{me['id']}/{me['avatar']}.png?size=128"
+                    if me.get("avatar") else ""
+                ),
+            }
+
+    ctx.update({
+        "bot_profile": bot_profile,
+        "avatar_presets": AVATAR_PRESETS,
+        "subpage": "settings",
+    })
+    return templates.TemplateResponse("guild_settings.html", ctx)
+
+
+@app.get("/guild/{guild_id}/robot/{robot_key}", response_class=HTMLResponse)
+async def robot_page(
+    request: Request,
+    guild_id: str,
+    robot_key: str,
+    session: Optional[str] = Cookie(None),
+):
+    """ロボット1体ぶんの設定画面。"""
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+
+    robot = ROBOTS_BY_KEY.get(robot_key)
+    # 独自ページを持つ機能（お知らせ・抽選・道しるべ）はそちらへ送る
+    if robot is None or not robot["url"].endswith(f"/robot/{robot_key}"):
+        target = robot["url"].format(gid=guild_id) if robot else f"/guild/{guild_id}"
+        return RedirectResponse(target, status_code=303)
+
+    ctx = await _guild_page_ctx(request, sess, guild_id)
+    ctx["robot"] = robot
+    ctx["subpage"] = "robot"
+
+    if robot_key == "shipping":
+        fuel_cache: dict = {}
+        fuel_path = config_store.deployment_dir(guild_id) / "data" / "fuel_surcharge.json"
+        if fuel_path.exists():
+            try:
+                fuel_cache = json.loads(fuel_path.read_text("utf-8"))
+            except (OSError, ValueError):
+                log.warning("燃油サーチャージのキャッシュを読めませんでした")
+        ctx["fuel_cache"] = fuel_cache
+
+    if robot_key == "forwarding":
+        ctx.update(await _forwarding_ctx(guild_id))
+
+    return templates.TemplateResponse(f"robot_{robot_key}.html", ctx)
+
+
+async def _forwarding_ctx(guild_id: str) -> dict:
+    """転送ページ専用の重い取得（転送Botが参加する全サーバーのチャンネル一覧）。
+
+    以前は setup ページの表示ごとに走っていて、転送を使わない人にも
+    その待ち時間を払わせていた。転送ページ限定にする。
+    """
+    fwd_servers: list = []
+    forward_rules: list = []
+    labels = {
+        "original": "そのまま（原文＋画像）",
+        "image_only": "画像のみ",
+        "decorated": "加工（原文＋付加文）",
+        "custom": "任意テキストに置換",
+    }
+    try:
+        token = forward_store.forward_bot_token()
+        if token:
+            fwd_servers = await forward_store.list_servers_with_channels(token)
+        ch_index = forward_store.index_channels(fwd_servers)
+        role_index = forward_store.index_roles(fwd_servers)
+        for r in forward_store.load_rules():
+            src, dst = str(r.get("source")), str(r.get("dest"))
+            s, d = ch_index.get(src), ch_index.get(dst)
+            mode = r.get("mode", "original")
+            role_ids = [str(x) for x in (r.get("role_ids") or [])]
+            forward_rules.append({
+                "source": src,
+                "dest": dst,
+                "source_label": f"{s['server']} ＞ #{s['channel']}" if s else f"(ID: {src})",
+                "dest_label": f"{d['server']} ＞ #{d['channel']}" if d else f"(ID: {dst})",
+                "source_server_id": s["server_id"] if s else "",
+                "mode": mode,
+                "mode_label": labels.get(mode, mode),
+                "role_ids": role_ids,
+                "role_labels": [role_index.get(rid, rid) for rid in role_ids],
+                "template": r.get("template") or "",
+            })
+    except Exception:  # noqa: BLE001 — 転送一覧が取れなくてもページは開く
+        log.warning("転送先サーバー/ルールの取得に失敗しました", exc_info=True)
+    return {
+        "fwd_servers": fwd_servers,
+        "forward_rules": forward_rules,
+        "fwd_mode_labels": labels,
+    }
+
+
 @app.get("/guild/{guild_id}/setup", response_class=HTMLResponse)
+async def guild_setup_redirect(
+    guild_id: str,
+    session: Optional[str] = Cookie(None),
+):
+    """旧・全部入り設定ページ。ブックマーク救済のためハブへ転送する。
+
+    どのタブを見ていたかは #tab-xxx というフラグメントで、サーバーには
+    届かない。転送先のハブ側に置いた JS が hash を見て各ロボットへ送る。
+    """
+    require_session(session)
+    return RedirectResponse(f"/guild/{guild_id}", status_code=301)
+
+
+@app.get("/guild/{guild_id}/setup/legacy", response_class=HTMLResponse)
 async def guild_setup(
     request: Request,
     guild_id: str,
@@ -902,6 +1245,8 @@ async def guild_save(
     }
     updates: dict[str, str] = {}
     for k in form.keys():
+        if k.startswith("_"):
+            continue          # _present / _next はフォームの制御用。.env には書かない
         if k in multi_keys:
             vals = [v for v in form.getlist(k) if v]
             updates[k] = ",".join(vals)
@@ -911,23 +1256,34 @@ async def guild_save(
                 continue
             updates[k] = str(v)
 
+    # 選択がゼロの <select multiple> はキー自体が送信されないため、上のループでは
+    # 拾えない。write_env はマージ型なので、そのままだと「全部外して保存」しても
+    # 古い値が残り続ける。フォーム側が _present で「この画面はこのキーを扱う」と
+    # 申告し、送信が無ければ空文字で明示的に消す。
+    for k in form.getlist("_present"):
+        if k in multi_keys and k not in updates:
+            updates[k] = ""
+
     # Auto-extract Google Sheet ID if user pasted a URL
     if "SHIPPING_SHEET_ID" in updates:
         sid = config_store.extract_sheet_id(updates["SHIPPING_SHEET_ID"])
         if sid:
             updates["SHIPPING_SHEET_ID"] = sid
 
+    # 値が実際に変わったかを見て、変化が無ければ BOT を再起動しない。
+    before = config_store.read_env(guild_id)
+    changed = any((before.get(k) or "") != (v or "") for k, v in updates.items())
+
     config_store.write_env(guild_id, updates)
 
     # Verify Discord auth right after save so the user gets immediate feedback.
     # We call /guilds/{id} with the bot token; success means the token is valid AND
     # the bot is already in this guild.
+    # トークンを含む保存（＝基盤設定ページ）のときだけ検証する。各ロボットの
+    # 保存で毎回 Discord に問い合わせると、その分だけ保存が遅くなる。
     auth_status = "unknown"
-    bot_token = (
-        updates.get("DISCORD_TOKEN_SUPPORT")
-        or _bot_token_for(guild_id)
-    )
-    if bot_token:
+    bot_token = updates.get("DISCORD_TOKEN_SUPPORT") or _bot_token_for(guild_id)
+    if bot_token and "DISCORD_TOKEN_SUPPORT" in updates:
         rest = DiscordREST(bot_token)
         try:
             guild_info = await rest.get_guild(guild_id)
@@ -940,10 +1296,17 @@ async def guild_save(
             log.warning("post-save Discord auth check failed: %s", e)
             auth_status = "invalid_token"
 
-    bot_manager.restart(guild_id)
-    return RedirectResponse(
-        f"/guild/{guild_id}/setup?saved=1&auth={auth_status}", status_code=303
-    )
+    # 設定が実際に変わったときだけ再起動する。以前は保存のたびに落として
+    # 上げ直していたため、チャンネルを1つ変えるだけで BOT が切断されていた。
+    if changed:
+        bot_manager.restart(guild_id)
+
+    # 部分フォームは自分のページへ戻す。guild 配下に限定してオープンリダイレクトを防ぐ。
+    nxt = str(form.get("_next") or "")
+    if not nxt.startswith(f"/guild/{guild_id}/"):
+        nxt = f"/guild/{guild_id}"
+    sep = "&" if "?" in nxt else "?"
+    return RedirectResponse(f"{nxt}{sep}saved=1&auth={auth_status}", status_code=303)
 
 
 @app.post("/guild/{guild_id}/credential")

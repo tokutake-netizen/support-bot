@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% import "_icons.html" as icon %}
+{% import "_form_macros.html" as f %}
+{% block title %}受付ロボ — {{ guild_name }} — Musubot{% endblock %}
+{% block body %}
+{% with subpage = "robot" %}{% include "_nav.html" %}{% endwith %}
+
+<div class="page">
+  <a href="/guild/{{ guild_id }}" class="back-link">{{ icon.chevronLeft(15) }} ロボット一覧へ戻る</a>
+  <h1>受付ロボ</h1>
+  <p class="subtitle">お客様が「Open ticket」を押すと、その人専用のプライベートチャンネルを作ります。</p>
+
+  {% if request.query_params.get("saved") %}
+    <div class="flash ok">変更を保存しました。数秒で反映されます。</div>
+  {% endif %}
+  {% if not discord_ok %}
+    <div class="callout">
+      Discord 連携が未完了です。先に <a href="/guild/{{ guild_id }}/settings">基盤設定</a> で BOT トークンを保存してください。
+    </div>
+  {% else %}
+
+  <form method="post" action="/guild/{{ guild_id }}/save" enctype="multipart/form-data">
+    <input type="hidden" name="_next" value="/guild/{{ guild_id }}/robot/ticket">
+    <input type="hidden" name="_present" value="TICKET_STAFF_ROLE_IDS">
+  {# ============ TICKETS ============ #}
+  <h2>{{ icon.ticket(17) }} チケット（個別チャット）</h2>
+  <p class="section-desc">お客様が「Open ticket」ボタンを押すと、自分専用のプライベートチャンネルが自動作成されます。</p>
+  <div class="card">
+    <div class="row">
+      <div class="field">
+        <label>チケット親カテゴリ</label>
+        {{ f.category_select("TICKET_CATEGORY_ID", env, channels_grouped) }}
+        <div class="hint">新規チケット ch はここの配下に作成されます。</div>
+      </div>
+      <div class="field">
+        <label>パネル文中で言及するチャンネル</label>
+        {{ f.channel_select("CARD_GAME_CHANNEL_ID", env, channels_grouped, placeholder="(言及しない)") }}
+        <div class="hint">「#card-game で気になるカードを見つけたら…」誘導文に使用。</div>
+      </div>
+    </div>
+    <div class="field">
+      <label>運営スタッフロール (チケット閲覧可)</label>
+      {{ f.role_select("TICKET_STAFF_ROLE_IDS", env, roles, multiple=true) }}
+      <div class="hint">これらのロール保有者だけがチケット ch を見られます。</div>
+    </div>
+    <div class="field">
+      <label>UI 言語の固定</label>
+      <select name="FORCE_UI_LANG_TICKET">
+        {% set t = env.get('FORCE_UI_LANG_TICKET','en') %}
+        <option value="en"{% if t=='en' %} selected{% endif %}>英語に固定 (推奨)</option>
+        <option value="ja"{% if t=='ja' %} selected{% endif %}>日本語に固定</option>
+        <option value=""{% if not t %} selected{% endif %}>ユーザー言語に従う</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="color:var(--heading);font-size:14px;margin-bottom:6px">チケットパネルを投稿</h3>
+    <p class="section-desc">「Open ticket」ボタン付き embed を、選んだチャンネルに即時投稿します。Discord で <code>/ticket panel</code> を打つ代わりに、ここからワンクリックで設置可能。</p>
+    <div style="display:flex;gap:8px;align-items:flex-end">
+      <div class="field" style="flex:1;margin-bottom:0">
+        <label>投稿先チャンネル</label>
+        <select id="ticket-panel-channel-select">
+          <option value="">(選択してください)</option>
+          {% for cat, chs in channels_grouped %}
+            {% if cat %}<optgroup label="{{ cat.name }}">{% endif %}
+            {% for c in chs %}
+              <option value="{{ c.id }}"># {{ c.name }}</option>
+            {% endfor %}
+            {% if cat %}</optgroup>{% endif %}
+          {% endfor %}
+        </select>
+      </div>
+      <button type="button" id="post-ticket-panel-btn" class="btn green">{{ icon.send(16) }} パネルを投稿</button>
+    </div>
+    <div class="hint" style="margin-top:8px">このボタンは <b>フォーム全体の保存はしません</b>。設定を変えた場合は先に「変更を保存」を押してから投稿してください。</div>
+    <div id="post-ticket-panel-result" style="margin-top:8px;font-size:13px"></div>
+  </div>
+  <script>
+    document.getElementById('post-ticket-panel-btn').addEventListener('click', async function(){
+      const sel = document.getElementById('ticket-panel-channel-select');
+      const chId = sel.value;
+      const out = document.getElementById('post-ticket-panel-result');
+      if(!chId){ out.innerHTML = '<span style="color:var(--red)">チャンネルを選択してください</span>'; return; }
+      out.innerHTML = '<span style="color:var(--muted)">送信中…</span>';
+      const fd = new FormData();
+      fd.append('action', 'ticket_panel');
+      fd.append('channel_id', chId);
+      try {
+        const r = await fetch('/guild/{{ guild_id }}/cmd', {method:'POST', body:fd, credentials:'same-origin', redirect:'manual'});
+        if(r.type === 'opaqueredirect' || r.ok || r.status === 303){
+          out.innerHTML = '<span style="color:var(--green)">キューに送信しました。BOT が 5 秒以内にチャンネルに投稿します。</span>';
+        } else {
+          out.innerHTML = '<span style="color:var(--red)">失敗 (HTTP '+r.status+')</span>';
+        }
+      } catch(e){
+        out.innerHTML = '<span style="color:var(--red)">'+e+'</span>';
+      }
+    });
+  </script>
+
+    <div class="sticky-save">
+      <button type="submit" class="btn">{{ icon.save(16) }} 変更を保存</button>
+      <a href="/guild/{{ guild_id }}" class="btn outline">戻る</a>
+    </div>
+  </form>
+
+  {% endif %}
+</div>
+{% include "_assistant.html" %}
+{% endblock %}

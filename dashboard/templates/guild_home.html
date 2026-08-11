@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% import "_icons.html" as icon %}
+{% block title %}{{ guild_name }} — Musubot{% endblock %}
+{% block head %}
+<style>
+  .hub-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:26px}
+  .hub-head .spacer{flex:1}
+  .robot-sum{display:block;color:var(--muted);font-size:12px;margin-top:5px;
+             overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .robot.is-unconfigured .robot-face{background:var(--bg3);color:var(--muted)}
+</style>
+{% endblock %}
+{% block body %}
+{% with subpage = "home" %}{% include "_nav.html" %}{% endwith %}
+
+<div class="page">
+  <div class="hub-head">
+    <h1>{{ guild_name }}</h1>
+    <span class="spacer"></span>
+    {% if bot_running %}
+      <span class="badge running">BOT 稼働中</span>
+    {% else %}
+      <span class="badge stopped">BOT 停止中</span>
+    {% endif %}
+    <a href="/guild/{{ guild_id }}/settings" class="btn outline btn-sm">{{ icon.settings(15) }} 基盤設定</a>
+    <a href="/guild/{{ guild_id }}/status" class="btn outline btn-sm">{{ icon.activity(15) }} 稼働状況・ログ</a>
+  </div>
+
+  {% if request.query_params.get("saved") %}
+    <div class="flash ok">変更を保存しました。数秒で反映されます。</div>
+  {% endif %}
+
+  {% if not discord_ok %}
+    <div class="callout">
+      <b>まずはじめに：</b>Discord BOT トークンがまだ設定されていません。
+      <a href="/guild/{{ guild_id }}/settings">基盤設定</a> でトークンを保存すると、
+      各ロボットの画面でチャンネルやロールを選べるようになります。
+    </div>
+  {% endif %}
+
+  <p class="subtitle" style="margin-top:0">
+    このサーバーに<b>派遣するロボット</b>を選んでください。ロボットごとに担当チャンネル・ロール・文面を設定でき、保存すると数秒で Discord に反映されます。
+  </p>
+
+  <div class="robot-grid">
+    {% for r in cards %}
+    <a class="robot is-{{ r.state }}" href="{{ r.href }}">
+      <span class="robot-face">{{ icon[r.icon](20) }}</span>
+      <span class="robot-body">
+        <span class="robot-name">
+          {{ r.name }}
+          {% if r.state == "active" %}<span class="badge running">{{ r.state_label }}</span>
+          {% elif r.state == "incomplete" %}<span class="badge unconfigured">{{ r.state_label }}</span>
+          {% elif r.state == "unconfigured" %}<span class="badge">{{ r.state_label }}</span>
+          {% endif %}
+        </span>
+        <span class="robot-desc">{{ r.desc }}</span>
+        {% if r.summary %}<span class="robot-sum">{{ r.summary }}</span>{% endif %}
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% include "_assistant.html" %}
+<script>
+  // 旧 /setup#tab-xxx のブックマークから来た場合、対応するページへ送る。
+  // フラグメントはサーバーに届かないので、転送はここでやるしかない。
+  (function(){
+    var m = (location.hash || '').match(/^#tab-([a-z]+)$/);
+    if(!m) return;
+    var key = m[1];
+    var base = '/guild/{{ guild_id }}';
+    var special = {api: base + '/settings', appearance: base + '/settings',
+                   template: base + '/settings', schedule: base + '/schedule'};
+    var known = ['translation','ticket','welcome','suggester','shipping','auction','invite','forwarding'];
+    if(special[key]) location.replace(special[key]);
+    else if(known.indexOf(key) !== -1) location.replace(base + '/robot/' + key);
+  })();
+</script>
+{% endblock %}

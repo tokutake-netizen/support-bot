@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% import "_icons.html" as icon %}
+{% import "_form_macros.html" as f %}
+{% block title %}気配りロボ — {{ guild_name }} — Musubot{% endblock %}
+{% block body %}
+{% with subpage = "robot" %}{% include "_nav.html" %}{% endwith %}
+
+<div class="page">
+  <a href="/guild/{{ guild_id }}" class="back-link">{{ icon.chevronLeft(15) }} ロボット一覧へ戻る</a>
+  <h1>気配りロボ</h1>
+  <p class="subtitle">監視チャンネルの発言をAIで分類し、商品問合せや配送相談を見つけたら適切な窓口へ案内します。</p>
+
+  {% if request.query_params.get("saved") %}
+    <div class="flash ok">変更を保存しました。数秒で反映されます。</div>
+  {% endif %}
+  {% if not discord_ok %}
+    <div class="callout">
+      Discord 連携が未完了です。先に <a href="/guild/{{ guild_id }}/settings">基盤設定</a> で BOT トークンを保存してください。
+    </div>
+  {% else %}
+
+  <form method="post" action="/guild/{{ guild_id }}/save" enctype="multipart/form-data">
+    <input type="hidden" name="_next" value="/guild/{{ guild_id }}/robot/suggester">
+
+  {# ============ SUGGESTER ============ #}
+  <h2>{{ icon.sparkles(17) }} 自動アドバイス（意図判定）</h2>
+  <p class="section-desc">指定 ch での発言を AI が分類して、商品問合せ/配送相談には誘導文を自動 reply します。</p>
+  <div class="card">
+    <div class="row">
+      <div class="field">
+        <label>監視対象チャンネル</label>
+        {{ f.channel_select("COMMUNITY_CHANNEL_ID", env, channels_grouped) }}
+      </div>
+      <div class="field">
+        <label>判定信頼度の最小値</label>
+        <input type="number" name="SUGGEST_MIN_CONFIDENCE" value="{{ env.get('SUGGEST_MIN_CONFIDENCE','0.70') }}" step="0.05" min="0.5" max="1">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>商品問合せの誘導先</label>
+        {{ f.channel_select("PRODUCT_INQUIRY_CHANNEL_ID", env, channels_grouped) }}
+      </div>
+      <div class="field">
+        <label>配送相談の誘導先</label>
+        {{ f.channel_select("SHIPPING_GUIDE_CHANNEL_ID", env, channels_grouped) }}
+      </div>
+    </div>
+    <details>
+      <summary>誘導テキストを編集する (日英 2 言語)</summary>
+      <div class="row" style="margin-top:10px">
+        <div class="field">
+          <label>商品問合せ → 日本語</label>
+          <textarea name="PRODUCT_ADVICE_TEXT" rows="3">{{ env.get('PRODUCT_ADVICE_TEXT','') }}</textarea>
+        </div>
+        <div class="field">
+          <label>商品問合せ → 英語</label>
+          <textarea name="PRODUCT_ADVICE_TEXT_EN" rows="3">{{ env.get('PRODUCT_ADVICE_TEXT_EN','') }}</textarea>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>配送相談 → 日本語</label>
+          <textarea name="SHIPPING_ADVICE_TEXT" rows="3">{{ env.get('SHIPPING_ADVICE_TEXT','') }}</textarea>
+        </div>
+        <div class="field">
+          <label>配送相談 → 英語</label>
+          <textarea name="SHIPPING_ADVICE_TEXT_EN" rows="3">{{ env.get('SHIPPING_ADVICE_TEXT_EN','') }}</textarea>
+        </div>
+      </div>
+    </details>
+  </div>
+
+    <div class="sticky-save">
+      <button type="submit" class="btn">{{ icon.save(16) }} 変更を保存</button>
+      <a href="/guild/{{ guild_id }}" class="btn outline">戻る</a>
+    </div>
+  </form>
+
+  {% endif %}
+</div>
+{% include "_assistant.html" %}
+{% endblock %}

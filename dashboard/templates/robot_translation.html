@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% import "_icons.html" as icon %}
+{% import "_form_macros.html" as f %}
+{% block title %}翻訳ロボ — {{ guild_name }} — Musubot{% endblock %}
+{% block body %}
+{% with subpage = "robot" %}{% include "_nav.html" %}{% endwith %}
+
+<div class="page">
+  <a href="/guild/{{ guild_id }}" class="back-link">{{ icon.chevronLeft(15) }} ロボット一覧へ戻る</a>
+  <h1>翻訳ロボ</h1>
+  <p class="subtitle">指定したチャンネルの英語・日本語の発言を、自動で翻訳して返信します。</p>
+
+  {% if request.query_params.get("saved") %}
+    <div class="flash ok">変更を保存しました。数秒で反映されます。</div>
+  {% endif %}
+  {% if not discord_ok %}
+    <div class="callout">
+      Discord 連携が未完了です。先に <a href="/guild/{{ guild_id }}/settings">基盤設定</a> で BOT トークンを保存してください。
+    </div>
+  {% else %}
+
+  <form method="post" action="/guild/{{ guild_id }}/save" enctype="multipart/form-data">
+    <input type="hidden" name="_next" value="/guild/{{ guild_id }}/robot/translation">
+    <input type="hidden" name="_present" value="TRANSLATE_CHANNEL_IDS">
+    <input type="hidden" name="_present" value="TICKET_CATEGORY_IDS">
+  {# ============ TRANSLATION ============ #}
+  <h2>{{ icon.globe(17) }} 自動翻訳</h2>
+  <p class="section-desc">指定したチャンネルでの英語・日本語の発言を BOT が自動翻訳して返信します。</p>
+  <div class="card">
+    <div class="row">
+      <div class="field">
+        <label>翻訳対象チャンネル (複数可)</label>
+        {{ f.channel_select("TRANSLATE_CHANNEL_IDS", env, channels_grouped, multiple=true) }}
+        <div class="hint">Cmd/Ctrl クリックで複数選択。</div>
+      </div>
+      <div class="field">
+        <label>チケットカテゴリ全体を翻訳対象に</label>
+        {{ f.category_select("TICKET_CATEGORY_IDS", env, channels_grouped, multiple=true) }}
+        <div class="hint">配下の動的に作られるチケット ch も自動対象。</div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>翻訳プロバイダ</label>
+        <select name="TRANSLATE_PROVIDER">
+          {% set p = env.get('TRANSLATE_PROVIDER','deepl') %}
+          <option value="deepl"{% if p=='deepl' %} selected{% endif %}>DeepL (推奨)</option>
+          <option value="claude"{% if p=='claude' %} selected{% endif %}>Anthropic Claude</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>既定の翻訳方向</label>
+        <select name="TRANSLATE_DEFAULT_MODE">
+          {% set m = env.get('TRANSLATE_DEFAULT_MODE','both') %}
+          <option value="both"{% if m=='both' %} selected{% endif %}>双方向 (EN↔JP)</option>
+          <option value="en2ja"{% if m=='en2ja' %} selected{% endif %}>英 → 日 のみ</option>
+          <option value="ja2en"{% if m=='ja2en' %} selected{% endif %}>日 → 英 のみ</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+    <div class="sticky-save">
+      <button type="submit" class="btn">{{ icon.save(16) }} 変更を保存</button>
+      <a href="/guild/{{ guild_id }}" class="btn outline">戻る</a>
+    </div>
+  </form>
+
+  {% endif %}
+</div>
+{% include "_assistant.html" %}
+{% endblock %}

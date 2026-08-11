@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% import "_icons.html" as icon %}
+{% import "_form_macros.html" as f %}
+{% block title %}案内ロボ — {{ guild_name }} — Musubot{% endblock %}
+{% block body %}
+{% with subpage = "robot" %}{% include "_nav.html" %}{% endwith %}
+
+<div class="page">
+  <a href="/guild/{{ guild_id }}" class="back-link">{{ icon.chevronLeft(15) }} ロボット一覧へ戻る</a>
+  <h1>案内ロボ</h1>
+  <p class="subtitle">入室時にどの招待コードで来たかを自動で判定し、記録します。</p>
+
+  {% if request.query_params.get("saved") %}
+    <div class="flash ok">変更を保存しました。数秒で反映されます。</div>
+  {% endif %}
+  {% if not discord_ok %}
+    <div class="callout">
+      Discord 連携が未完了です。先に <a href="/guild/{{ guild_id }}/settings">基盤設定</a> で BOT トークンを保存してください。
+    </div>
+  {% else %}
+
+  <form method="post" action="/guild/{{ guild_id }}/save" enctype="multipart/form-data">
+    <input type="hidden" name="_next" value="/guild/{{ guild_id }}/robot/invite">
+    <input type="hidden" name="_present" value="INVITE_CREATOR_ROLE_IDS">
+    <input type="hidden" name="_present" value="ALLOW_CH_INVITE">
+    <input type="hidden" name="_present" value="ALLOW_CH_GIVEAWAY">
+    <input type="hidden" name="_present" value="GIVEAWAY_MANAGER_ROLE_IDS">
+  {# ============ INVITE ============ #}
+  <h2>招待トラッキング</h2>
+  <p class="section-desc">入室時にどの招待コードで来たかを自動判定し、Welcome embed と運営ログに記録します。</p>
+  <div class="card">
+    <div class="row">
+      <div class="field">
+        <label>判定ログの送信先</label>
+        {{ f.channel_select("INVITE_LOG_CHANNEL_ID", env, channels_grouped, placeholder="(MODERATOR_CHANNEL_ID にフォールバック)") }}
+      </div>
+      <div class="field">
+        <label>/invite create が使える ch</label>
+        {{ f.channel_select("ALLOW_CH_INVITE", env, channels_grouped, multiple=true) }}
+      </div>
+    </div>
+    <div class="field">
+      <label>/invite create が使えるロール</label>
+      {{ f.role_select("INVITE_CREATOR_ROLE_IDS", env, roles, multiple=true) }}
+      <div class="hint">空欄なら admin 限定。ここに入れたロールの人は招待リンクを発行できます。</div>
+    </div>
+    <div class="field">
+      <label>運営通知の送信先 (moderator-only)</label>
+      {{ f.channel_select("MODERATOR_CHANNEL_ID", env, channels_grouped) }}
+    </div>
+  </div>
+
+    <div class="sticky-save">
+      <button type="submit" class="btn">{{ icon.save(16) }} 変更を保存</button>
+      <a href="/guild/{{ guild_id }}" class="btn outline">戻る</a>
+    </div>
+  </form>
+
+  {% endif %}
+</div>
+{% include "_assistant.html" %}
+{% endblock %}

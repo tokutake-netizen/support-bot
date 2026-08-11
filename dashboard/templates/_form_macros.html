@@ -1,0 +1,46 @@
+{#
+  設定フォームで共通に使うセレクトのマクロ。
+  setup.html / 各ロボットページ / giveaway / onboarding から import する。
+#}
+{# ============ macros ============ #}
+{% macro channel_select(name, env, channels_grouped, multiple=false, placeholder="(未選択)") %}
+  {% set raw = env.get(name, "") %}
+  {% set selected = raw.split(",") if raw else [] %}
+  <select name="{{ name }}"{% if multiple %} multiple size="4"{% endif %}>
+    {% if not multiple %}<option value="">{{ placeholder }}</option>{% endif %}
+    {% for cat, chs in channels_grouped %}
+      {% if cat %}
+        <optgroup label="{{ cat.name }}">
+      {% endif %}
+      {% for c in chs %}
+        <option value="{{ c.id }}"{% if c.id in selected %} selected{% endif %}># {{ c.name }}</option>
+      {% endfor %}
+      {% if cat %}</optgroup>{% endif %}
+    {% endfor %}
+  </select>
+{% endmacro %}
+
+{% macro category_select(name, env, channels_grouped, multiple=false, placeholder="(未選択)") %}
+  {% set raw = env.get(name, "") %}
+  {% set selected = raw.split(",") if raw else [] %}
+  <select name="{{ name }}"{% if multiple %} multiple size="4"{% endif %}>
+    {% if not multiple %}<option value="">{{ placeholder }}</option>{% endif %}
+    {% for cat, _ in channels_grouped %}
+      {% if cat %}
+        <option value="{{ cat.id }}"{% if cat.id in selected %} selected{% endif %}>{{ cat.name }}</option>
+      {% endif %}
+    {% endfor %}
+  </select>
+{% endmacro %}
+
+{% macro role_select(name, env, roles, multiple=true) %}
+  {% set raw = env.get(name, "") %}
+  {% set selected = raw.split(",") if raw else [] %}
+  <select name="{{ name }}"{% if multiple %} multiple size="4"{% endif %}>
+    {% if not multiple %}<option value="">(未選択)</option>{% endif %}
+    {% for r in roles %}
+      <option value="{{ r.id }}"{% if r.id in selected %} selected{% endif %}
+        {% if r.color %}style="color:#{{ '%06x' | format(r.color) }}"{% endif %}>{{ r.name }}</option>
+    {% endfor %}
+  </select>
+{% endmacro %}

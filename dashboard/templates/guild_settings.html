@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% import "_icons.html" as icon %}
+{% block title %}基盤設定 — {{ guild_name }} — Musubot{% endblock %}
+{% block body %}
+{% with subpage = "settings" %}{% include "_nav.html" %}{% endwith %}
+
+<div class="page">
+  <a href="/guild/{{ guild_id }}" class="back-link">{{ icon.chevronLeft(15) }} ロボット一覧へ戻る</a>
+  <h1>基盤設定</h1>
+  <p class="subtitle">すべてのロボットが共通で使う土台の設定です。<b>まずここの Discord BOT トークンを保存</b>すると、各ロボットの画面でチャンネルやロールを選べるようになります。</p>
+
+  {% if request.query_params.get("saved") %}
+    <div class="flash ok">変更を保存しました。数秒で反映されます。</div>
+  {% endif %}
+  {% if request.query_params.get("auth") == "ok" %}
+    <div class="flash ok"><b>Discord 認証成功</b> — BOT トークンが有効で、対象サーバーにアクセスできました。</div>
+  {% elif request.query_params.get("auth") == "invalid_token" %}
+    <div class="flash warn"><b>Discord 認証失敗</b> — BOT トークンが無効か、形式エラーの可能性。Reset Token して貼り直してください。</div>
+  {% elif request.query_params.get("auth") == "not_in_guild" %}
+    <div class="flash warn">BOT トークンは有効ですが、このサーバーに <b>BOT が招待されていません</b>。Discord Developer Portal → OAuth2 → URL Generator で `bot` + `applications.commands` を選択 → 生成 URL からサーバーに招待してください。</div>
+  {% endif %}
+
+  {% if not discord_ok %}
+    <div class="callout">
+      <b>初回セットアップ：</b> まず下の「Discord BOT トークン」を入力して保存してください。<br>
+      トークン発行先: <a href="https://discord.com/developers/applications" target="_blank" rel="noopener">Discord Developer Portal</a> → アプリ作成 → Bot → Reset Token
+    </div>
+  {% endif %}
+
+  <nav class="tabs">
+    <a href="#tab-api" class="tab" data-tab="api">API キー</a>
+    <a href="#tab-appearance" class="tab" data-tab="appearance">見た目</a>
+    <a href="#tab-template" class="tab" data-tab="template">サーバー構成</a>
+  </nav>
+
+  <div class="tab-panel" id="tab-api">
+  <form method="post" action="/guild/{{ guild_id }}/save">
+    <input type="hidden" name="_next" value="/guild/{{ guild_id }}/settings">
+  {# ============ API KEYS ============ #}
+  <h2>{{ icon.key(17) }} API キー <span class="help">トークン類は暗号化されたフォームでサーバー側に保存されます</span></h2>
+  <div class="card">
+    <div class="help-box">
+      <div class="h">キーの取得先</div>
+      <b>Discord BOT トークン:</b> <a href="https://discord.com/developers/applications" target="_blank">Discord Developer Portal</a> → Bot →
+      <b>DeepL:</b> <a href="https://www.deepl.com/pro-api" target="_blank">deepl.com/pro-api</a> →
+      <b>Anthropic:</b> <a href="https://console.anthropic.com/" target="_blank">console.anthropic.com</a>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Discord BOT トークン<span class="req">*</span></label>
+        <input type="password" name="DISCORD_TOKEN_SUPPORT" value="{{ env.get('DISCORD_TOKEN_SUPPORT','') }}" autocomplete="off">
+        <div class="hint">BOT 本体の認証。これを入れて保存すると、下のチャンネル/ロール一覧が自動取得されます。</div>
+      </div>
+      <div class="field">
+        <label>DeepL API キー</label>
+        <input type="password" name="DEEPL_API_KEY" value="{{ env.get('DEEPL_API_KEY','') }}" autocomplete="off">
+        <div class="hint">翻訳に使用。Free / Pro どちらでも可。空欄なら Anthropic にフォールバック。</div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Anthropic API キー</label>
+        <input type="password" name="ANTHROPIC_API_KEY" value="{{ env.get('ANTHROPIC_API_KEY','') }}" autocomplete="off">
+        <div class="hint">意図判定機能および翻訳のフォールバックに使用。</div>
+      </div>
+      <div class="field">
+        <label>Anthropic モデル</label>
+        <input type="text" name="ANTHROPIC_MODEL" value="{{ env.get('ANTHROPIC_MODEL','claude-haiku-4-5') }}">
+        <div class="hint">既定: claude-haiku-4-5</div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Guild ID (固定)</label>
+        <input type="text" name="GUILD_ID" value="{{ guild_id }}" readonly>
+      </div>
+      <div class="field">
+        <label>月間予算 (USD)</label>
+        <input type="number" name="MONTHLY_BUDGET_USD" value="{{ env.get('MONTHLY_BUDGET_USD','10') }}" step="0.1" min="0">
+        <div class="hint">この金額を超えたら自動翻訳が一時停止します。</div>
+      </div>
+    </div>
+  </div>
+    <div class="sticky-save">
+      <button type="submit" class="btn">{{ icon.save(16) }} 変更を保存</button>
+    </div>
+  </form>
+  </div>
+
+  <div class="tab-panel" id="tab-appearance">
+  {# ============ BOT の見た目 ============ #}
+  <h2>{{ icon.knot(17) }} ロボットの見た目 <span class="help">Discord に表示される名前とアイコン</span></h2>
+  <p class="section-desc">お客様から見える BOT の顔です。親しみやすいアイコンにすると、話しかけてもらいやすくなります。</p>
+
+  {% if request.query_params.get("appearance_ok") %}
+    <div class="flash ok">{{ request.query_params.get("appearance_ok") }}</div>
+  {% elif request.query_params.get("appearance_err") %}
+    <div class="flash warn">{{ request.query_params.get("appearance_err") }}</div>
+  {% endif %}
+
+  <div class="card">
+    {% if not bot_profile %}
+      <div class="callout" style="margin:0">
+        BOT トークンを保存すると、ここで名前とアイコンを変更できるようになります。
+      </div>
+    {% else %}
+    <div class="avatar-row">
+      {% if bot_profile.avatar_url %}
+        <img class="avatar-preview" id="avatar-preview" src="{{ bot_profile.avatar_url }}" alt="現在のBOTアイコン">
+      {% else %}
+        <span class="avatar-preview" id="avatar-preview">{{ icon.knot(36) }}</span>
+      {% endif %}
+      <div style="flex:1;min-width:220px">
+        <div style="font-weight:700;color:var(--heading);font-size:15px">{{ bot_profile.username or "（未設定）" }}</div>
+        <div style="color:var(--muted);font-size:12px;font-family:Menlo,monospace">ID: {{ bot_profile.id }}</div>
+        <div class="hint" style="margin-top:6px">これが Discord のメンバー一覧・発言に表示されます。</div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if bot_profile %}
+  {# 親フォームは /save 宛なので、見た目の更新は独立したフォームにする #}
+  <div class="card">
+    <div class="help-box">
+      <div class="h">変更時の注意</div>
+      Discord は<b>名前の変更を厳しく制限</b>しています（短時間に何度も変えると弾かれます）。名前は決めてから一度だけ変更するのがおすすめです。アイコンは比較的自由に変えられます。
+    </div>
+
+    <div class="field">
+      <label>表示名</label>
+      <input type="text" form="appearance-form" name="bot_username" value="{{ bot_profile.username }}"
+             minlength="2" maxlength="32" placeholder="例: 結びロボ">
+      <div class="hint">2〜32文字。空欄のままだと名前は変更しません。</div>
+    </div>
+
+    <div class="field">
+      <label>アイコン画像</label>
+      <input type="file" form="appearance-form" name="avatar" accept="image/png,image/jpeg,image/gif" id="avatar-input">
+      <div class="hint">PNG / JPEG / GIF・2MBまで。正方形の画像がきれいに表示されます。</div>
+    </div>
+
+    <div class="field">
+      <label>プリセットから選ぶ</label>
+      <div class="preset-grid" id="preset-grid">
+        {% for p in avatar_presets %}
+          <button type="button" class="preset" data-preset="{{ p.key }}" title="{{ p.label }}" aria-label="{{ p.label }}">
+            <img src="{{ url_for('static', path='presets/' ~ p.key ~ '.png') }}" alt="{{ p.label }}">
+          </button>
+        {% endfor %}
+      </div>
+      <input type="hidden" form="appearance-form" name="preset" id="preset-input">
+      <div class="hint">画像を用意しなくても、この中から選べます。</div>
+    </div>
+
+    <form method="post" action="/guild/{{ guild_id }}/appearance"
+          enctype="multipart/form-data" id="appearance-form">
+      <button type="submit" class="btn">{{ icon.save(16) }} 見た目を更新</button>
+    </form>
+  </div>
+  {% endif %}
+  </div>
+
+  <div class="tab-panel" id="tab-template">
+<h2>{{ icon.layers(17) }} サーバー構成テンプレート <span class="help">カテゴリ + チャンネル(個別チケット除く)</span></h2>
+<div class="card">
+  <p class="section-desc">
+    現在のサーバーをテンプレートとして保存して、別サーバーに同期できます。
+    個別チケット ch(<code>TICKET_CATEGORY_ID</code> 配下の動的 ch)は除外、親カテゴリは保持。
+  </p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <form method="post" action="/guild/{{ guild_id }}/template/export" style="display:inline">
+      <button type="submit" class="btn">このサーバー構成をテンプレートとして保存</button>
+    </form>
+    <form method="post" action="/guild/{{ guild_id }}/template/apply" style="display:inline" onsubmit="return confirm('保存済みテンプレートをこのサーバーに適用します。既存の同名カテゴリ/チャンネルはスキップ。続けますか?')">
+      <button type="submit" class="btn outline">テンプレートを適用（同期）</button>
+    </form>
+    <span style="color:var(--muted);font-size:12px">テンプレートは 1 つだけ保存(上書き)、Volume 永続</span>
+  </div>
+  </div>
+</div>
+{% include "_assistant.html" %}
+<script>
+(function(){
+  function activate(id){
+    document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('active', t.dataset.tab === id); });
+    document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.toggle('active', p.id === 'tab-' + id); });
+    history.replaceState(null, '', '#tab-' + id);
+  }
+  document.querySelectorAll('.tab').forEach(function(t){
+    t.addEventListener('click', function(e){ e.preventDefault(); activate(t.dataset.tab); });
+  });
+  var initial = (location.hash || '').replace(/^#tab-/, '') || 'api';
+  if(!document.getElementById('tab-' + initial)) initial = 'api';
+  activate(initial);
+
+  // アイコンのプリセット選択とプレビュー
+  var presetInput = document.getElementById('preset-input');
+  var fileInput = document.getElementById('avatar-input');
+  var preview = document.getElementById('avatar-preview');
+  function showPreview(src){
+    if(!preview) return;
+    if(preview.tagName !== 'IMG'){
+      var img = document.createElement('img');
+      img.className = 'avatar-preview'; img.id = 'avatar-preview'; img.alt = 'BOTアイコン';
+      preview.replaceWith(img); preview = img;
+    }
+    preview.src = src;
+  }
+  document.querySelectorAll('.preset').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var already = btn.classList.contains('selected');
+      document.querySelectorAll('.preset').forEach(function(b){ b.classList.remove('selected'); });
+      if(already){ presetInput.value = ''; return; }
+      btn.classList.add('selected');
+      presetInput.value = btn.dataset.preset;
+      if(fileInput) fileInput.value = '';
+      showPreview(btn.querySelector('img').src);
+    });
+  });
+  if(fileInput){
+    fileInput.addEventListener('change', function(){
+      if(!fileInput.files || !fileInput.files[0]) return;
+      presetInput.value = '';
+      document.querySelectorAll('.preset').forEach(function(b){ b.classList.remove('selected'); });
+      showPreview(URL.createObjectURL(fileInput.files[0]));
+    });
+  }
+})();
+</script>
+{% endblock %}

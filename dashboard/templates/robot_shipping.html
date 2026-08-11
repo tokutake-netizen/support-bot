@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% import "_icons.html" as icon %}
+{% import "_form_macros.html" as f %}
+{% block title %}送料ロボ — {{ guild_name }} — Musubot{% endblock %}
+{% block body %}
+{% with subpage = "robot" %}{% include "_nav.html" %}{% endwith %}
+
+<div class="page">
+  <a href="/guild/{{ guild_id }}" class="back-link">{{ icon.chevronLeft(15) }} ロボット一覧へ戻る</a>
+  <h1>送料ロボ</h1>
+  <p class="subtitle">商品・数量・宛先国から、DHL と FedEx の安い方を自動で計算します。</p>
+
+  {% if request.query_params.get("saved") %}
+    <div class="flash ok">変更を保存しました。数秒で反映されます。</div>
+  {% endif %}
+  {% if not discord_ok %}
+    <div class="callout">
+      Discord 連携が未完了です。先に <a href="/guild/{{ guild_id }}/settings">基盤設定</a> で BOT トークンを保存してください。
+    </div>
+  {% else %}
+
+  <form method="post" action="/guild/{{ guild_id }}/save" enctype="multipart/form-data">
+    <input type="hidden" name="_next" value="/guild/{{ guild_id }}/robot/shipping">
+    <input type="hidden" name="_present" value="ALLOW_CH_SHIPPING">
+    <input type="hidden" name="_present" value="ALLOW_CAT_SHIPPING">
+  {# ============ SHIPPING ============ #}
+  <h2>{{ icon.box(17) }} 送料計算</h2>
+  <p class="section-desc">お客様が <code>/shipping</code> で送料を確認できます。Google Sheets「比較表US基準」から DHL/FedEx の安い方を自動選択。</p>
+  <div class="card">
+    <div class="help-box">
+      <div class="h">送料表スプレッドシートの繋ぎ方</div>
+      <b>共有設定 →</b> プラットフォーム所有のサービスアカウントを <b>Editor</b> で追加 →
+      <b>URL を貼り付け</b> →
+      <b>保存</b>
+      <div class="hint" style="margin-top:6px;color:#a3d4ff">サービスアカウントのメアドは管理者から共有されます。.env の <code>GOOGLE_SERVICE_ACCOUNT_JSON</code> は Railway 側で一括設定済み(個別アップロード不要)。</div>
+    </div>
+    <div class="field">
+      <label>送料表スプレッドシートの URL or ID</label>
+      <input type="text" name="SHIPPING_SHEET_ID" value="{{ env.get('SHIPPING_SHEET_ID','') }}" placeholder="https://docs.google.com/spreadsheets/d/.../edit">
+      <div class="hint">URL でも ID でも可。URL を貼ると自動で ID を抽出します。</div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>対象シート名</label>
+        <input type="text" name="SHIPPING_SHEET_NAME" value="{{ env.get('SHIPPING_SHEET_NAME','比較表US基準') }}">
+      </div>
+      <div class="field">
+        <label>梱包材重量 (g)</label>
+        <input type="number" name="PACKAGING_WEIGHT_G" value="{{ env.get('PACKAGING_WEIGHT_G','1000') }}">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>実行を許可するチャンネル</label>
+        {{ f.channel_select("ALLOW_CH_SHIPPING", env, channels_grouped, multiple=true) }}
+      </div>
+      <div class="field">
+        <label>許可するカテゴリ全体</label>
+        {{ f.category_select("ALLOW_CAT_SHIPPING", env, channels_grouped, multiple=true) }}
+        <div class="hint">配下の動的チケット ch 全部で許可。</div>
+      </div>
+    </div>
+
+    <h3 style="color:var(--heading);font-size:13px;margin:20px 0 6px">燃油サーチャージ (Fuel Surcharge)</h3>
+    <div class="help-box">
+      <div class="h">動作の優先順位</div>
+      ① <b>毎週月曜 04:00 JST</b> に FedEx 公式ページを自動取得 → 下のキャッシュに反映 → 自動値を優先利用<br>
+      ② 取得失敗時は前週値が残ったまま使われる<br>
+      ③ <b>DHL は手動入力モード</b>(SPA構造が頻繁に変わるため、ダッシュボードの DHL 手動 % を毎週更新してください)<br>
+      計算式: <code>最終料金 = base × (1 + pct/100)</code> ・ JPY 四捨五入
+    </div>
+
+    {# ----- auto cache (read-only display) ----- #}
+    <div class="row">
+      {% set fed_c = fuel_cache.get("FEDEX") %}
+      <div class="field">
+        <label>DHL <span style="color:var(--yellow);font-size:11px">手動モード</span></label>
+        <div style="padding:9px 10px;background:var(--bg3);border:1px solid var(--line);border-radius:6px;font-size:13px;color:var(--muted)">
+          下の「DHL 手動 %」が常に使われます
+        </div>
+      </div>
+      <div class="field">
+        <label>FedEx 自動取得値</label>
+        <div style="padding:9px 10px;background:var(--bg3);border:1px solid var(--line);border-radius:6px;font-size:13px">
+          {% if fed_c %}<span style="color:var(--green);font-weight:700">{{ '%.2f' % fed_c.pct }}%</span>
+            <span style="color:var(--muted);font-size:11px;margin-left:6px">最終取得: {% if fed_c.fetched_at %}<time>{{ fed_c.fetched_at | int }}</time>{% else %}—{% endif %} (source: {{ fed_c.source }})</span>
+          {% else %}<span style="color:var(--muted)">(まだ取得されていません)</span>{% endif %}
+        </div>
+      </div>
+    </div>
+    <div style="margin-bottom:14px">
+      <button type="button" id="fuel-refresh-btn" class="btn outline">今すぐ取得 (FedEx のみ自動)</button>
+      <span id="fuel-refresh-result" style="margin-left:8px;font-size:13px"></span>
+    </div>
+
+    {# ----- manual override ----- #}
+    <h4 style="color:var(--muted);font-size:12px;margin:14px 0 6px;text-transform:uppercase;letter-spacing:.6px;font-weight:600">手動オーバーライド (自動取得失敗時の保険)</h4>
+    <div class="row">
+      <div class="field">
+        <label>DHL 手動 %</label>
+        <input type="number" name="SHIPPING_DHL_FUEL_SURCHARGE_PCT" value="{{ env.get('SHIPPING_DHL_FUEL_SURCHARGE_PCT','0') }}" step="0.01" min="0">
+        <div class="hint">
+          <a href="https://mydhl.express.dhl/jp/ja/important-information/weekly-fuel-surcharge.html" target="_blank" style="color:var(--cyan)">DHL Japan Weekly Fuel Surcharge</a> 参照
+        </div>
+      </div>
+      <div class="field">
+        <label>FedEx 手動 %</label>
+        <input type="number" name="SHIPPING_FEDEX_FUEL_SURCHARGE_PCT" value="{{ env.get('SHIPPING_FEDEX_FUEL_SURCHARGE_PCT','0') }}" step="0.01" min="0">
+        <div class="hint">
+          <a href="https://www.fedex.com/ja-jp/shipping/surcharges.html" target="_blank" style="color:var(--cyan)">FedEx Japan</a> 参照
+        </div>
+      </div>
+    </div>
+
+    {# ----- arbitrary extra surcharge ----- #}
+    <h4 style="color:var(--muted);font-size:12px;margin:14px 0 6px;text-transform:uppercase;letter-spacing:.6px;font-weight:600">追加サーチャージ (任意の上乗せ)</h4>
+    <div class="row">
+      <div class="field">
+        <label>追加サーチャージ (%)</label>
+        <input type="number" name="SHIPPING_EXTRA_SURCHARGE_PCT" value="{{ env.get('SHIPPING_EXTRA_SURCHARGE_PCT','0') }}" step="0.01" min="0">
+        <div class="hint">
+          全配送業者の燃油サーチャージに加算される追加 %(マージン / バッファ等)。<br>
+          例: 燃油 25.50% + 追加 5.00% = 合計 30.50% を base に乗算
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    document.getElementById('fuel-refresh-btn').addEventListener('click', async function(){
+      const out = document.getElementById('fuel-refresh-result');
+      out.innerHTML='<span style="color:var(--muted)">取得中…(数秒)</span>';
+      const fd = new FormData();
+      fd.append('action','fuel_surcharge_refresh');
+      try {
+        const r = await fetch('/guild/{{ guild_id }}/cmd', {method:'POST', body:fd, credentials:'same-origin', redirect:'manual'});
+        if(r.type==='opaqueredirect'||r.ok||r.status===303){
+          out.innerHTML='<span style="color:var(--green)">キュー送信完了。10 秒ほどでキャッシュ更新 → リロードで確認</span>';
+        } else {
+          out.innerHTML='<span style="color:var(--red)">失敗 (HTTP '+r.status+')</span>';
+        }
+      } catch(e){ out.innerHTML='<span style="color:var(--red)">'+e+'</span>'; }
+    });
+  </script>
+
+    <div class="sticky-save">
+      <button type="submit" class="btn">{{ icon.save(16) }} 変更を保存</button>
+      <a href="/guild/{{ guild_id }}" class="btn outline">戻る</a>
+    </div>
+  </form>
+
+  {% endif %}
+</div>
+{% include "_assistant.html" %}
+{% endblock %}
