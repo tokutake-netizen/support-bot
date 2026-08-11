@@ -20,6 +20,7 @@ from typing import Optional
 
 import httpx
 from fastapi import (
+    BackgroundTasks,
     Cookie,
     FastAPI,
     File,
@@ -46,6 +47,7 @@ from . import (
     auction_helpers as ah,
     users as user_store,
     mailer,
+    line_forward,
     member_stats,
     schedule_store,
     server_template,
@@ -765,6 +767,13 @@ ROBOTS = [
         active_if=[], needs=[], summary=[],   # 件数で判定するため env は見ない
     ),
     dict(
+        key="line", name="LINEロボ", desc="LINEグループの画像をDiscordへ運ぶ", icon="send",
+        url="/guild/{gid}/robot/line",
+        active_if=["LINE_FORWARD_CHANNEL_ID"],
+        needs=["LINE_CHANNEL_SECRET", "LINE_CHANNEL_ACCESS_TOKEN"],
+        summary=[("転送先", "LINE_FORWARD_CHANNEL_ID", "channel")],
+    ),
+    dict(
         key="schedule", name="お知らせロボ", desc="決まった時刻にメッセージを投稿", icon="mail",
         url="/guild/{gid}/schedule",
         active_if=[], needs=[], summary=[],
@@ -980,6 +989,14 @@ async def robot_page(
 
     if robot_key == "forwarding":
         ctx.update(await _forwarding_ctx(guild_id))
+
+    if robot_key == "line":
+        # LINE 側に貼ってもらう webhook URL。公開URLが分からない環境では
+        # リクエストのホストから組み立てる。
+        base = (os.environ.get("DASHBOARD_BASE_URL") or "").rstrip("/")
+        if not base:
+            base = str(request.base_url).rstrip("/")
+        ctx["webhook_url"] = f"{base}/line/webhook/{guild_id}"
 
     return templates.TemplateResponse(f"robot_{robot_key}.html", ctx)
 
@@ -1960,6 +1977,93 @@ async def update_bot_appearance(
     return RedirectResponse(
         f"/guild/{guild_id}/setup?{key}={msg}#tab-appearance", status_code=303
     )
+
+
+# -------------------------- LINE → Discord 転送 --------------------------
+
+
+@app.post("/line/webhook/{guild_id}")
+async def line_webhook(
+    guild_id: str,
+    request: Request,
+    background: BackgroundTasks,
+):
+    """LINE Messaging API の webhook 受け口。
+
+    ここは Discord のセッションを持たない外部からの呼び出しなので、
+    **署名検証だけが認証**になる。検証に通らないものは 403 で捨てる。
+
+    LINE は応答が遅いと再送してくるため、実際の転送は背景タスクに逃がして
+    すぐ 200 を返す。
+    """
+    env = config_store.read_env(guild_id)
+    secret = (env.get("LINE_CHANNEL_SECRET") or "").strip()
+    if not secret:
+        raise HTTPException(status_code=404, detail="LINE forwarding not configured")
+
+    body = await request.body()
+    signature = request.headers.get("X-Line-Signature", "")
+    if not line_forward.verify_signature(secret, body, signature):
+        log.warning("LINE webhook の署名が一致しません (guild=%s)", guild_id)
+        raise HTTPException(status_code=403, detail="bad signature")
+
+    try:
+        payload = json.loads(body or b"{}")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid JSON")
+
+    for event in payload.get("events", []):
+        background.add_task(_handle_line_event, guild_id, event)
+    return {"ok": True}
+
+
+async def _handle_line_event(guild_id: str, event: dict) -> None:
+    """1件の LINE イベントを Discord へ転送する。
+
+    失敗しても webhook 自体は既に 200 を返しているので、ここでは
+    ログを残すだけにして LINE の再送を誘発しない。
+    """
+    env = config_store.read_env(guild_id)
+    access_token = (env.get("LINE_CHANNEL_ACCESS_TOKEN") or "").strip()
+    dest = (env.get("LINE_FORWARD_CHANNEL_ID") or "").strip()
+    if not access_token or not dest.isdigit():
+        return
+    if not line_forward.is_allowed(event, env.get("LINE_ALLOWED_SOURCE_IDS", "")):
+        return
+    if event.get("type") != "message":
+        return
+
+    message = event.get("message") or {}
+    mtype = message.get("type")
+    forward_text = (env.get("LINE_FORWARD_TEXT") or "") == "1"
+    if mtype not in ("image",) and not (mtype == "text" and forward_text):
+        return
+
+    bot_token = _bot_token_for(guild_id)
+    if not bot_token:
+        log.warning("LINE 転送: guild %s の BOT トークンがありません", guild_id)
+        return
+
+    name = await line_forward.sender_name(access_token, event)
+    prefix = f"**{name}** さんが LINE に投稿しました" if name else "LINE に投稿されました"
+    rest = DiscordREST(bot_token)
+
+    try:
+        if mtype == "text":
+            await rest.create_message(dest, {"content": f"{prefix}\n{message.get('text', '')}"})
+            return
+        data = await line_forward.fetch_content(access_token, str(message.get("id")))
+        if not data:
+            return
+        await rest.create_message(
+            dest,
+            {"content": prefix},
+            image_bytes=data,
+            image_filename=f"line-{message.get('id')}.jpg",
+        )
+        log.info("LINE から Discord へ転送しました (guild=%s)", guild_id)
+    except Exception:  # noqa: BLE001 — 転送失敗でプロセスを落とさない
+        log.exception("LINE 転送に失敗しました (guild=%s)", guild_id)
 
 
 # -------------------------- 定期メッセージ --------------------------

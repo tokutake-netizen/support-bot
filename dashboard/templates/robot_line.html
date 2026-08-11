@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% import "_icons.html" as icon %}
+{% import "_form_macros.html" as f %}
+{% block title %}LINEロボ — {{ guild_name }} — Musubot{% endblock %}
+{% block head %}
+<style>
+  .webhook-box{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .webhook-url{
+    flex:1;min-width:260px;background:var(--bg3);border:1px solid var(--line);
+    border-radius:8px;padding:9px 12px;font-family:"SF Mono",Menlo,monospace;
+    font-size:12.5px;color:var(--fg);overflow-x:auto;white-space:nowrap;
+  }
+</style>
+{% endblock %}
+{% block body %}
+{% with subpage = "robot" %}{% include "_nav.html" %}{% endwith %}
+
+<div class="page">
+  <a href="/guild/{{ guild_id }}" class="back-link">{{ icon.chevronLeft(15) }} ロボット一覧へ戻る</a>
+  <h1>LINEロボ</h1>
+  <p class="subtitle">LINEグループに投稿された画像を、自動で Discord のチャンネルへ届けます。梱包写真や入荷品をLINEで共有している運用を、そのままお客様向けサーバーに流せます。</p>
+
+  {% if request.query_params.get("saved") %}
+    <div class="flash ok">変更を保存しました。数秒で反映されます。</div>
+  {% endif %}
+  {% if not discord_ok %}
+    <div class="callout">
+      転送先チャンネルを選ぶには、先に <a href="/guild/{{ guild_id }}/settings">基盤設定</a> で Discord BOT トークンを保存してください。
+      下のLINE側の準備は、いまのうちに進められます。
+    </div>
+  {% endif %}
+
+  <div class="help-box">
+    <div class="h">はじめる前に</div>
+    LINE側の準備が必要です。<b>個人どうしのトークは読めません</b>（LINEの仕様）。転送元は、Musubot の LINE公式アカウントを<b>招待できるグループ</b>である必要があります。
+  </div>
+
+  <h2>{{ icon.list(17) }} 設定の手順</h2>
+  <div class="card">
+    <ol class="line-steps" style="margin:0;padding-left:20px;line-height:2">
+      <li><a href="https://developers.line.biz/console/" target="_blank" rel="noopener">LINE Developers</a> にログイン → プロバイダーを作成</li>
+      <li><b>Messaging API</b> のチャネルを作成（＝LINE公式アカウントができます）</li>
+      <li>「チャネル基本設定」の <b>チャネルシークレット</b> を下にコピー</li>
+      <li>「Messaging API設定」で <b>チャネルアクセストークン（長期）</b> を発行して下にコピー</li>
+      <li>同じ画面の <b>応答メッセージをオフ</b>、<b>Webhookの利用をオン</b> にする</li>
+      <li>下の <b>Webhook URL</b> をコピーして、LINE側の Webhook URL に貼り付け → 「検証」を押す</li>
+      <li>転送元のLINEグループに、この公式アカウントを<b>招待</b>する</li>
+      <li>下で転送先の Discord チャンネルを選んで保存</li>
+    </ol>
+  </div>
+
+  <h2>{{ icon.forward(17) }} Webhook URL</h2>
+  <div class="card">
+    <p class="section-desc" style="margin-top:0">LINE Developers の「Messaging API設定 → Webhook URL」にこれを貼り付けてください。</p>
+    <div class="webhook-box">
+      <code class="webhook-url" id="webhook-url">{{ webhook_url }}</code>
+      <button type="button" class="btn outline btn-sm" id="copy-webhook">コピー</button>
+    </div>
+    <div class="hint">
+      このURLは第三者に知られても、<b>チャネルシークレットによる署名検証</b>を通らないリクエストは受け付けません。
+      {% if not env.get('LINE_CHANNEL_SECRET') %}<br><b>チャネルシークレットを保存するまで、このURLは 404 を返します。</b>{% endif %}
+    </div>
+  </div>
+
+  <form method="post" action="/guild/{{ guild_id }}/save">
+    <input type="hidden" name="_next" value="/guild/{{ guild_id }}/robot/line">
+
+    <h2>{{ icon.key(17) }} LINE の認証情報</h2>
+    <div class="card">
+      <div class="row">
+        <div class="field">
+          <label>チャネルシークレット<span class="req">*</span></label>
+          <input type="password" name="LINE_CHANNEL_SECRET" value="{{ env.get('LINE_CHANNEL_SECRET','') }}" autocomplete="off">
+          <div class="hint">チャネル基本設定にある32文字の文字列。webhook が本物かの確認に使います。</div>
+        </div>
+        <div class="field">
+          <label>チャネルアクセストークン（長期）<span class="req">*</span></label>
+          <input type="password" name="LINE_CHANNEL_ACCESS_TOKEN" value="{{ env.get('LINE_CHANNEL_ACCESS_TOKEN','') }}" autocomplete="off">
+          <div class="hint">Messaging API設定で発行する長い文字列。画像の取得に使います。</div>
+        </div>
+      </div>
+    </div>
+
+    <h2>{{ icon.box(17) }} 転送のしかた</h2>
+    <div class="card">
+      <div class="field">
+        <label>転送先チャンネル<span class="req">*</span></label>
+        {% if discord_ok %}
+          {{ f.channel_select("LINE_FORWARD_CHANNEL_ID", env, channels_grouped, placeholder="(選択してください)") }}
+          <div class="hint">LINEの画像をここへ投稿します。</div>
+        {% else %}
+          <select disabled><option>基盤設定でBOTトークンを保存すると選べます</option></select>
+          <div class="hint">Discord のチャンネル一覧を読み込めていないため、いまは選択できません。</div>
+        {% endif %}
+      </div>
+
+      <div class="feature">
+        <div>
+          <div class="name">テキストも転送する</div>
+          <div class="desc">オフなら画像だけを転送します（既定）</div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" name="LINE_FORWARD_TEXT" value="1"
+                 {% if env.get('LINE_FORWARD_TEXT') == '1' %}checked{% endif %}
+                 style="width:auto;height:auto">
+          <span>転送する</span>
+        </label>
+      </div>
+
+      <div class="field" style="margin-top:14px">
+        <label>転送元のグループIDを限定する（任意）</label>
+        <input type="text" name="LINE_ALLOWED_SOURCE_IDS" value="{{ env.get('LINE_ALLOWED_SOURCE_IDS','') }}"
+               placeholder="Cxxxxxxxx,Cyyyyyyyy">
+        <div class="hint">
+          空欄なら、この公式アカウントが参加している<b>すべての</b>グループが転送対象になります。
+          特定のグループだけに絞りたい場合はグループIDをカンマ区切りで入力してください。
+          グループIDは <a href="/guild/{{ guild_id }}/status">稼働状況・ログ</a> に転送時のログとして出ます。
+        </div>
+      </div>
+    </div>
+
+    <div class="sticky-save">
+      <button type="submit" class="btn">{{ icon.save(16) }} 変更を保存</button>
+      <a href="/guild/{{ guild_id }}" class="btn outline">戻る</a>
+    </div>
+  </form>
+
+</div>
+{% include "_assistant.html" %}
+<script>
+  document.getElementById('copy-webhook').addEventListener('click', function(){
+    var el = document.getElementById('webhook-url');
+    navigator.clipboard.writeText(el.textContent.trim()).then(function(){
+      var b = document.getElementById('copy-webhook');
+      var old = b.textContent; b.textContent = 'コピーしました';
+      setTimeout(function(){ b.textContent = old; }, 1600);
+    });
+  });
+</script>
+{% endblock %}

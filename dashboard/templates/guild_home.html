@@ -72,7 +72,7 @@
     var base = '/guild/{{ guild_id }}';
     var special = {api: base + '/settings', appearance: base + '/settings',
                    template: base + '/settings', schedule: base + '/schedule'};
-    var known = ['translation','ticket','welcome','suggester','shipping','auction','invite','forwarding'];
+    var known = ['translation','ticket','welcome','suggester','shipping','auction','invite','forwarding','line'];
     if(special[key]) location.replace(special[key]);
     else if(known.indexOf(key) !== -1) location.replace(base + '/robot/' + key);
   })();

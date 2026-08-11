@@ -411,7 +411,8 @@ details summary:hover{color:var(--heading)}
 
 /* ---------- ロボット設定ページの戻るリンク ---------- */
 .back-link{
-  display:inline-flex;align-items:center;gap:5px;
+  /* h1 は inline-block なので、flex にして自分の行を確保する */
+  display:flex;align-items:center;gap:5px;width:fit-content;
   color:var(--muted);font-size:13px;font-weight:500;
   margin-bottom:14px;
 }

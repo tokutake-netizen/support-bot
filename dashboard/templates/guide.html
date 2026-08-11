@@ -72,6 +72,7 @@
       <a href="#g-giveaway">{{ icon.gift(15) }} Giveaway</a>
       <a href="#g-invite">{{ icon.door(15) }} 招待</a>
       <a href="#g-forwarding">{{ icon.forward(15) }} 転送メッセージ</a>
+      <a href="#g-line">{{ icon.send(15) }} LINE連携</a>
     </aside>
 
     <div>
@@ -371,6 +372,22 @@
         <li>「ルールを追加」で作成。既存ルールは「編集」で変更、「削除」で削除（いずれも即反映）</li>
       </ol>
       <div class="pt">別サーバーへ転送するには、その<b>転送先サーバーにも転送Botが参加</b>している必要があります。トリガーは「画像を含む投稿」です。</div>
+    </div>
+
+    <div class="guide-sec card" id="g-line">
+      <h2>{{ icon.send(18) }} LINE連携</h2>
+      <p>LINEグループに投稿された画像を、自動で Discord のチャンネルへ転送します。梱包写真をLINEで共有している運用を、そのままお客様向けサーバーに流せます。</p>
+      <ol class="steps plain">
+        <li><a href="https://developers.line.biz/console/" target="_blank" rel="noopener">LINE Developers</a> で <b>Messaging API</b> のチャネルを作成（LINE公式アカウントができます）</li>
+        <li><b>チャネルシークレット</b>と<b>チャネルアクセストークン（長期）</b>を、LINEロボの画面に貼って保存</li>
+        <li>LINEロボの画面に出ている <b>Webhook URL</b> を、LINE側の Webhook URL に貼り付けて「検証」</li>
+        <li>転送元のLINEグループに、その公式アカウントを<b>招待</b>する</li>
+        <li>転送先の Discord チャンネルを選んで保存</li>
+      </ol>
+      <div class="warn-pt">
+        <b>個人どうしのLINEトークは読めません。</b>これはLINEの仕様で、BOTが参加しているグループ・トークルーム、または公式アカウント宛のメッセージしか受け取れません。転送元は「BOTを招待できるグループ」である必要があります。
+      </div>
+      <div class="pt">Webhook URL は第三者に知られても、チャネルシークレットによる署名検証を通らないリクエストは受け付けません。既定では画像だけを転送し、テキストも流したい場合は設定で切り替えられます。</div>
     </div>
 
     <div class="callout" style="margin-top:24px">
