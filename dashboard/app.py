@@ -81,6 +81,20 @@ async def autostart_bots() -> None:
         except Exception:
             log.exception("autostart failed for guild %s", gid)
 
+@app.exception_handler(401)
+async def unauthorized_to_login(request: Request, exc: HTTPException):
+    """ログインが必要なページに未ログインで来たら、ログイン画面へ返す。
+
+    ロボット個別ページのような深いURLをブックマークしてもらう作りなので、
+    生の 401 JSON ではなくログイン画面を見せる。API 呼び出し（fetch）には
+    従来どおり JSON を返す。
+    """
+    accepts_html = "text/html" in (request.headers.get("accept") or "")
+    if accepts_html and request.method == "GET":
+        return RedirectResponse("/login", status_code=303)
+    return JSONResponse({"detail": exc.detail}, status_code=401)
+
+
 HERE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(HERE / "templates"))
 app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
