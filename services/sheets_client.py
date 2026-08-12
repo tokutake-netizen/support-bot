@@ -17,6 +17,32 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 CACHE_TTL_SECONDS = 300  # 5 minutes
 
 
+def _is_carrier_choice_header(cell: Optional[str]) -> bool:
+    """「どちらの運送会社で送るか」を示す列見出しか。
+
+    ブロックによって書き方が違う:
+      ・安い方
+      ・使う配送方法（US/DDU_DHL）  ← 安さではなく意図的に DHL を選ぶ場合
+    """
+    s = (cell or "").strip()
+    if not s:
+        return False
+    return any(k in s for k in ("安い", "使う配送", "配送方法", "採用", "使用便"))
+
+
+def _parse_price(row: list[str], col: Optional[int]) -> Optional[int]:
+    """「¥2,683」のような表記を整数の円に直す。読めなければ None。"""
+    if col is None or col >= len(row):
+        return None
+    s = (row[col] or "").replace("¥", "").replace(",", "").replace("￥", "").strip()
+    if not s:
+        return None
+    try:
+        return int(float(s))
+    except ValueError:
+        return None
+
+
 @dataclass
 class RateResult:
     carrier: str       # "DHL" or "Fedex"
@@ -94,8 +120,12 @@ class SheetsClient:
                 blocks.setdefault(last_block_label, {})["dhl"] = ci
             elif cell_norm == "fedex":
                 blocks.setdefault(last_block_label, {})["fedex"] = ci
-            elif "安い" in (cell or ""):
-                blocks.setdefault(last_block_label, {})["cheaper"] = ci
+            elif _is_carrier_choice_header(cell):
+                # 「どちらの運送会社で送るか」を書いてある列。
+                # 多くのブロックは「安い方」だが、アメリカのように安さではなく
+                # 意図的に DHL を選んでいるブロックは「使う配送方法」と書かれる。
+                # どちらも同じ意味の列として扱う。
+                blocks.setdefault(last_block_label, {}).setdefault("carrier_col", ci)
 
         # Find weight column: look in column index 0 or 1 for first row after header that parses as float
         weight_col = 1  # B column = index 1
@@ -164,17 +194,60 @@ class SheetsClient:
             bracket = higher[0]
 
         row = rows[row_idx]
-        cheaper = (row[block["cheaper"]] if "cheaper" in block and block["cheaper"] < len(row) else "").strip()
-        carrier = "DHL" if cheaper.upper().startswith("D") else "Fedex"
-        price_col = block["dhl"] if carrier == "DHL" else block["fedex"]
-        if price_col >= len(row):
+        dhl_price = _parse_price(row, block.get("dhl"))
+        fedex_price = _parse_price(row, block.get("fedex"))
+
+        carrier = self._decide_carrier(row, block, block_header, dhl_price, fedex_price)
+        if carrier is None:
             return None
-        price_str = (row[price_col] or "").replace("¥", "").replace(",", "").strip()
-        try:
-            price = int(float(price_str))
-        except ValueError:
+        price = dhl_price if carrier == "DHL" else fedex_price
+        if price is None:
             return None
         return RateResult(carrier=carrier, price_jpy=price, bracket_kg=bracket, block_header=block_header)
+
+    @staticmethod
+    def _decide_carrier(
+        row: list[str],
+        block: dict[str, int],
+        block_header: str,
+        dhl_price: Optional[int],
+        fedex_price: Optional[int],
+    ) -> Optional[str]:
+        """このブロックをどちらの運送会社で送るかを決める。
+
+        シートの「使う配送方法／安い方」列に書かれた指定を最優先する。
+        アメリカのように、安さではなく意図的に DHL を選んでいるブロックが
+        あるため、ここを勝手に安い方で上書きしてはいけない。
+
+        指定が読めなかったときは、以前は無条件に Fedex にしていたが、それだと
+        シートの指定と逆の運送会社を選びうる。安い方に倒す。
+        """
+        raw = ""
+        ci = block.get("carrier_col")
+        if ci is not None and ci < len(row):
+            raw = (row[ci] or "").strip()
+        upper = raw.upper()
+        if upper.startswith("D"):
+            return "DHL"
+        if upper.startswith("F"):
+            return "Fedex"
+
+        if raw:
+            log.warning(
+                "運送会社の指定を解釈できませんでした（%s: %r）。安い方を採ります",
+                block_header, raw,
+            )
+        else:
+            log.warning(
+                "運送会社を指定する列が見つかりません（%s）。安い方を採ります", block_header
+            )
+        if dhl_price is None and fedex_price is None:
+            return None
+        if fedex_price is None:
+            return "DHL"
+        if dhl_price is None:
+            return "Fedex"
+        return "DHL" if dhl_price <= fedex_price else "Fedex"
 
     def reload(self) -> dict[str, Any]:
         return self._load(force=True)
