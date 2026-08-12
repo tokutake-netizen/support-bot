@@ -1,59 +1,41 @@
 {
-  "version": "2026-05-09",
+  "version": "2026-08-12",
   "products": [
     {
-      "id": "wanpiece_case",
-      "name_ja": "わんぴーすCASE",
-      "name_en": "One Piece CASE",
-      "emoji": "🧰",
-      "weight_g": 5300,
-      "unit_ja": "個",
-      "unit_en": ""
-    },
-    {
-      "id": "wanpiece_box",
-      "name_ja": "わんぴーすBOX",
-      "name_en": "One Piece BOX",
-      "emoji": "🍞",
-      "weight_g": 400,
-      "unit_ja": "個",
-      "unit_en": ""
-    },
-    {
-      "id": "pokemon_case",
-      "name_ja": "ポケモンCASE",
-      "name_en": "Pokémon CASE",
-      "emoji": "🧰",
-      "weight_g": 4000,
-      "unit_ja": "個",
-      "unit_en": ""
-    },
-    {
-      "id": "pokemon_box",
-      "name_ja": "ポケモンBOX",
-      "name_en": "Pokémon BOX",
-      "emoji": "⚡",
+      "id": "pokemon_expansion_box",
+      "name_ja": "ポケモン拡張ボックス",
+      "name_en": "Pokémon Expansion Box",
+      "emoji": "",
       "weight_g": 300,
-      "unit_ja": "個",
-      "unit_en": ""
+      "unit_ja": "箱",
+      "unit_en": "box"
+    },
+    {
+      "id": "pokemon_high_class_box",
+      "name_ja": "ポケモンハイクラス",
+      "name_en": "Pokémon High Class Box",
+      "emoji": "",
+      "weight_g": 200,
+      "unit_ja": "箱",
+      "unit_en": "box"
+    },
+    {
+      "id": "one_piece_box",
+      "name_ja": "ワンピース",
+      "name_en": "One Piece Booster Box",
+      "emoji": "",
+      "weight_g": 400,
+      "unit_ja": "箱",
+      "unit_en": "box"
     },
     {
       "id": "psa",
       "name_ja": "PSA",
-      "name_en": "PSA",
-      "emoji": "🏆",
+      "name_en": "PSA Graded Card",
+      "emoji": "",
       "weight_g": 40,
       "unit_ja": "枚",
-      "unit_en": ""
-    },
-    {
-      "id": "single_card",
-      "name_ja": "Single card",
-      "name_en": "Single Card",
-      "emoji": "🃏",
-      "weight_g": 3,
-      "unit_ja": "枚",
-      "unit_en": ""
+      "unit_en": "card"
     }
   ]
 }

@@ -2,6 +2,17 @@
 {% import "_icons.html" as icon %}
 {% import "_form_macros.html" as f %}
 {% block title %}お迎えロボ — {{ guild_name }} — Musubot{% endblock %}
+{% block head %}
+<style>
+  .dm-preview{
+    background:#313338;color:#dbdee1;border-radius:10px;padding:16px 18px;
+    font-size:14px;line-height:1.75;white-space:pre-wrap;word-break:break-word;
+    min-height:90px;border:1px solid #26282c;
+  }
+  .dm-preview .ph{color:#949ba4;font-style:italic}
+  .dm-preview b{color:#fff}
+</style>
+{% endblock %}
 {% block body %}
 {% with subpage = "robot" %}{% include "_nav.html" %}{% endwith %}
 
@@ -17,7 +28,9 @@
     <div class="callout">
       Discord 連携が未完了です。先に <a href="/guild/{{ guild_id }}/settings">基盤設定</a> で BOT トークンを保存してください。
     </div>
-  {% else %}
+  {% endif %}
+
+  {% if discord_ok %}
 
   <form method="post" action="/guild/{{ guild_id }}/save" enctype="multipart/form-data">
     <input type="hidden" name="_next" value="/guild/{{ guild_id }}/robot/welcome">
@@ -124,5 +137,103 @@
 
   {% endif %}
 </div>
+
+  {# DM の文面は Discord 接続前でも用意できるよう、独立したフォームにする #}
+  <form method="post" action="/guild/{{ guild_id }}/save">
+    <input type="hidden" name="_next" value="/guild/{{ guild_id }}/robot/welcome">
+
+  <h2>{{ icon.mail(17) }} 入室した人へのDM</h2>
+  <div class="card">
+    <div class="help-box">
+      <div class="h">DMについて</div>
+      入室した瞬間に、その人だけに届くメッセージです。招待リンクや、
+      チャンネル投稿には書けない案内を渡せます。
+      <b>相手が「サーバーメンバーからのDMを許可しない」設定にしている場合は届きません。</b>
+      これはDiscordの仕様で、届かなくてもエラーにはならず、入室の歓迎投稿は通常どおり行われます。
+    </div>
+
+    <div class="feature">
+      <div>
+        <div class="name">入室時にDMを送る</div>
+        <div class="desc">オフのあいだは送信しません</div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" name="WELCOME_DM_ENABLED" value="1"
+               {% if env.get('WELCOME_DM_ENABLED') == '1' %}checked{% endif %}
+               style="width:auto;height:auto">
+        <span>送る</span>
+      </label>
+    </div>
+
+    <div class="field" style="margin-top:14px">
+      <label>招待リンク（任意）</label>
+      <input type="url" id="dm-invite" name="WELCOME_DM_INVITE_URL"
+             value="{{ env.get('WELCOME_DM_INVITE_URL','') }}"
+             placeholder="https://discord.gg/xxxxxxx">
+      <div class="hint">本文で <span class="chip">{invite_url}</span> と書くと、ここのURLに置き換わります。</div>
+    </div>
+
+    <div class="field">
+      <label>DMの本文</label>
+      <textarea id="dm-message" name="WELCOME_DM_MESSAGE" rows="7"
+                placeholder="例: {user_display}さん、{guild_name}へようこそ！">{{ env.get('WELCOME_DM_MESSAGE','') }}</textarea>
+      <div class="hint">
+        使えるプレースホルダ:
+        <span class="chip">{user_display}</span><span class="chip">{user_name}</span><span class="chip">{user_mention}</span><span class="chip">{guild_name}</span><span class="chip">{member_count}</span><span class="chip">{invite_url}</span><br>
+        2000文字まで。<b>**太字**</b> などDiscordの記法が使えます。
+      </div>
+    </div>
+
+    <div class="field">
+      <label>プレビュー</label>
+      <div class="dm-preview" id="dm-preview">本文を入力すると、届く見た目がここに出ます。</div>
+      <div class="hint" id="dm-count"></div>
+    </div>
+  </div>
+
+    <div class="sticky-save">
+      <button type="submit" class="btn">{{ icon.save(16) }} DMの設定を保存</button>
+      <a href="/guild/{{ guild_id }}" class="btn outline">戻る</a>
+    </div>
+  </form>
+
 {% include "_assistant.html" %}
+<script>
+  // プレビューはサーバーに問い合わせる。BOTと同じ置換関数を通すので、
+  // 画面で見えているものと実際に届くものがずれない。
+  (function(){
+    var msg = document.getElementById('dm-message');
+    var inv = document.getElementById('dm-invite');
+    var out = document.getElementById('dm-preview');
+    var cnt = document.getElementById('dm-count');
+    if(!msg || !out) return;
+    var timer = null;
+
+    function render(){
+      if(!msg.value.trim()){
+        out.innerHTML = '<span class="ph">本文を入力すると、届く見た目がここに出ます。</span>';
+        cnt.textContent = '';
+        return;
+      }
+      var fd = new FormData();
+      fd.append('message', msg.value);
+      fd.append('invite_url', inv ? inv.value : '');
+      fetch('/guild/{{ guild_id }}/welcome/dm-preview', {method:'POST', body:fd, credentials:'same-origin'})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          // 太字だけ再現。それ以外はそのまま（テキストとして安全に入れる）
+          var esc = d.preview.replace(/[&<>]/g, function(c){
+            return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];
+          });
+          out.innerHTML = esc.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+          cnt.textContent = d.length + ' / 2000 文字' + (d.length > 2000 ? '（超過分は切り捨てられます）' : '');
+        })
+        .catch(function(){ out.textContent = 'プレビューを取得できませんでした'; });
+    }
+    function schedule(){ clearTimeout(timer); timer = setTimeout(render, 300); }
+    msg.addEventListener('input', schedule);
+    if(inv) inv.addEventListener('input', schedule);
+    render();
+  })();
+</script>
 {% endblock %}

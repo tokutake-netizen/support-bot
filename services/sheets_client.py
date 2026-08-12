@@ -82,6 +82,21 @@ def parse_rules(rows: list[list[str]]) -> dict[str, dict[str, str]]:
     return out
 
 
+def normalize_header(s: str) -> str:
+    """ブロック見出しの照合用に正規化する。
+
+    シートの見出しは「ヨーロッパ（オーストリア、ベルギー、…）」のように長く、
+    改行やスペースの入り方が編集のたびに変わる。完全一致で照合していたため、
+    空白を1つ足しただけで送料が引けなくなっていた。空白を全て落とし、
+    全角半角と括弧・読点の揺れを吸収してから比べる。
+    """
+    import unicodedata
+    s = unicodedata.normalize("NFKC", s or "")
+    for a, b in (("（", "("), ("）", ")"), ("、", ","), ("／", "/"), ("　", "")):
+        s = s.replace(a, b)
+    return "".join(s.split()).lower()
+
+
 def _is_carrier_choice_header(cell: Optional[str]) -> bool:
     """「どちらの運送会社で送るか」を示す列見出しか。
 
@@ -240,13 +255,26 @@ class SheetsClient:
 
         block = blocks.get(block_header)
         if not block:
-            # try fuzzy match by substring
+            # 完全一致しなければ、空白や全角半角を無視して照合する
+            want = normalize_header(block_header)
             for bh, info in blocks.items():
-                if block_header in bh or bh in block_header:
-                    block = info
-                    block_header = bh
+                if normalize_header(bh) == want:
+                    block, block_header = info, bh
                     break
         if not block:
+            # それでも駄目なら部分一致（見出しを短く書き換えた場合の救済）
+            want = normalize_header(block_header)
+            for bh, info in blocks.items():
+                nb = normalize_header(bh)
+                if want and (want in nb or nb in want):
+                    block, block_header = info, bh
+                    break
+        if not block:
+            log.warning(
+                "送料表にブロック『%s』が見つかりません。シートの見出しと "
+                "countries.json の対応を確認してください（読めている見出し: %s）",
+                block_header, list(blocks)[:3],
+            )
             return None
 
         row_idx = weights.get(bracket)

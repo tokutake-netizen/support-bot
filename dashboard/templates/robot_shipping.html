@@ -28,6 +28,136 @@
     <div class="flash warn">{{ request.query_params.get("import_err") }}</div>
   {% endif %}
 
+
+  {% if request.query_params.get("prod_ok") %}
+    <div class="flash ok" id="products">{{ request.query_params.get("prod_ok") }}</div>
+  {% elif request.query_params.get("prod_err") %}
+    <div class="flash warn" id="products">{{ request.query_params.get("prod_err") }}</div>
+  {% endif %}
+
+  <h2 id="products">{{ icon.box(17) }} カートに出す商品
+    <span class="help">{{ products | length }} / {{ products_max }} 件{% if not products_own %}・既定のまま{% endif %}</span>
+  </h2>
+  <div class="card">
+    <p class="section-desc" style="margin-top:0">
+      お客様が <code>/shipping</code> を実行したとき、選択メニューに出る商品です。
+      <b>英語名は海外のお客様に表示されます。</b>上から順に並びます。
+    </p>
+
+    {% if products %}
+    <table style="width:100%;border-collapse:collapse;font-size:13.5px;margin-bottom:16px">
+      <thead>
+        <tr style="text-align:left;color:var(--muted);font-size:12px">
+          <th style="padding:8px 6px">商品名（日本語）</th>
+          <th style="padding:8px 6px">英語名</th>
+          <th style="padding:8px 6px;text-align:right">重量</th>
+          <th style="padding:8px 6px">単位</th>
+          <th style="padding:8px 6px;text-align:right">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for p in products %}
+        <tr style="border-top:1px solid var(--line)">
+          <td style="padding:10px 6px;font-weight:600;color:var(--heading)">{{ p.emoji }} {{ p.name_ja }}</td>
+          <td style="padding:10px 6px;color:var(--muted)">{{ p.name_en }}</td>
+          <td style="padding:10px 6px;text-align:right;font-variant-numeric:tabular-nums">{{ "{:,}".format(p.weight_g) }} g</td>
+          <td style="padding:10px 6px;color:var(--muted)">{{ p.unit_ja }}{% if p.unit_en %} / {{ p.unit_en }}{% endif %}</td>
+          <td style="padding:10px 6px;text-align:right;white-space:nowrap">
+            <form method="post" action="/guild/{{ guild_id }}/products/move" style="display:inline">
+              <input type="hidden" name="id" value="{{ p.id }}"><input type="hidden" name="dir" value="up">
+              <button class="btn outline btn-sm" title="上へ">↑</button>
+            </form>
+            <form method="post" action="/guild/{{ guild_id }}/products/move" style="display:inline">
+              <input type="hidden" name="id" value="{{ p.id }}"><input type="hidden" name="dir" value="down">
+              <button class="btn outline btn-sm" title="下へ">↓</button>
+            </form>
+            <form method="post" action="/guild/{{ guild_id }}/products/remove" style="display:inline"
+                  onsubmit="return confirm('「{{ p.name_ja }}」を削除しますか？')">
+              <input type="hidden" name="id" value="{{ p.id }}">
+              <button class="btn red btn-sm">削除</button>
+            </form>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="5" style="padding:0 6px 10px">
+            <details>
+              <summary>編集する</summary>
+              <form method="post" action="/guild/{{ guild_id }}/products/update" style="margin-top:10px">
+                <input type="hidden" name="id" value="{{ p.id }}">
+                <div class="row">
+                  <div class="field">
+                    <label>商品名（日本語）</label>
+                    <input type="text" name="name_ja" value="{{ p.name_ja }}" required maxlength="60">
+                  </div>
+                  <div class="field">
+                    <label>商品名（英語）</label>
+                    <input type="text" name="name_en" value="{{ p.name_en }}" required maxlength="60">
+                  </div>
+                </div>
+                <div class="row">
+                  <div class="field">
+                    <label>1個あたりの重量（g）</label>
+                    <input type="number" name="weight_g" value="{{ p.weight_g }}" required min="1" max="100000">
+                  </div>
+                  <div class="field">
+                    <label>単位（日本語 / 英語）</label>
+                    <div style="display:flex;gap:8px">
+                      <input type="text" name="unit_ja" value="{{ p.unit_ja }}" maxlength="8" placeholder="箱">
+                      <input type="text" name="unit_en" value="{{ p.unit_en }}" maxlength="12" placeholder="box">
+                    </div>
+                  </div>
+                </div>
+                <button type="submit" class="btn btn-sm">{{ icon.save(15) }} 保存</button>
+              </form>
+            </details>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p style="color:var(--muted)">まだ商品がありません。下から追加してください。</p>
+    {% endif %}
+
+    <h3 style="margin-top:18px">商品を追加</h3>
+    <form method="post" action="/guild/{{ guild_id }}/products/add">
+      <div class="row">
+        <div class="field">
+          <label>商品名（日本語）<span class="req">*</span></label>
+          <input type="text" name="name_ja" required maxlength="60" placeholder="例: ポケモン拡張ボックス">
+        </div>
+        <div class="field">
+          <label>商品名（英語）<span class="req">*</span></label>
+          <input type="text" name="name_en" required maxlength="60" placeholder="例: Pokémon Expansion Box">
+          <div class="hint">海外のお客様にはこちらが表示されます。</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>1個あたりの重量（g）<span class="req">*</span></label>
+          <input type="number" name="weight_g" required min="1" max="100000" placeholder="300">
+          <div class="hint">梱包材は別途 1kg が自動で加算されます。</div>
+        </div>
+        <div class="field">
+          <label>単位（日本語 / 英語）</label>
+          <div style="display:flex;gap:8px">
+            <input type="text" name="unit_ja" maxlength="8" placeholder="箱">
+            <input type="text" name="unit_en" maxlength="12" placeholder="box">
+          </div>
+        </div>
+      </div>
+      <button type="submit" class="btn">{{ icon.plus(16) }} 追加する</button>
+      {% if products_own %}
+      <span style="margin-left:10px">
+        <form method="post" action="/guild/{{ guild_id }}/products/reset" style="display:inline"
+              onsubmit="return confirm('登録した商品を捨てて、既定のリストに戻します。よろしいですか？')">
+          <button class="btn outline btn-sm">既定に戻す</button>
+        </form>
+      </span>
+      {% endif %}
+    </form>
+  </div>
+
   <h2>{{ icon.layers(17) }} 送料設定（発送ルール・国一覧）
     <span class="help">
       {% if ship_cfg.own %}このサーバー独自の設定{% else %}マスターをそのまま使用中{% endif %}

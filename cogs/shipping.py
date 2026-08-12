@@ -112,8 +112,30 @@ class Product:
 
 
 def load_products() -> list[Product]:
-    data = json.loads(PRODUCTS_PATH.read_text("utf-8"))
-    return [Product(**p) for p in data["products"]]
+    """カートに出す商品。
+
+    BOT の CWD はそのサーバーのデプロイディレクトリなので、まず
+    data/products.json（ダッシュボードで登録したもの）を見る。無ければ
+    リポジトリ同梱の既定リストにフォールバックする。
+    """
+    local = Path("data") / "products.json"
+    path = local if local.exists() else PRODUCTS_PATH
+    try:
+        data = json.loads(path.read_text("utf-8"))
+    except (OSError, ValueError):
+        log.exception("商品リストを読めませんでした（%s）", path)
+        return []
+    out = []
+    for p in data.get("products", []):
+        try:
+            out.append(Product(
+                id=p["id"], name_ja=p["name_ja"], name_en=p.get("name_en") or p["name_ja"],
+                emoji=p.get("emoji", ""), weight_g=int(p["weight_g"]),
+                unit_ja=p.get("unit_ja", ""), unit_en=p.get("unit_en", ""),
+            ))
+        except (KeyError, TypeError, ValueError):
+            log.warning("商品の定義が不正なので飛ばしました: %r", p)
+    return out
 
 
 @dataclass

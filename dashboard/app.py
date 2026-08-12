@@ -53,6 +53,7 @@ from . import (
     mailer,
     line_forward,
     member_stats,
+    products_store,
     schedule_store,
     server_template,
     shipping_master,
@@ -1223,7 +1224,8 @@ ROBOTS = [
         active_if=["WELCOME_CHANNEL_ID"], needs=[],
         summary=[("投稿先", "WELCOME_CHANNEL_ID", "channel")],
         shared=["WELCOME_TITLE", "WELCOME_DESCRIPTION", "WELCOME_COLOR",
-                "WELCOME_BANNER_URL", "WELCOME_THUMBNAIL_URL"],
+                "WELCOME_BANNER_URL", "WELCOME_THUMBNAIL_URL",
+                "WELCOME_DM_ENABLED", "WELCOME_DM_MESSAGE", "WELCOME_DM_INVITE_URL"],
         local=["WELCOME_CHANNEL_ID", "WELCOME_AUTOROLE_IDS",
                "WELCOME_RULES_CHANNEL_ID", "WELCOME_INTRO_CHANNEL_ID"],
     ),
@@ -1517,6 +1519,9 @@ async def robot_page(
 
     if robot_key == "shipping":
         cfg = shipping_master.load_config(guild_id)
+        ctx["products"] = products_store.load(guild_id)
+        ctx["products_own"] = products_store.has_own(guild_id)
+        ctx["products_max"] = products_store.MAX_PRODUCTS
         ctx["ship_cfg"] = {
             "own": shipping_master.has_own_config(guild_id),
             "blocks": len(cfg.get("blocks", {}).get("_aliases", {})),
@@ -2677,6 +2682,118 @@ async def shipping_reset(
     msg = "マスターに戻しました" if done else "独自設定はありません"
     return RedirectResponse(
         f"/guild/{guild_id}/robot/shipping?import_ok={msg}", status_code=303
+    )
+
+
+@app.post("/guild/{guild_id}/welcome/dm-preview")
+async def welcome_dm_preview(
+    request: Request, guild_id: str, session: Optional[str] = Cookie(None)
+):
+    """DM本文のプレビュー。BOTと同じ置換ロジックを通して返す。
+
+    画面側で別に組み立てると、実際に届く文面とずれる。ここで同じ関数を
+    使うことで、プレビューと本番の差が出ないようにする。
+    """
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    form = await request.form()
+
+    from services import dm_template
+    body = dm_template.render(
+        str(form.get("message") or ""),
+        user_mention="@新しいメンバー",
+        user_name="new_member",
+        user_display="新しいメンバー",
+        guild_name=_guild_name_from_session(sess, guild_id),
+        member_count=1234,
+        invite_url=str(form.get("invite_url") or ""),
+    )
+    return JSONResponse({"preview": body[:2000], "length": len(body)})
+
+
+# -------------------------- 送料カートの商品登録 --------------------------
+
+
+def _products_redirect(guild_id: str, **q) -> RedirectResponse:
+    url = f"/guild/{guild_id}/robot/shipping"
+    if q:
+        url += "?" + urllib.parse.urlencode(q) + "#products"
+    return RedirectResponse(url, status_code=303)
+
+
+@app.post("/guild/{guild_id}/products/add")
+async def products_add(
+    request: Request, guild_id: str, session: Optional[str] = Cookie(None)
+):
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    form = await request.form()
+    try:
+        item = products_store.validate(
+            str(form.get("name_ja") or ""), str(form.get("name_en") or ""),
+            str(form.get("weight_g") or ""), str(form.get("unit_ja") or ""),
+            str(form.get("unit_en") or ""), str(form.get("emoji") or ""),
+        )
+        products_store.add(guild_id, item)
+    except ValueError as e:
+        return _products_redirect(guild_id, prod_err=str(e))
+    return _products_redirect(guild_id, prod_ok="商品を追加しました")
+
+
+@app.post("/guild/{guild_id}/products/update")
+async def products_update(
+    request: Request, guild_id: str, session: Optional[str] = Cookie(None)
+):
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    form = await request.form()
+    try:
+        item = products_store.validate(
+            str(form.get("name_ja") or ""), str(form.get("name_en") or ""),
+            str(form.get("weight_g") or ""), str(form.get("unit_ja") or ""),
+            str(form.get("unit_en") or ""), str(form.get("emoji") or ""),
+        )
+    except ValueError as e:
+        return _products_redirect(guild_id, prod_err=str(e))
+    ok = products_store.update(guild_id, str(form.get("id") or ""), item)
+    return _products_redirect(
+        guild_id, **({"prod_ok": "商品を更新しました"} if ok else {"prod_err": "見つかりませんでした"})
+    )
+
+
+@app.post("/guild/{guild_id}/products/remove")
+async def products_remove(
+    request: Request, guild_id: str, session: Optional[str] = Cookie(None)
+):
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    form = await request.form()
+    products_store.remove(guild_id, str(form.get("id") or ""))
+    return _products_redirect(guild_id, prod_ok="商品を削除しました")
+
+
+@app.post("/guild/{guild_id}/products/move")
+async def products_move(
+    request: Request, guild_id: str, session: Optional[str] = Cookie(None)
+):
+    """カートの選択メニューに出る順を入れ替える。"""
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    form = await request.form()
+    delta = -1 if str(form.get("dir") or "") == "up" else 1
+    products_store.move(guild_id, str(form.get("id") or ""), delta)
+    return _products_redirect(guild_id)
+
+
+@app.post("/guild/{guild_id}/products/reset")
+async def products_reset(
+    guild_id: str, session: Optional[str] = Cookie(None)
+):
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    done = products_store.reset(guild_id)
+    return _products_redirect(
+        guild_id, prod_ok="既定の商品リストに戻しました" if done else "独自の登録はありません"
     )
 
 

@@ -117,6 +117,43 @@ def _build_embed(
     return embed
 
 
+
+async def send_join_dm(member: "discord.Member") -> tuple[bool, str]:
+    """入室者にDMを送る。(送れたか, 理由) を返す。
+
+    DM は相手の設定次第で必ず拒否されうる。届かないこと自体は異常では
+    ないので、失敗しても入室処理は続行しログに残すだけにする。
+    """
+    if member.bot:
+        return False, "bot"
+    if (os.getenv("WELCOME_DM_ENABLED") or "") != "1":
+        return False, "disabled"
+    template = (os.getenv("WELCOME_DM_MESSAGE") or "").strip()
+    if not template:
+        return False, "no_message"
+
+    from services import dm_template
+    body = dm_template.render(
+        template,
+        user_mention=member.mention,
+        user_name=member.name,
+        user_display=member.display_name,
+        guild_name=member.guild.name,
+        member_count=member.guild.member_count or 0,
+        invite_url=os.getenv("WELCOME_DM_INVITE_URL") or "",
+    )
+    try:
+        await member.send(body[:2000])
+    except discord.Forbidden:
+        log.info("DMを拒否されました（%s）。相手のプライバシー設定によるものです", member)
+        return False, "forbidden"
+    except discord.HTTPException as e:
+        log.warning("DMの送信に失敗しました（%s）: %s", member, e)
+        return False, "http_error"
+    log.info("入室者にDMを送りました: %s", member)
+    return True, "sent"
+
+
 class WelcomeCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
@@ -132,6 +169,14 @@ class WelcomeCog(commands.Cog):
         """
         if member.bot:
             return
+
+        # 入室者へのDM。チャンネル投稿とは独立させ、片方が失敗しても
+        # もう片方は動くようにする。
+        try:
+            await send_join_dm(member)
+        except Exception:  # noqa: BLE001 — DMの失敗で歓迎処理を止めない
+            log.exception("入室DMの処理で例外が出ました（%s）", member)
+
         ch_id = _channel_id("WELCOME_CHANNEL_ID")
         if not ch_id:
             return

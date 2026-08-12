@@ -1,5 +1,5 @@
 {
-  "version": "2026-08-12-zone-expand",
+  "version": "2026-08-12-major-only",
   "_note": "block は スプシ Row2 ヘッダ文字列と完全一致させる。グループブロックは複数国を共有。実シートで列ヘッダの正確な文字列が確定したらここを更新。",
   "regions": {
     "north_america": {
@@ -51,435 +51,25 @@
       "block_th": "タイ",
       "block_ph": "フィリピン",
       "block_id": "インドネシア",
-      "block_oceania_a": "オセアニア（フィジー、ミクロネシア、パプアニューギニア、ウォリス・フツナ）／アジア（カンボジア、ラオス）",
+      "block_oceania_a": "オセアニア（フィジー共和国、 ミクロネシア パプアニューギニア独立国、ウォリス・フツナ） アジア（カンボジア、ラオス）",
       "block_nz": "ニュージーランド",
       "block_bt_bd": "ブータン、バングラデシュ",
       "block_in": "インド",
-      "block_eu_a": "ヨーロッパA",
-      "block_eu_b": "ヨーロッパB／中東(トルコ)",
-      "block_caucasus": "コーカサス／バルカン",
+      "block_eu_a": "ヨーロッパ（オーストリア、ベルギー、チェコ、 デンマーク、フィンランド、フランス、ドイツ、 ギリシャ、ハンガリー、アイルランド、イタリア、 リヒテンシュタイン、ルクセンブルグ、モナコ、 オランダ、ノルウェー、ポーランド、ポルトガル、 サンマリノ、スロバキア、スペイン、 スウェーデン、スイス、イギリス）",
+      "block_eu_b": "ヨーロッパ（アンドラ、ブルガリア、クロアチア、 キプロス、エストニア、ラトビア、リトアニア、 マルタ、ルーマニア、スロベニア） 中東（トルコ）",
+      "block_caucasus": "アジア（アルメニア、アゼルバイジャン） ヨーロッパ（アルバニア、ボスニア・ヘルツェゴビナ、 ジブラルタル、アイスランド、マケドニア、 モンテネグロ、セルビア）",
       "block_il": "イスラエル",
-      "block_sa": "南米（除フォークランド・ガイアナ・スリナム）",
-      "block_africa_a": "アフリカ（南ア以外）／アジア（モルディブ等）／中東（イラク等）",
-      "block_za_etc": "南ア／アジア（カザフ等）／中東（UAE等）",
-      "block_pacific": "オセアニア島嶼",
-      "block_cam_carib": "中米／バミューダ／南米例外（ガイアナ・スリナム）",
+      "block_sa": "南米（フォークランド諸島、ガイアナ、 スリナム以外）",
+      "block_africa_a": "アフリカ（南アフリカ共和国以外） アジア（モルディブ、ネパール、パキスタン、スリランカ） 中東（イラク、ヨルダン、レバノン、サウジアラビア）",
+      "block_za_etc": "アフリカ（南アフリカ共和国） アジア（、キルギス、グルジア、ウズベキスタン） 中東（バーレーン、クウェート、オマーン、 カタール、アラブ首長国連邦）",
+      "block_pacific": "オセアニア（米領サモア、クック諸島、グアム島、 マーシャル諸島、ナウル共和国、ニューカレドニア島、 ニューカレドニア島、パラオ、トンガ、 バヌアツ、サモア独立国",
+      "block_cam_carib": "中米（プエルトリコ、米領バージン諸島以外）、 バミューダ諸島 南米（ガイアナ、スリナム）",
       "block_mn": "モンゴル",
       "block_au": "オーストラリア"
-    }
+    },
+    "_note": "block は送料表のブロック見出しに対応する。照合は空白・全角半角を無視した正規化のうえで行うため、見出しの表記ゆれは吸収される。見出しを大きく書き換えた場合は、ダッシュボードの送料ロボから「発送ルール」を貼り付けて更新すること。"
   },
   "countries": [
-    {
-      "name_ja": "アルジェリア",
-      "name_en": "Algeria",
-      "iso2": "DZ",
-      "iso3": "DZA",
-      "flag": "🇩🇿",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Algeria"
-      ]
-    },
-    {
-      "name_ja": "アンゴラ",
-      "name_en": "Angola",
-      "iso2": "AO",
-      "iso3": "AGO",
-      "flag": "🇦🇴",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Angola"
-      ]
-    },
-    {
-      "name_ja": "ウガンダ",
-      "name_en": "Uganda",
-      "iso2": "UG",
-      "iso3": "UGA",
-      "flag": "🇺🇬",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Uganda"
-      ]
-    },
-    {
-      "name_ja": "エジプト",
-      "name_en": "Egypt",
-      "iso2": "EG",
-      "iso3": "EGY",
-      "flag": "🇪🇬",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Egypt"
-      ]
-    },
-    {
-      "name_ja": "エスワティニ",
-      "name_en": "Eswatini",
-      "iso2": "SZ",
-      "iso3": "SWZ",
-      "flag": "🇸🇿",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "スワジランド",
-        "Eswatini"
-      ]
-    },
-    {
-      "name_ja": "エチオピア",
-      "name_en": "Ethiopia",
-      "iso2": "ET",
-      "iso3": "ETH",
-      "flag": "🇪🇹",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Ethiopia"
-      ]
-    },
-    {
-      "name_ja": "カメルーン",
-      "name_en": "Cameroon",
-      "iso2": "CM",
-      "iso3": "CMR",
-      "flag": "🇨🇲",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Cameroon"
-      ]
-    },
-    {
-      "name_ja": "ガボン",
-      "name_en": "Gabon",
-      "iso2": "GA",
-      "iso3": "GAB",
-      "flag": "🇬🇦",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Gabon"
-      ]
-    },
-    {
-      "name_ja": "ガーナ",
-      "name_en": "Ghana",
-      "iso2": "GH",
-      "iso3": "GHA",
-      "flag": "🇬🇭",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Ghana"
-      ]
-    },
-    {
-      "name_ja": "ギニア",
-      "name_en": "Guinea",
-      "iso2": "GN",
-      "iso3": "GIN",
-      "flag": "🇬🇳",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Guinea"
-      ]
-    },
-    {
-      "name_ja": "ケニア",
-      "name_en": "Kenya",
-      "iso2": "KE",
-      "iso3": "KEN",
-      "flag": "🇰🇪",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Kenya"
-      ]
-    },
-    {
-      "name_ja": "コンゴ民主共和国",
-      "name_en": "DR Congo",
-      "iso2": "CD",
-      "iso3": "COD",
-      "flag": "🇨🇩",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "コンゴ",
-        "DR Congo"
-      ]
-    },
-    {
-      "name_ja": "コートジボワール",
-      "name_en": "Côte d'Ivoire",
-      "iso2": "CI",
-      "iso3": "CIV",
-      "flag": "🇨🇮",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "アイボリーコースト",
-        "Côte d'Ivoire"
-      ]
-    },
-    {
-      "name_ja": "ザンビア",
-      "name_en": "Zambia",
-      "iso2": "ZM",
-      "iso3": "ZMB",
-      "flag": "🇿🇲",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Zambia"
-      ]
-    },
-    {
-      "name_ja": "ジンバブエ",
-      "name_en": "Zimbabwe",
-      "iso2": "ZW",
-      "iso3": "ZWE",
-      "flag": "🇿🇼",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Zimbabwe"
-      ]
-    },
-    {
-      "name_ja": "セネガル",
-      "name_en": "Senegal",
-      "iso2": "SN",
-      "iso3": "SEN",
-      "flag": "🇸🇳",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Senegal"
-      ]
-    },
-    {
-      "name_ja": "セーシェル",
-      "name_en": "Seychelles",
-      "iso2": "SC",
-      "iso3": "SYC",
-      "flag": "🇸🇨",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Seychelles"
-      ]
-    },
-    {
-      "name_ja": "タンザニア",
-      "name_en": "Tanzania",
-      "iso2": "TZ",
-      "iso3": "TZA",
-      "flag": "🇹🇿",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Tanzania"
-      ]
-    },
-    {
-      "name_ja": "チュニジア",
-      "name_en": "Tunisia",
-      "iso2": "TN",
-      "iso3": "TUN",
-      "flag": "🇹🇳",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Tunisia"
-      ]
-    },
-    {
-      "name_ja": "トーゴ",
-      "name_en": "Togo",
-      "iso2": "TG",
-      "iso3": "TGO",
-      "flag": "🇹🇬",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Togo"
-      ]
-    },
-    {
-      "name_ja": "ナイジェリア",
-      "name_en": "Nigeria",
-      "iso2": "NG",
-      "iso3": "NGA",
-      "flag": "🇳🇬",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Nigeria"
-      ]
-    },
-    {
-      "name_ja": "ナミビア",
-      "name_en": "Namibia",
-      "iso2": "NA",
-      "iso3": "NAM",
-      "flag": "🇳🇦",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Namibia"
-      ]
-    },
-    {
-      "name_ja": "ブルキナファソ",
-      "name_en": "Burkina Faso",
-      "iso2": "BF",
-      "iso3": "BFA",
-      "flag": "🇧🇫",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Burkina Faso"
-      ]
-    },
-    {
-      "name_ja": "ベナン",
-      "name_en": "Benin",
-      "iso2": "BJ",
-      "iso3": "BEN",
-      "flag": "🇧🇯",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Benin"
-      ]
-    },
-    {
-      "name_ja": "ボツワナ",
-      "name_en": "Botswana",
-      "iso2": "BW",
-      "iso3": "BWA",
-      "flag": "🇧🇼",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Botswana"
-      ]
-    },
-    {
-      "name_ja": "マダガスカル",
-      "name_en": "Madagascar",
-      "iso2": "MG",
-      "iso3": "MDG",
-      "flag": "🇲🇬",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Madagascar"
-      ]
-    },
-    {
-      "name_ja": "マラウイ",
-      "name_en": "Malawi",
-      "iso2": "MW",
-      "iso3": "MWI",
-      "flag": "🇲🇼",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Malawi"
-      ]
-    },
-    {
-      "name_ja": "マリ",
-      "name_en": "Mali",
-      "iso2": "ML",
-      "iso3": "MLI",
-      "flag": "🇲🇱",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Mali"
-      ]
-    },
-    {
-      "name_ja": "モザンビーク",
-      "name_en": "Mozambique",
-      "iso2": "MZ",
-      "iso3": "MOZ",
-      "flag": "🇲🇿",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Mozambique"
-      ]
-    },
-    {
-      "name_ja": "モロッコ",
-      "name_en": "Morocco",
-      "iso2": "MA",
-      "iso3": "MAR",
-      "flag": "🇲🇦",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Morocco"
-      ]
-    },
-    {
-      "name_ja": "モーリシャス",
-      "name_en": "Mauritius",
-      "iso2": "MU",
-      "iso3": "MUS",
-      "flag": "🇲🇺",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Mauritius"
-      ]
-    },
-    {
-      "name_ja": "リビア",
-      "name_en": "Libya",
-      "iso2": "LY",
-      "iso3": "LBY",
-      "flag": "🇱🇾",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Libya"
-      ]
-    },
-    {
-      "name_ja": "ルワンダ",
-      "name_en": "Rwanda",
-      "iso2": "RW",
-      "iso3": "RWA",
-      "flag": "🇷🇼",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Rwanda"
-      ]
-    },
-    {
-      "name_ja": "レソト",
-      "name_en": "Lesotho",
-      "iso2": "LS",
-      "iso3": "LSO",
-      "flag": "🇱🇸",
-      "region": "africa",
-      "block": "block_africa_a",
-      "aliases": [
-        "Lesotho"
-      ]
-    },
     {
       "name_ja": "南アフリカ共和国",
       "name_en": "South Africa",
@@ -492,26 +82,6 @@
         "南ア",
         "RSA"
       ]
-    },
-    {
-      "name_ja": "アゼルバイジャン",
-      "name_en": "Azerbaijan",
-      "iso2": "AZ",
-      "iso3": "AZE",
-      "flag": "🇦🇿",
-      "region": "asia",
-      "block": "block_caucasus",
-      "aliases": []
-    },
-    {
-      "name_ja": "アルメニア",
-      "name_en": "Armenia",
-      "iso2": "AM",
-      "iso3": "ARM",
-      "flag": "🇦🇲",
-      "region": "asia",
-      "block": "block_caucasus",
-      "aliases": []
     },
     {
       "name_ja": "インド",
@@ -534,79 +104,6 @@
       "aliases": []
     },
     {
-      "name_ja": "ウズベキスタン",
-      "name_en": "Uzbekistan",
-      "iso2": "UZ",
-      "iso3": "UZB",
-      "flag": "🇺🇿",
-      "region": "asia",
-      "block": "block_za_etc",
-      "aliases": [
-        "Uzbekistan"
-      ]
-    },
-    {
-      "name_ja": "カザフスタン",
-      "name_en": "Kazakhstan",
-      "iso2": "KZ",
-      "iso3": "KAZ",
-      "flag": "🇰🇿",
-      "region": "asia",
-      "block": "block_za_etc",
-      "aliases": [
-        "カザフ",
-        "Kazakhstan"
-      ]
-    },
-    {
-      "name_ja": "カンボジア",
-      "name_en": "Cambodia",
-      "iso2": "KH",
-      "iso3": "KHM",
-      "flag": "🇰🇭",
-      "region": "asia",
-      "block": "block_oceania_a",
-      "aliases": []
-    },
-    {
-      "name_ja": "キルギス",
-      "name_en": "Kyrgyzstan",
-      "iso2": "KG",
-      "iso3": "KGZ",
-      "flag": "🇰🇬",
-      "region": "asia",
-      "block": "block_za_etc",
-      "aliases": [
-        "キルギスタン",
-        "Kyrgyzstan"
-      ]
-    },
-    {
-      "name_ja": "ジョージア",
-      "name_en": "Georgia",
-      "iso2": "GE",
-      "iso3": "GEO",
-      "flag": "🇬🇪",
-      "region": "asia",
-      "block": "block_za_etc",
-      "aliases": [
-        "グルジア",
-        "Georgia"
-      ]
-    },
-    {
-      "name_ja": "スリランカ",
-      "name_en": "Sri Lanka",
-      "iso2": "LK",
-      "iso3": "LKA",
-      "flag": "🇱🇰",
-      "region": "asia",
-      "block": "block_africa_a",
-      "aliases": [
-        "Sri Lanka"
-      ]
-    },
-    {
       "name_ja": "タイ",
       "name_en": "Thailand",
       "iso2": "TH",
@@ -617,40 +114,6 @@
       "aliases": []
     },
     {
-      "name_ja": "ネパール",
-      "name_en": "Nepal",
-      "iso2": "NP",
-      "iso3": "NPL",
-      "flag": "🇳🇵",
-      "region": "asia",
-      "block": "block_africa_a",
-      "aliases": [
-        "Nepal"
-      ]
-    },
-    {
-      "name_ja": "バングラデシュ",
-      "name_en": "Bangladesh",
-      "iso2": "BD",
-      "iso3": "BGD",
-      "flag": "🇧🇩",
-      "region": "asia",
-      "block": "block_bt_bd",
-      "aliases": []
-    },
-    {
-      "name_ja": "パキスタン",
-      "name_en": "Pakistan",
-      "iso2": "PK",
-      "iso3": "PAK",
-      "flag": "🇵🇰",
-      "region": "asia",
-      "block": "block_africa_a",
-      "aliases": [
-        "Pakistan"
-      ]
-    },
-    {
       "name_ja": "フィリピン",
       "name_en": "Philippines",
       "iso2": "PH",
@@ -658,16 +121,6 @@
       "flag": "🇵🇭",
       "region": "asia",
       "block": "block_ph",
-      "aliases": []
-    },
-    {
-      "name_ja": "ブータン",
-      "name_en": "Bhutan",
-      "iso2": "BT",
-      "iso3": "BTN",
-      "flag": "🇧🇹",
-      "region": "asia",
-      "block": "block_bt_bd",
       "aliases": []
     },
     {
@@ -704,18 +157,6 @@
       "aliases": []
     },
     {
-      "name_ja": "モルディブ",
-      "name_en": "Maldives",
-      "iso2": "MV",
-      "iso3": "MDV",
-      "flag": "🇲🇻",
-      "region": "asia",
-      "block": "block_africa_a",
-      "aliases": [
-        "Maldives"
-      ]
-    },
-    {
       "name_ja": "モンゴル",
       "name_en": "Mongolia",
       "iso2": "MN",
@@ -723,16 +164,6 @@
       "flag": "🇲🇳",
       "region": "asia",
       "block": "block_mn",
-      "aliases": []
-    },
-    {
-      "name_ja": "ラオス",
-      "name_en": "Laos",
-      "iso2": "LA",
-      "iso3": "LAO",
-      "flag": "🇱🇦",
-      "region": "asia",
-      "block": "block_oceania_a",
       "aliases": []
     },
     {
@@ -787,16 +218,6 @@
       ]
     },
     {
-      "name_ja": "アイスランド",
-      "name_en": "Iceland",
-      "iso2": "IS",
-      "iso3": "ISL",
-      "flag": "🇮🇸",
-      "region": "europe",
-      "block": "block_caucasus",
-      "aliases": []
-    },
-    {
       "name_ja": "アイルランド",
       "name_en": "Ireland",
       "iso2": "IE",
@@ -804,26 +225,6 @@
       "flag": "🇮🇪",
       "region": "europe",
       "block": "block_eu_a",
-      "aliases": []
-    },
-    {
-      "name_ja": "アルバニア",
-      "name_en": "Albania",
-      "iso2": "AL",
-      "iso3": "ALB",
-      "flag": "🇦🇱",
-      "region": "europe",
-      "block": "block_caucasus",
-      "aliases": []
-    },
-    {
-      "name_ja": "アンドラ",
-      "name_en": "Andorra",
-      "iso2": "AD",
-      "iso3": "AND",
-      "flag": "🇦🇩",
-      "region": "europe",
-      "block": "block_eu_b",
       "aliases": []
     },
     {
@@ -853,16 +254,6 @@
       "aliases": []
     },
     {
-      "name_ja": "エストニア",
-      "name_en": "Estonia",
-      "iso2": "EE",
-      "iso3": "EST",
-      "flag": "🇪🇪",
-      "region": "europe",
-      "block": "block_eu_b",
-      "aliases": []
-    },
-    {
       "name_ja": "オランダ",
       "name_en": "Netherlands",
       "iso2": "NL",
@@ -885,16 +276,6 @@
       "aliases": []
     },
     {
-      "name_ja": "キプロス",
-      "name_en": "Cyprus",
-      "iso2": "CY",
-      "iso3": "CYP",
-      "flag": "🇨🇾",
-      "region": "europe",
-      "block": "block_eu_b",
-      "aliases": []
-    },
-    {
       "name_ja": "ギリシャ",
       "name_en": "Greece",
       "iso2": "GR",
@@ -903,38 +284,6 @@
       "region": "europe",
       "block": "block_eu_a",
       "aliases": []
-    },
-    {
-      "name_ja": "クロアチア",
-      "name_en": "Croatia",
-      "iso2": "HR",
-      "iso3": "HRV",
-      "flag": "🇭🇷",
-      "region": "europe",
-      "block": "block_eu_b",
-      "aliases": []
-    },
-    {
-      "name_ja": "サンマリノ",
-      "name_en": "San Marino",
-      "iso2": "SM",
-      "iso3": "SMR",
-      "flag": "🇸🇲",
-      "region": "europe",
-      "block": "block_eu_a",
-      "aliases": []
-    },
-    {
-      "name_ja": "ジブラルタル",
-      "name_en": "Gibraltar",
-      "iso2": "GI",
-      "iso3": "GIB",
-      "flag": "🇬🇮",
-      "region": "europe",
-      "block": "block_caucasus",
-      "aliases": [
-        "Gibraltar"
-      ]
     },
     {
       "name_ja": "スイス",
@@ -964,36 +313,6 @@
       "flag": "🇪🇸",
       "region": "europe",
       "block": "block_eu_a",
-      "aliases": []
-    },
-    {
-      "name_ja": "スロバキア",
-      "name_en": "Slovakia",
-      "iso2": "SK",
-      "iso3": "SVK",
-      "flag": "🇸🇰",
-      "region": "europe",
-      "block": "block_eu_a",
-      "aliases": []
-    },
-    {
-      "name_ja": "スロベニア",
-      "name_en": "Slovenia",
-      "iso2": "SI",
-      "iso3": "SVN",
-      "flag": "🇸🇮",
-      "region": "europe",
-      "block": "block_eu_b",
-      "aliases": []
-    },
-    {
-      "name_ja": "セルビア",
-      "name_en": "Serbia",
-      "iso2": "RS",
-      "iso3": "SRB",
-      "flag": "🇷🇸",
-      "region": "europe",
-      "block": "block_caucasus",
       "aliases": []
     },
     {
@@ -1071,16 +390,6 @@
       "aliases": []
     },
     {
-      "name_ja": "ブルガリア",
-      "name_en": "Bulgaria",
-      "iso2": "BG",
-      "iso3": "BGR",
-      "flag": "🇧🇬",
-      "region": "europe",
-      "block": "block_eu_b",
-      "aliases": []
-    },
-    {
       "name_ja": "ベルギー",
       "name_en": "Belgium",
       "iso2": "BE",
@@ -1089,18 +398,6 @@
       "region": "europe",
       "block": "block_eu_a",
       "aliases": []
-    },
-    {
-      "name_ja": "ボスニア・ヘルツェゴビナ",
-      "name_en": "Bosnia and Herzegovina",
-      "iso2": "BA",
-      "iso3": "BIH",
-      "flag": "🇧🇦",
-      "region": "europe",
-      "block": "block_caucasus",
-      "aliases": [
-        "Bosnia"
-      ]
     },
     {
       "name_ja": "ポルトガル",
@@ -1120,96 +417,6 @@
       "flag": "🇵🇱",
       "region": "europe",
       "block": "block_eu_a",
-      "aliases": []
-    },
-    {
-      "name_ja": "マケドニア",
-      "name_en": "North Macedonia",
-      "iso2": "MK",
-      "iso3": "MKD",
-      "flag": "🇲🇰",
-      "region": "europe",
-      "block": "block_caucasus",
-      "aliases": []
-    },
-    {
-      "name_ja": "マルタ",
-      "name_en": "Malta",
-      "iso2": "MT",
-      "iso3": "MLT",
-      "flag": "🇲🇹",
-      "region": "europe",
-      "block": "block_eu_b",
-      "aliases": []
-    },
-    {
-      "name_ja": "モナコ",
-      "name_en": "Monaco",
-      "iso2": "MC",
-      "iso3": "MCO",
-      "flag": "🇲🇨",
-      "region": "europe",
-      "block": "block_eu_a",
-      "aliases": []
-    },
-    {
-      "name_ja": "モンテネグロ",
-      "name_en": "Montenegro",
-      "iso2": "ME",
-      "iso3": "MNE",
-      "flag": "🇲🇪",
-      "region": "europe",
-      "block": "block_caucasus",
-      "aliases": []
-    },
-    {
-      "name_ja": "ラトビア",
-      "name_en": "Latvia",
-      "iso2": "LV",
-      "iso3": "LVA",
-      "flag": "🇱🇻",
-      "region": "europe",
-      "block": "block_eu_b",
-      "aliases": []
-    },
-    {
-      "name_ja": "リトアニア",
-      "name_en": "Lithuania",
-      "iso2": "LT",
-      "iso3": "LTU",
-      "flag": "🇱🇹",
-      "region": "europe",
-      "block": "block_eu_b",
-      "aliases": []
-    },
-    {
-      "name_ja": "リヒテンシュタイン",
-      "name_en": "Liechtenstein",
-      "iso2": "LI",
-      "iso3": "LIE",
-      "flag": "🇱🇮",
-      "region": "europe",
-      "block": "block_eu_a",
-      "aliases": []
-    },
-    {
-      "name_ja": "ルクセンブルグ",
-      "name_en": "Luxembourg",
-      "iso2": "LU",
-      "iso3": "LUX",
-      "flag": "🇱🇺",
-      "region": "europe",
-      "block": "block_eu_a",
-      "aliases": []
-    },
-    {
-      "name_ja": "ルーマニア",
-      "name_en": "Romania",
-      "iso2": "RO",
-      "iso3": "ROU",
-      "flag": "🇷🇴",
-      "region": "europe",
-      "block": "block_eu_b",
       "aliases": []
     },
     {
@@ -1236,54 +443,6 @@
       "aliases": []
     },
     {
-      "name_ja": "イラク",
-      "name_en": "Iraq",
-      "iso2": "IQ",
-      "iso3": "IRQ",
-      "flag": "🇮🇶",
-      "region": "middle_east",
-      "block": "block_africa_a",
-      "aliases": [
-        "Iraq"
-      ]
-    },
-    {
-      "name_ja": "オマーン",
-      "name_en": "Oman",
-      "iso2": "OM",
-      "iso3": "OMN",
-      "flag": "🇴🇲",
-      "region": "middle_east",
-      "block": "block_za_etc",
-      "aliases": [
-        "Oman"
-      ]
-    },
-    {
-      "name_ja": "カタール",
-      "name_en": "Qatar",
-      "iso2": "QA",
-      "iso3": "QAT",
-      "flag": "🇶🇦",
-      "region": "middle_east",
-      "block": "block_za_etc",
-      "aliases": [
-        "Qatar"
-      ]
-    },
-    {
-      "name_ja": "クウェート",
-      "name_en": "Kuwait",
-      "iso2": "KW",
-      "iso3": "KWT",
-      "flag": "🇰🇼",
-      "region": "middle_east",
-      "block": "block_za_etc",
-      "aliases": [
-        "Kuwait"
-      ]
-    },
-    {
       "name_ja": "サウジアラビア",
       "name_en": "Saudi Arabia",
       "iso2": "SA",
@@ -1306,42 +465,6 @@
       ]
     },
     {
-      "name_ja": "バーレーン",
-      "name_en": "Bahrain",
-      "iso2": "BH",
-      "iso3": "BHR",
-      "flag": "🇧🇭",
-      "region": "middle_east",
-      "block": "block_za_etc",
-      "aliases": [
-        "Bahrain"
-      ]
-    },
-    {
-      "name_ja": "ヨルダン",
-      "name_en": "Jordan",
-      "iso2": "JO",
-      "iso3": "JOR",
-      "flag": "🇯🇴",
-      "region": "middle_east",
-      "block": "block_africa_a",
-      "aliases": [
-        "Jordan"
-      ]
-    },
-    {
-      "name_ja": "レバノン",
-      "name_en": "Lebanon",
-      "iso2": "LB",
-      "iso3": "LBN",
-      "flag": "🇱🇧",
-      "region": "middle_east",
-      "block": "block_africa_a",
-      "aliases": [
-        "Lebanon"
-      ]
-    },
-    {
       "name_ja": "アメリカ",
       "name_en": "United States",
       "iso2": "US",
@@ -1358,16 +481,6 @@
       ]
     },
     {
-      "name_ja": "バミューダ諸島",
-      "name_en": "Bermuda",
-      "iso2": "BM",
-      "iso3": "BMU",
-      "flag": "🇧🇲",
-      "region": "north_america",
-      "block": "block_cam_carib",
-      "aliases": []
-    },
-    {
       "name_ja": "プエルトリコ",
       "name_en": "Puerto Rico",
       "iso2": "PR",
@@ -1377,16 +490,6 @@
       "excluded": true,
       "reason_ja": "中米のプエルトリコは発送除外",
       "reason_en": "Puerto Rico excluded from shipping",
-      "aliases": []
-    },
-    {
-      "name_ja": "ウォリス・フツナ",
-      "name_en": "Wallis and Futuna",
-      "iso2": "WF",
-      "iso3": "WLF",
-      "flag": "🇼🇫",
-      "region": "oceania",
-      "block": "block_oceania_a",
       "aliases": []
     },
     {
@@ -1402,18 +505,6 @@
       ]
     },
     {
-      "name_ja": "クック諸島",
-      "name_en": "Cook Islands",
-      "iso2": "CK",
-      "iso3": "COK",
-      "flag": "🇨🇰",
-      "region": "oceania",
-      "block": "block_pacific",
-      "aliases": [
-        "Cook Islands"
-      ]
-    },
-    {
       "name_ja": "グアム",
       "name_en": "Guam",
       "iso2": "GU",
@@ -1422,50 +513,6 @@
       "region": "oceania",
       "block": "block_pacific",
       "aliases": []
-    },
-    {
-      "name_ja": "サモア",
-      "name_en": "Samoa",
-      "iso2": "WS",
-      "iso3": "WSM",
-      "flag": "🇼🇸",
-      "region": "oceania",
-      "block": "block_pacific",
-      "aliases": []
-    },
-    {
-      "name_ja": "トンガ",
-      "name_en": "Tonga",
-      "iso2": "TO",
-      "iso3": "TON",
-      "flag": "🇹🇴",
-      "region": "oceania",
-      "block": "block_pacific",
-      "aliases": []
-    },
-    {
-      "name_ja": "ナウル",
-      "name_en": "Nauru",
-      "iso2": "NR",
-      "iso3": "NRU",
-      "flag": "🇳🇷",
-      "region": "oceania",
-      "block": "block_pacific",
-      "aliases": [
-        "Nauru"
-      ]
-    },
-    {
-      "name_ja": "ニューカレドニア",
-      "name_en": "New Caledonia",
-      "iso2": "NC",
-      "iso3": "NCL",
-      "flag": "🇳🇨",
-      "region": "oceania",
-      "block": "block_pacific",
-      "aliases": [
-        "New Caledonia"
-      ]
     },
     {
       "name_ja": "ニュージーランド",
@@ -1480,85 +527,6 @@
       ]
     },
     {
-      "name_ja": "バヌアツ",
-      "name_en": "Vanuatu",
-      "iso2": "VU",
-      "iso3": "VUT",
-      "flag": "🇻🇺",
-      "region": "oceania",
-      "block": "block_pacific",
-      "aliases": []
-    },
-    {
-      "name_ja": "パプアニューギニア",
-      "name_en": "Papua New Guinea",
-      "iso2": "PG",
-      "iso3": "PNG",
-      "flag": "🇵🇬",
-      "region": "oceania",
-      "block": "block_oceania_a",
-      "aliases": [
-        "PNG",
-        "パプアニューギニア独立国"
-      ]
-    },
-    {
-      "name_ja": "パラオ",
-      "name_en": "Palau",
-      "iso2": "PW",
-      "iso3": "PLW",
-      "flag": "🇵🇼",
-      "region": "oceania",
-      "block": "block_pacific",
-      "aliases": []
-    },
-    {
-      "name_ja": "フィジー",
-      "name_en": "Fiji",
-      "iso2": "FJ",
-      "iso3": "FJI",
-      "flag": "🇫🇯",
-      "region": "oceania",
-      "block": "block_oceania_a",
-      "aliases": [
-        "フィジー共和国"
-      ]
-    },
-    {
-      "name_ja": "マーシャル諸島",
-      "name_en": "Marshall Islands",
-      "iso2": "MH",
-      "iso3": "MHL",
-      "flag": "🇲🇭",
-      "region": "oceania",
-      "block": "block_pacific",
-      "aliases": [
-        "Marshall Islands"
-      ]
-    },
-    {
-      "name_ja": "ミクロネシア",
-      "name_en": "Micronesia",
-      "iso2": "FM",
-      "iso3": "FSM",
-      "flag": "🇫🇲",
-      "region": "oceania",
-      "block": "block_oceania_a",
-      "aliases": []
-    },
-    {
-      "name_ja": "米領サモア",
-      "name_en": "American Samoa",
-      "iso2": "AS",
-      "iso3": "ASM",
-      "flag": "🇦🇸",
-      "region": "oceania",
-      "block": "block_pacific",
-      "aliases": [
-        "American Samoa"
-      ]
-    },
-    {
       "name_ja": "アルゼンチン",
       "name_en": "Argentina",
       "iso2": "AR",
@@ -1567,136 +535,6 @@
       "region": "south_america",
       "block": "block_sa",
       "aliases": []
-    },
-    {
-      "name_ja": "アルバ",
-      "name_en": "Aruba",
-      "iso2": "AW",
-      "iso3": "ABW",
-      "flag": "🇦🇼",
-      "region": "south_america",
-      "block": "block_cam_carib",
-      "aliases": [
-        "Aruba"
-      ]
-    },
-    {
-      "name_ja": "アンティグア・バーブーダ",
-      "name_en": "Antigua and Barbuda",
-      "iso2": "AG",
-      "iso3": "ATG",
-      "flag": "🇦🇬",
-      "region": "south_america",
-      "block": "block_cam_carib",
-      "aliases": [
-        "Antigua and Barbuda"
-      ]
-    },
-    {
-      "name_ja": "ウルグアイ",
-      "name_en": "Uruguay",
-      "iso2": "UY",
-      "iso3": "URY",
-      "flag": "🇺🇾",
-      "region": "south_america",
-      "block": "block_sa",
-      "aliases": [
-        "Uruguay"
-      ]
-    },
-    {
-      "name_ja": "エクアドル",
-      "name_en": "Ecuador",
-      "iso2": "EC",
-      "iso3": "ECU",
-      "flag": "🇪🇨",
-      "region": "south_america",
-      "block": "block_sa",
-      "aliases": [
-        "Ecuador"
-      ]
-    },
-    {
-      "name_ja": "エルサルバドル",
-      "name_en": "El Salvador",
-      "iso2": "SV",
-      "iso3": "SLV",
-      "flag": "🇸🇻",
-      "region": "south_america",
-      "block": "block_cam_carib",
-      "aliases": [
-        "El Salvador"
-      ]
-    },
-    {
-      "name_ja": "ガイアナ",
-      "name_en": "Guyana",
-      "iso2": "GY",
-      "iso3": "GUY",
-      "flag": "🇬🇾",
-      "region": "south_america",
-      "block": "block_cam_carib",
-      "aliases": []
-    },
-    {
-      "name_ja": "キュラソー",
-      "name_en": "Curaçao",
-      "iso2": "CW",
-      "iso3": "CUW",
-      "flag": "🇨🇼",
-      "region": "south_america",
-      "block": "block_cam_carib",
-      "aliases": [
-        "Curaçao"
-      ]
-    },
-    {
-      "name_ja": "グアテマラ",
-      "name_en": "Guatemala",
-      "iso2": "GT",
-      "iso3": "GTM",
-      "flag": "🇬🇹",
-      "region": "south_america",
-      "block": "block_cam_carib",
-      "aliases": [
-        "Guatemala"
-      ]
-    },
-    {
-      "name_ja": "グレナダ",
-      "name_en": "Grenada",
-      "iso2": "GD",
-      "iso3": "GRD",
-      "flag": "🇬🇩",
-      "region": "south_america",
-      "block": "block_cam_carib",
-      "aliases": [
-        "Grenada"
-      ]
-    },
-    {
-      "name_ja": "ケイマン諸島",
-      "name_en": "Cayman Islands",
-      "iso2": "KY",
-      "iso3": "CYM",
-      "flag": "🇰🇾",
-      "region": "south_america",
-      "block": "block_cam_carib",
-      "aliases": [
-        "Cayman Islands"
-      ]
-    },
-    {
-      "name_ja": "コスタリカ",
-      "name_en": "Costa Rica",
-      "iso2": "CR",
-      "iso3": "CRI",
-      "flag": "🇨🇷",
-      "region": "south_america",
-      "block": "block_cam_carib",
-      "aliases": [
-        "Costa Rica"
-      ]
     },
     {
       "name_ja": "コロンビア",
@@ -1709,52 +547,6 @@
       "aliases": []
     },
     {
-      "name_ja": "ジャマイカ",
-      "name_en": "Jamaica",
-      "iso2": "JM",
-      "iso3": "JAM",
-      "flag": "🇯🇲",
-      "region": "south_america",
-      "block": "block_cam_carib",
-      "aliases": [
-        "Jamaica"
-      ]
-    },
-    {
-      "name_ja": "スリナム",
-      "name_en": "Suriname",
-      "iso2": "SR",
-      "iso3": "SUR",
-      "flag": "🇸🇷",
-      "region": "south_america",
-      "block": "block_cam_carib",
-      "aliases": []
-    },
-    {
-      "name_ja": "セントルシア",
-      "name_en": "Saint Lucia",
-      "iso2": "LC",
-      "iso3": "LCA",
-      "flag": "🇱🇨",
-      "region": "south_america",
-      "block": "block_cam_carib",
-      "aliases": [
-        "Saint Lucia"
-      ]
-    },
-    {
-      "name_ja": "タークス・カイコス諸島",
-      "name_en": "Turks and Caicos Islands",
-      "iso2": "TC",
-      "iso3": "TCA",
-      "flag": "🇹🇨",
-      "region": "south_america",
-      "block": "block_cam_carib",
-      "aliases": [
-        "Turks and Caicos Islands"
-      ]
-    },
-    {
       "name_ja": "チリ",
       "name_en": "Chile",
       "iso2": "CL",
@@ -1763,90 +555,6 @@
       "region": "south_america",
       "block": "block_sa",
       "aliases": []
-    },
-    {
-      "name_ja": "トリニダード・トバゴ",
-      "name_en": "Trinidad and Tobago",
-      "iso2": "TT",
-      "iso3": "TTO",
-      "flag": "🇹🇹",
-      "region": "south_america",
-      "block": "block_cam_carib",
-      "aliases": [
-        "Trinidad and Tobago"
-      ]
-    },
-    {
-      "name_ja": "ドミニカ共和国",
-      "name_en": "Dominican Republic",
-      "iso2": "DO",
-      "iso3": "DOM",
-      "flag": "🇩🇴",
-      "region": "south_america",
-      "block": "block_cam_carib",
-      "aliases": [
-        "Dominican Republic"
-      ]
-    },
-    {
-      "name_ja": "ニカラグア",
-      "name_en": "Nicaragua",
-      "iso2": "NI",
-      "iso3": "NIC",
-      "flag": "🇳🇮",
-      "region": "south_america",
-      "block": "block_cam_carib",
-      "aliases": [
-        "Nicaragua"
-      ]
-    },
-    {
-      "name_ja": "バハマ",
-      "name_en": "Bahamas",
-      "iso2": "BS",
-      "iso3": "BHS",
-      "flag": "🇧🇸",
-      "region": "south_america",
-      "block": "block_cam_carib",
-      "aliases": [
-        "Bahamas"
-      ]
-    },
-    {
-      "name_ja": "バルバドス",
-      "name_en": "Barbados",
-      "iso2": "BB",
-      "iso3": "BRB",
-      "flag": "🇧🇧",
-      "region": "south_america",
-      "block": "block_cam_carib",
-      "aliases": [
-        "Barbados"
-      ]
-    },
-    {
-      "name_ja": "パナマ",
-      "name_en": "Panama",
-      "iso2": "PA",
-      "iso3": "PAN",
-      "flag": "🇵🇦",
-      "region": "south_america",
-      "block": "block_cam_carib",
-      "aliases": [
-        "Panama"
-      ]
-    },
-    {
-      "name_ja": "パラグアイ",
-      "name_en": "Paraguay",
-      "iso2": "PY",
-      "iso3": "PRY",
-      "flag": "🇵🇾",
-      "region": "south_america",
-      "block": "block_sa",
-      "aliases": [
-        "Paraguay"
-      ]
     },
     {
       "name_ja": "フォークランド諸島",
@@ -1871,30 +579,6 @@
       "aliases": []
     },
     {
-      "name_ja": "ベネズエラ",
-      "name_en": "Venezuela",
-      "iso2": "VE",
-      "iso3": "VEN",
-      "flag": "🇻🇪",
-      "region": "south_america",
-      "block": "block_sa",
-      "aliases": [
-        "Venezuela"
-      ]
-    },
-    {
-      "name_ja": "ベリーズ",
-      "name_en": "Belize",
-      "iso2": "BZ",
-      "iso3": "BLZ",
-      "flag": "🇧🇿",
-      "region": "south_america",
-      "block": "block_cam_carib",
-      "aliases": [
-        "Belize"
-      ]
-    },
-    {
       "name_ja": "ペルー",
       "name_en": "Peru",
       "iso2": "PE",
@@ -1903,30 +587,6 @@
       "region": "south_america",
       "block": "block_sa",
       "aliases": []
-    },
-    {
-      "name_ja": "ホンジュラス",
-      "name_en": "Honduras",
-      "iso2": "HN",
-      "iso3": "HND",
-      "flag": "🇭🇳",
-      "region": "south_america",
-      "block": "block_cam_carib",
-      "aliases": [
-        "Honduras"
-      ]
-    },
-    {
-      "name_ja": "ボリビア",
-      "name_en": "Bolivia",
-      "iso2": "BO",
-      "iso3": "BOL",
-      "flag": "🇧🇴",
-      "region": "south_america",
-      "block": "block_sa",
-      "aliases": [
-        "Bolivia"
-      ]
     },
     {
       "name_ja": "メキシコ",
@@ -1938,18 +598,6 @@
       "block": "block_cam_carib",
       "aliases": [
         "Mexico"
-      ]
-    },
-    {
-      "name_ja": "英領バージン諸島",
-      "name_en": "British Virgin Islands",
-      "iso2": "VG",
-      "iso3": "VGB",
-      "flag": "🇻🇬",
-      "region": "south_america",
-      "block": "block_cam_carib",
-      "aliases": [
-        "British Virgin Islands"
       ]
     }
   ]
