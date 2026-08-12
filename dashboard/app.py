@@ -46,6 +46,7 @@ from . import (
     bot_manager,
     config_store,
     forward_store,
+    legal,
     giveaway_helpers as gh,
     auction_helpers as ah,
     users as user_store,
@@ -69,6 +70,25 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 log = logging.getLogger("dashboard")
 
 app = FastAPI(title="Musubot Dashboard")
+
+
+@app.on_event("startup")
+async def bootstrap_tenants() -> None:
+    """起動時にテナント台帳を用意し、旧ユーザーの担当サーバーを確定させる。
+
+    担当が未設定のユーザーは「全サーバーが見える」フォールバックで動く。
+    1社運用のうちは正しかったが、他社を迎えたあとは新しい会社のサーバーまで
+    見えてしまう。起動のたびに、取りこぼしたユーザーへ現時点の担当を付与する。
+    """
+    try:
+        tenants.ensure_bootstrap()
+        n = user_store.migrate_existing_users(
+            tenants.guilds_for_tenant(tenants.DEFAULT_SLUG)
+        )
+        if n:
+            log.info("担当サーバーが未設定だった %d 人に、既定会社の担当を付与しました", n)
+    except Exception:  # noqa: BLE001 — 起動そのものは止めない
+        log.exception("テナント台帳の初期化に失敗しました")
 
 
 @app.on_event("startup")
@@ -128,7 +148,8 @@ templates.env.globals["asset_v"] = _asset_version()
 # 初期パスワードのまま他のページを触らせない。発行された文字列は管理者も
 # 知っているので、本人が変えるまでは操作をさせない。
 _PW_EXEMPT = ("/account/password", "/logout", "/login", "/static", "/healthz",
-              "/oauth", "/register", "/signup", "/forgot", "/line/webhook")
+              "/oauth", "/register", "/signup", "/forgot", "/line/webhook",
+              "/terms", "/privacy")
 
 
 @app.middleware("http")
@@ -208,6 +229,36 @@ def require_admin_for_guild(sess: dict, guild_id: str) -> dict:
         if str(g["id"]) == str(guild_id):
             return g
     raise HTTPException(status_code=403, detail="not an admin of that guild")
+
+
+def _discord_user_id(sess: dict) -> int:
+    """Discord のユーザーID。メール認証には無いので 0 を返す。
+
+    以前は int(sess["user_id"]) としており、メール認証だと user_id が
+    メールアドレスなので ValueError で 500 になっていた。抽選と競りの
+    作成が、マルチテナントの主対象であるメールユーザーで使えなかった。
+    """
+    uid = str(sess.get("user_id") or "")
+    return int(uid) if uid.isdigit() else 0
+
+
+def require_guild_admin(sess: dict, guild_id: str) -> dict:
+    """APIキーやBOTの起動停止など、会社の管理者だけに許す操作のガード。
+
+    招待画面で「スタッフ（日々の運用のみ）」と説明している以上、スタッフが
+    APIキーを読める状態にしてはいけない。role を実際に照合する。
+    """
+    g = require_admin_for_guild(sess, guild_id)
+    if sess.get("is_root") or sess.get("auth_method") != "email":
+        return g
+    email = sess.get("user_id") or ""
+    if user_store.role_of(email) != "tenant_admin":
+        log.warning("スタッフ権限で管理者専用の操作を試みました（%s → %s）", email, guild_id)
+        raise HTTPException(
+            status_code=403,
+            detail="この操作は会社の管理者のみが行えます。管理者にご依頼ください。",
+        )
+    return g
 
 
 def require_root(sess: dict) -> None:
@@ -290,6 +341,20 @@ async def oauth_callback(
     set_session(resp, sess)
     resp.delete_cookie("oauth_state")
     return resp
+
+
+@app.get("/terms", response_class=HTMLResponse)
+async def terms_page(request: Request):
+    return templates.TemplateResponse(
+        "terms.html", {"request": request, "legal": legal.info()}
+    )
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_page(request: Request):
+    return templates.TemplateResponse(
+        "privacy.html", {"request": request, "legal": legal.info()}
+    )
 
 
 @app.get("/signup", response_class=HTMLResponse)
@@ -1380,7 +1445,7 @@ async def guild_settings(
 ):
     """APIキー・BOTの見た目・サーバー構成テンプレート。ロボット共通の土台。"""
     sess = require_session(session)
-    require_admin_for_guild(sess, guild_id)
+    require_guild_admin(sess, guild_id)
 
     ctx = await _guild_page_ctx(request, sess, guild_id)
     token = _bot_token_for(guild_id)
@@ -1697,6 +1762,44 @@ async def guild_setup(
     )
 
 
+async def _assert_channels_in_scope(sess: dict, guild_id: str, *channel_ids: int) -> None:
+    """転送ルールの送信元・転送先が、その会社の担当サーバーのものか確かめる。
+
+    転送Botは全社共通で、参加している全サーバーのチャンネルを列挙できる。
+    チャンネルIDを検証しないと、他社サーバーの非公開チャンネルを送信元に
+    指定して会話や画像を自社へ吸い出せてしまう。ここが最後の砦になる。
+    """
+    if sess.get("is_root"):
+        return
+
+    # このセッションが触れるサーバーの集合
+    if sess.get("auth_method") == "email":
+        slug = user_store.tenant_of(sess.get("user_id") or "")
+        allowed_guilds = set(tenants.guilds_for_tenant(slug)) if slug else {str(guild_id)}
+    else:
+        allowed_guilds = {str(g["id"]) for g in sess.get("guilds", [])}
+
+    token = forward_store.forward_bot_token()
+    if not token:
+        raise HTTPException(status_code=400, detail="転送Botのトークンが未設定です")
+    servers = await forward_store.list_servers_with_channels(token)
+    ok: set[str] = set()
+    for s in servers:
+        if str(s.get("id")) in allowed_guilds:
+            ok.update(str(c["id"]) for c in s.get("channels", []))
+
+    for cid in channel_ids:
+        if str(cid) not in ok:
+            log.warning(
+                "担当外のチャンネルを転送に指定しました（%s → ch=%s）",
+                sess.get("user_id"), cid,
+            )
+            raise HTTPException(
+                status_code=403,
+                detail="担当していないサーバーのチャンネルは指定できません",
+            )
+
+
 @app.post("/guild/{guild_id}/forwarding/add")
 async def guild_forwarding_add(
     guild_id: str,
@@ -1713,6 +1816,7 @@ async def guild_forwarding_add(
         return JSONResponse({"ok": False, "error": "チャンネルIDが不正です"}, status_code=400)
     if source == dest:
         return JSONResponse({"ok": False, "error": "送信元と転送先が同じです"}, status_code=400)
+    await _assert_channels_in_scope(sess, guild_id, source, dest)
     mode = (form.get("mode") or "original").strip()
     role_ids = [s.strip() for s in (form.get("role_ids") or "").split(",") if s.strip()]
     template = (form.get("template") or "").strip()
@@ -1734,6 +1838,7 @@ async def guild_forwarding_update(
         dest = int((form.get("dest") or "").strip())
     except ValueError:
         return JSONResponse({"ok": False, "error": "チャンネルIDが不正です"}, status_code=400)
+    await _assert_channels_in_scope(sess, guild_id, source, dest)
     mode = (form.get("mode") or "original").strip()
     role_ids = [s.strip() for s in (form.get("role_ids") or "").split(",") if s.strip()]
     template = (form.get("template") or "").strip()
@@ -1755,6 +1860,7 @@ async def guild_forwarding_remove(
         dest = int((form.get("dest") or "").strip())
     except ValueError:
         return JSONResponse({"ok": False, "error": "チャンネルIDが不正です"}, status_code=400)
+    await _assert_channels_in_scope(sess, guild_id, source, dest)
     forward_store.remove_rule(source, dest)
     return JSONResponse({"ok": True})
 
@@ -1858,7 +1964,7 @@ async def upload_credential(
     service_account: UploadFile = File(...),
 ):
     sess = require_session(session)
-    require_admin_for_guild(sess, guild_id)
+    require_guild_admin(sess, guild_id)
     contents = await service_account.read()
     if not contents:
         raise HTTPException(status_code=400, detail="empty file")
@@ -1876,7 +1982,7 @@ async def upload_credential(
 @app.post("/guild/{guild_id}/start")
 async def guild_start(guild_id: str, session: Optional[str] = Cookie(None)):
     sess = require_session(session)
-    require_admin_for_guild(sess, guild_id)
+    require_guild_admin(sess, guild_id)
     try:
         st = bot_manager.start(guild_id)
     except FileNotFoundError as e:
@@ -1887,14 +1993,14 @@ async def guild_start(guild_id: str, session: Optional[str] = Cookie(None)):
 @app.post("/guild/{guild_id}/stop")
 async def guild_stop(guild_id: str, session: Optional[str] = Cookie(None)):
     sess = require_session(session)
-    require_admin_for_guild(sess, guild_id)
+    require_guild_admin(sess, guild_id)
     return JSONResponse(bot_manager.stop(guild_id))
 
 
 @app.post("/guild/{guild_id}/restart")
 async def guild_restart(guild_id: str, session: Optional[str] = Cookie(None)):
     sess = require_session(session)
-    require_admin_for_guild(sess, guild_id)
+    require_guild_admin(sess, guild_id)
     return JSONResponse(bot_manager.restart(guild_id))
 
 
@@ -1951,7 +2057,7 @@ async def guild_log(
     session: Optional[str] = Cookie(None),
 ):
     sess = require_session(session)
-    require_admin_for_guild(sess, guild_id)
+    require_guild_admin(sess, guild_id)
     return Response(bot_manager.tail_log(guild_id, lines=lines), media_type="text/plain")
 
 
@@ -2162,7 +2268,7 @@ async def giveaway_create(
         "prize": prize,
         "winner_count": winners,
         "ends_at": gh.future_iso(secs),
-        "host_id": int(sess["user_id"]),
+        "host_id": _discord_user_id(sess),
         "required_role_id": int(required_role_id) if required_role_id and required_role_id.isdigit() else None,
         "image_url": resolved_image_url,
         "note": (note or "").strip() or None,
@@ -2246,7 +2352,7 @@ async def auction_create(
         "description": (description or "").strip(),
         "image_url": resolved_image_url,
         "image_filename": image_filename,
-        "host_id": int(sess["user_id"]),
+        "host_id": _discord_user_id(sess),
         "starting_bid": int(starting_bid),
         "min_increment": int(min_increment),
         "reserve_price": int(reserve_price),
@@ -2457,7 +2563,7 @@ async def update_bot_appearance(
 ):
     """BOT のアイコンと表示名を Discord に反映する。"""
     sess = require_session(session)
-    require_admin_for_guild(sess, guild_id)
+    require_guild_admin(sess, guild_id)
     token = _bot_token_for(guild_id)
     if not token:
         return RedirectResponse(

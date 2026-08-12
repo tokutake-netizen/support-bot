@@ -60,6 +60,38 @@
     </a>
     {% endfor %}
   </div>
+
+  <h2>{{ icon.book(17) }} ガイド</h2>
+  <div class="mini-grid">
+    <a class="mini-card" href="/guide">
+      <span class="mini-icon">{{ icon.book(19) }}</span>
+      <span>
+        <span class="t">利用マニュアル</span>
+        <span class="d">機能の使い方と設定手順</span>
+      </span>
+    </a>
+    <a class="mini-card" href="/guide#g-start">
+      <span class="mini-icon">{{ icon.rocket(19) }}</span>
+      <span>
+        <span class="t">はじめに（導入の流れ）</span>
+        <span class="d">初回セットアップを6ステップで</span>
+      </span>
+    </a>
+    <div class="mini-card disabled">
+      <span class="mini-icon">{{ icon.play(19) }}</span>
+      <span>
+        <span class="t">マニュアル動画</span>
+        <span class="d">準備中</span>
+      </span>
+    </div>
+    <div class="mini-card disabled">
+      <span class="mini-icon">{{ icon.question(19) }}</span>
+      <span>
+        <span class="t">よくある質問</span>
+        <span class="d">準備中</span>
+      </span>
+    </div>
+  </div>
 </div>
 {% include "_assistant.html" %}
 <script>

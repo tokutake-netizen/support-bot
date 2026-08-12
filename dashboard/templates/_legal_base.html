@@ -1,0 +1,60 @@
+{#
+  規約ページ共通の枠。ログイン前でも読めるので、ナビは出さずに
+  ロゴと戻り導線だけにしてある。
+#}
+{% extends "base.html" %}
+{% import "_icons.html" as icon %}
+{% block head %}
+<style>
+  .legal{max-width:820px;margin:0 auto;padding:48px 24px 80px}
+  .legal-head{display:flex;align-items:center;gap:10px;margin-bottom:34px}
+  .legal-head .mark{width:34px;height:34px;border-radius:9px;background:var(--tile);color:#fff;
+                    display:flex;align-items:center;justify-content:center}
+  .legal-head .name{font-weight:700;color:var(--heading);font-size:16px}
+  .legal-head .sp{flex:1}
+  .legal h1{display:block;border:none;padding:0;font-size:26px;margin:0 0 6px}
+  .legal .meta{color:var(--muted);font-size:13px;margin:0 0 32px}
+  .legal h2{font-size:16px;margin:34px 0 10px;padding-bottom:8px;border-bottom:1px solid var(--line);display:block}
+  .legal h3{font-size:14px;color:var(--heading);margin:20px 0 6px;text-transform:none;letter-spacing:0}
+  .legal p, .legal li{font-size:14px;line-height:1.95;color:var(--fg)}
+  .legal ol, .legal ul{padding-left:22px;margin:8px 0}
+  .legal ol li{margin-bottom:6px}
+  .legal table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px}
+  .legal th, .legal td{border:1px solid var(--line);padding:10px 12px;text-align:left;vertical-align:top}
+  .legal th{background:var(--bg3);width:34%;font-weight:600;color:var(--heading)}
+  .legal .draft{background:var(--yellow-bg);border-left:3px solid var(--yellow);
+                border-radius:8px;padding:14px 16px;margin-bottom:28px;font-size:13px;line-height:1.8}
+  .legal footer{margin-top:48px;padding-top:20px;border-top:1px solid var(--line);
+                color:var(--muted);font-size:13px}
+</style>
+{% endblock %}
+{% block body %}
+<div class="legal">
+  <div class="legal-head">
+    <a class="brand" href="/login" style="color:var(--heading)">
+      <span class="mark">{{ icon.knot(19) }}</span>
+      <span class="name">Musubot</span>
+    </a>
+    <span class="sp"></span>
+    <button type="button" class="icon-btn" id="theme-toggle" title="カラーモードを切り替え"
+            style="color:var(--muted)">
+      <span class="icon-moon">{{ icon.moon(18) }}</span>
+      <span class="icon-sun">{{ icon.sun(18) }}</span>
+    </button>
+  </div>
+
+  {% if legal.incomplete %}
+  <div class="draft">
+    <b>公開前の確認事項</b><br>
+    運営者情報が未設定です（{{ legal.incomplete | join("、") }}）。Railway の Variables に設定してください。<br>
+    また、この文面は雛形です。<b>公開前に弁護士など専門家の確認を受けてください。</b>
+  </div>
+  {% endif %}
+
+  {% block legal_body %}{% endblock %}
+
+  <footer>
+    <a href="/terms">利用規約</a> ・ <a href="/privacy">プライバシーポリシー</a> ・ <a href="/login">ログイン</a> ・ <a href="/signup">導入のお申し込み</a>
+  </footer>
+</div>
+{% endblock %}

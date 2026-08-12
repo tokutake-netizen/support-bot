@@ -27,3 +27,10 @@ deployments/*/*.log
 .DS_Store
 .idea/
 .vscode/
+
+# --- 認証情報・テナント台帳（本番は永続ボリューム上にある） ---
+dashboard_users.json
+dashboard_discord_roots.json
+tenants.json
+signups.json
+member_stats.json
