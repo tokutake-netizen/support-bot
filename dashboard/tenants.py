@@ -80,13 +80,21 @@ def ensure_bootstrap() -> dict:
     return data
 
 
-def slugify(name: str) -> str:
-    """会社名から識別子を作る。日本語しか無ければ連番で代替する。"""
+def slugify(name: str, existing: Optional[dict] = None) -> str:
+    """会社名から識別子を作る。
+
+    日本語だけの社名からは英数字が取れないので、その場合は company-1、
+    company-2 … と連番にする。時刻由来の数字にすると意味が読めないため。
+    """
     s = unicodedata.normalize("NFKC", (name or "").strip().lower())
     s = re.sub(r"[^a-z0-9]+", "-", s).strip("-")
-    if not s:
-        s = f"tenant-{int(time.time()) % 100000}"
-    return s[:40]
+    if s:
+        return s[:40]
+    data = existing if existing is not None else _load()
+    n = 1
+    while f"company-{n}" in data:
+        n += 1
+    return f"company-{n}"
 
 
 def list_tenants() -> list[dict]:
@@ -114,7 +122,7 @@ def get(slug: str) -> Optional[dict]:
 
 def add(name: str, note: str = "") -> dict:
     data = ensure_bootstrap()
-    slug = slugify(name)
+    slug = slugify(name, data)
     base, i = slug, 2
     while slug in data:
         slug = f"{base}-{i}"

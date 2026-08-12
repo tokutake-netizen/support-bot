@@ -55,6 +55,7 @@ from . import (
     schedule_store,
     server_template,
     shipping_master,
+    signups,
     tenants,
 )
 from .discord_api import DiscordREST, assignable_roles, channels_grouped
@@ -127,7 +128,7 @@ templates.env.globals["asset_v"] = _asset_version()
 # 初期パスワードのまま他のページを触らせない。発行された文字列は管理者も
 # 知っているので、本人が変えるまでは操作をさせない。
 _PW_EXEMPT = ("/account/password", "/logout", "/login", "/static", "/healthz",
-              "/oauth", "/register", "/forgot", "/line/webhook")
+              "/oauth", "/register", "/signup", "/forgot", "/line/webhook")
 
 
 @app.middleware("http")
@@ -289,6 +290,75 @@ async def oauth_callback(
     set_session(resp, sess)
     resp.delete_cookie("oauth_state")
     return resp
+
+
+@app.get("/signup", response_class=HTMLResponse)
+async def signup_form(request: Request):
+    """導入の申し込みフォーム。ログイン不要で誰でも書ける。"""
+    return templates.TemplateResponse("signup.html", {"request": request})
+
+
+@app.post("/signup")
+async def signup_submit(request: Request):
+    form = await request.form()
+    try:
+        signups.submit(
+            company=str(form.get("company") or ""),
+            contact=str(form.get("contact") or ""),
+            email=str(form.get("email") or ""),
+            phone=str(form.get("phone") or ""),
+            guild_id=str(form.get("guild_id") or ""),
+            note=str(form.get("note") or ""),
+        )
+    except ValueError as e:
+        return RedirectResponse(f"/signup?err={urllib.parse.quote(str(e))}", status_code=303)
+    return RedirectResponse("/signup?ok=1", status_code=303)
+
+
+# -------------------------- 申し込みの承認（スーパー管理者） --------------------------
+
+
+@app.post("/admin/signups/{sid}/approve")
+async def signup_approve(
+    request: Request, sid: str, session: Optional[str] = Cookie(None)
+):
+    """申し込みを承認し、会社と担当者アカウントを同時に作る。"""
+    sess = require_session(session)
+    require_root(sess)
+
+    app_rec = signups.get(sid)
+    if not app_rec or app_rec.get("status") != "pending":
+        return RedirectResponse("/admin?err=対象の申し込みが見つかりません", status_code=303)
+
+    tn = tenants.add(app_rec["company"], note=app_rec.get("note", "")[:120])
+    if app_rec.get("guild_id"):
+        tenants.set_guilds(tn["slug"], [app_rec["guild_id"]])
+
+    try:
+        _, password = user_store.invite(
+            app_rec["email"], tn["slug"], role="tenant_admin",
+            added_by=sess.get("username", ""),
+        )
+    except ValueError as e:
+        return RedirectResponse(f"/admin?err={urllib.parse.quote(str(e))}", status_code=303)
+
+    signups.mark(sid, "approved", by=sess.get("username", ""))
+    sent = _mail_password(app_rec["email"], password)
+    q = urllib.parse.urlencode({
+        "ok": f"{app_rec['company']} を開設しました" + ("（初期パスワードをメール送信済み）" if sent else ""),
+        "pw": "" if sent else _stash_secret(password),
+    })
+    return RedirectResponse(f"/admin/tenants/{tn['slug']}?{q}", status_code=303)
+
+
+@app.post("/admin/signups/{sid}/reject")
+async def signup_reject(
+    request: Request, sid: str, session: Optional[str] = Cookie(None)
+):
+    sess = require_session(session)
+    require_root(sess)
+    signups.mark(sid, "rejected", by=sess.get("username", ""))
+    return RedirectResponse("/admin?ok=申し込みを却下しました", status_code=303)
 
 
 @app.get("/register", response_class=HTMLResponse)
@@ -536,7 +606,11 @@ async def admin_home(request: Request, session: Optional[str] = Cookie(None)):
     return templates.TemplateResponse(
         "admin_tenants.html",
         {"request": request, "session": sess, "tenants": rows,
-         "unassigned": tenants.unassigned_guilds(), "page": "admin"},
+         "unassigned": tenants.unassigned_guilds(),
+         "signups": signups.list_all("pending"),
+         "handled": signups.list_all()[:0] if False else
+                    [s for s in signups.list_all() if s["status"] != "pending"][:10],
+         "page": "admin"},
     )
 
 

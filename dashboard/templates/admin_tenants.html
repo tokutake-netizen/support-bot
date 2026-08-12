@@ -25,6 +25,39 @@
   {% if request.query_params.get("ok") %}<div class="flash ok">{{ request.query_params.get("ok") }}</div>{% endif %}
   {% if request.query_params.get("err") %}<div class="flash warn">{{ request.query_params.get("err") }}</div>{% endif %}
 
+
+  {% if signups %}
+  <h2>{{ icon.mail(17) }} 新規のお申し込み <span class="help">{{ signups | length }} 件</span></h2>
+  <div class="card">
+    {% for s in signups %}
+    <div class="feature" style="align-items:flex-start">
+      <div style="flex:1;min-width:0">
+        <div class="name">{{ s.company }} <span class="badge unconfigured">承認待ち</span></div>
+        <div class="desc" style="line-height:1.9">
+          ご担当者: {{ s.contact }}<br>
+          メール: <code>{{ s.email }}</code>{% if s.phone %} ・ 電話: {{ s.phone }}{% endif %}<br>
+          {% if s.guild_id %}Discordサーバー: <code>{{ s.guild_id }}</code><br>{% endif %}
+          {% if s.note %}<span style="color:var(--fg)">{{ s.note }}</span>{% endif %}
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <form method="post" action="/admin/signups/{{ s.id }}/approve"
+              onsubmit="return confirm('{{ s.company }} を開設し、{{ s.email }} に管理者アカウントを発行します。よろしいですか？')">
+          <button class="btn btn-sm">承認して開設</button>
+        </form>
+        <form method="post" action="/admin/signups/{{ s.id }}/reject"
+              onsubmit="return confirm('この申し込みを却下します。よろしいですか？')">
+          <button class="btn outline btn-sm">却下</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+    <div class="hint" style="margin-top:12px">
+      承認すると、会社の開設・Discordサーバーの割当・管理者アカウントの発行・初期パスワードの発行が一度に行われます。
+    </div>
+  </div>
+  {% endif %}
+
   <h2>{{ icon.users(17) }} 登録されている会社 <span class="help">{{ tenants | length }} 社</span></h2>
   <div class="t-grid">
     {% for t in tenants %}
@@ -69,6 +102,23 @@
     </p>
     {% for g in unassigned %}
       <span class="chip">{{ g }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if handled %}
+  <h2>{{ icon.list(17) }} 処理済みの申し込み <span class="help">直近{{ handled | length }}件</span></h2>
+  <div class="card">
+    {% for s in handled %}
+    <div class="feature">
+      <div>
+        <div class="name">{{ s.company }}
+          {% if s.status == 'approved' %}<span class="badge running">開設済み</span>
+          {% else %}<span class="badge stopped">却下</span>{% endif %}
+        </div>
+        <div class="desc">{{ s.contact }} ・ <code>{{ s.email }}</code>{% if s.handled_by %} ・ 対応: {{ s.handled_by }}{% endif %}</div>
+      </div>
+    </div>
     {% endfor %}
   </div>
   {% endif %}

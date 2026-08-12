@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% import "_icons.html" as icon %}
+{% block title %}導入のお申し込み — Musubot{% endblock %}
+{% block head %}
+<style>
+  .signup{max-width:640px}
+  .signup .login-card{max-width:640px}
+  .done{background:#fff;border-radius:16px;padding:36px;text-align:center;max-width:520px;
+        box-shadow:0 10px 15px -3px rgba(0,0,0,.1);color:#334155}
+  .done h1{font-size:21px;border:none;padding:0;margin:0 0 12px;display:block;color:#091E41}
+  .done .mark{width:52px;height:52px;border-radius:50%;background:#E8F0FE;color:#2457C9;
+              display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+  .feat{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 20px;padding:0;list-style:none}
+  .feat li{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.16);
+           border-radius:8px;padding:8px 12px;color:#fff;font-size:12.5px}
+  @media (max-width:640px){ .feat{grid-template-columns:1fr} }
+</style>
+{% endblock %}
+{% block body %}
+<div class="login signup">
+  <div class="login-brand">
+    <span class="mark">{{ icon.knot(24) }}</span>
+    <span class="name">Musubot</span>
+    <span class="tagline">Discord運営を、ひとつの画面で。</span>
+  </div>
+
+  {% if request.query_params.get("ok") %}
+    <div class="done">
+      <div class="mark">{{ icon.check(26) }}</div>
+      <h1>お申し込みを受け付けました</h1>
+      <p style="color:#64748B;font-size:14px;line-height:1.8;margin:0 0 20px">
+        担当者が内容を確認し、<b>3営業日以内</b>にご登録のメールアドレスへご連絡します。<br>
+        ご利用開始のご案内と、初回ログイン用のパスワードをお送りします。
+      </p>
+      <a href="/login" class="btn outline">ログイン画面へ</a>
+    </div>
+  {% else %}
+
+    <ul class="feat">
+      <li>英語と日本語を自動で通訳</li>
+      <li>お客様専用の問い合わせ窓口</li>
+      <li>宛先と重さから送料を自動計算</li>
+      <li>抽選・オークションの自動進行</li>
+    </ul>
+
+    <div class="login-card">
+      <h1>導入のお申し込み</h1>
+      <p style="color:#64748B;font-size:13px;margin:-8px 0 18px">
+        ご記入いただいた内容を確認のうえ、担当者からご連絡します。<span style="color:#DC2626">*</span> は必須です。
+      </p>
+
+      {% if request.query_params.get("err") %}
+        <div class="flash warn">{{ request.query_params.get("err") }}</div>
+      {% endif %}
+
+      <form method="post" action="/signup">
+        <div class="field">
+          <label>会社名<span class="req">*</span></label>
+          <input type="text" name="company" required maxlength="80" placeholder="株式会社サンプル">
+        </div>
+        <div class="field">
+          <label>ご担当者名<span class="req">*</span></label>
+          <input type="text" name="contact" required maxlength="40" placeholder="山田 太郎">
+        </div>
+        <div class="field">
+          <label>メールアドレス<span class="req">*</span></label>
+          <input type="email" name="email" required placeholder="yamada@example.co.jp">
+          <div class="hint">このアドレスにご案内とログイン情報をお送りします。</div>
+        </div>
+        <div class="field">
+          <label>お電話番号</label>
+          <input type="text" name="phone" maxlength="30" placeholder="03-0000-0000">
+        </div>
+        <div class="field">
+          <label>Discord サーバーID</label>
+          <input type="text" name="guild_id" pattern="\d{17,20}" maxlength="20"
+                 placeholder="123456789012345678">
+          <div class="hint">
+            お分かりになる場合のみで結構です。Discord の設定 → 詳細設定 → 開発者モードをオンにし、
+            サーバー名を右クリック →「サーバーIDをコピー」で確認できます。
+          </div>
+        </div>
+        <div class="field">
+          <label>ご利用の目的・ご要望</label>
+          <textarea name="note" rows="4" maxlength="400"
+                    placeholder="例: 海外のお客様向けにカードを販売しています。翻訳と問い合わせ対応、送料計算を自動化したいです。"></textarea>
+        </div>
+        <button type="submit" class="btn" style="width:100%">この内容で申し込む</button>
+      </form>
+
+      <p class="links">
+        すでにアカウントをお持ちの方は <a href="/login">ログイン</a>
+      </p>
+    </div>
+
+    <p class="login-note">
+      ご記入いただいた情報は、ご連絡とご利用開始の手続きにのみ使用します。
+    </p>
+  {% endif %}
+</div>
+{% endblock %}
