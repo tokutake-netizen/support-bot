@@ -109,7 +109,67 @@ def authenticate(email: str, password: str) -> Optional[dict]:
         "allowed": True,
         "added_by": record.get("added_by"),
         "created_at": record.get("created_at"),
+        "guilds": allowed_guilds(email),
     }
+
+
+# ---------- 担当サーバー（テナント越境を防ぐ要） ----------
+#
+# メール認証のユーザーは、以前は「全サーバーに素通し」だった。他社に
+# アカウントを配ると、URL のサーバーIDを差し替えるだけで他社の APIキーが
+# 見えてしまうため、ユーザーごとに触れるサーバーを持たせる。
+#
+# 既存ユーザーには guilds が無い。移行の取りこぼしで既存運用を止めたくない
+# ので、その場合は「全サーバー」として扱う（＝従来どおり）。他社を迎える前に
+# migrate_existing_users() で明示的に付与すること。
+
+def allowed_guilds(email: str) -> Optional[list[str]]:
+    """このユーザーが触れるサーバーID。None は「全部」の意味。"""
+    rec = _load().get((email or "").strip().lower())
+    if not rec:
+        return []
+    g = rec.get("guilds")
+    if g is None:
+        return None
+    return [str(x) for x in g]
+
+
+def set_allowed_guilds(email: str, guild_ids: Optional[list[str]]) -> bool:
+    """担当サーバーを設定する。None を渡すと全サーバー許可に戻る。"""
+    email = (email or "").strip().lower()
+    users = _load()
+    if email not in users:
+        return False
+    if guild_ids is None:
+        users[email].pop("guilds", None)
+    else:
+        users[email]["guilds"] = [str(x) for x in guild_ids]
+    _save(users)
+    return True
+
+
+def can_access_guild(email: str, guild_id: str) -> bool:
+    allowed = allowed_guilds(email)
+    if allowed is None:      # 未移行のユーザー
+        return True
+    return str(guild_id) in allowed
+
+
+def migrate_existing_users(all_guild_ids: list[str]) -> int:
+    """guilds を持たない既存ユーザーに、現時点の全サーバーを付与する。
+
+    他社を迎える前に一度流す。これをしないと既存ユーザーは「全部見える」
+    ままなので、新しい会社のサーバーまで見えてしまう。
+    """
+    users = _load()
+    n = 0
+    for email, rec in users.items():
+        if "guilds" not in rec:
+            rec["guilds"] = [str(g) for g in all_guild_ids]
+            n += 1
+    if n:
+        _save(users)
+    return n
 
 
 # ---------- user management (admin operations) ----------

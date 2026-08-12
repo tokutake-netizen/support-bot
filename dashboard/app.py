@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import re
 import urllib.parse
 import json
 import logging
@@ -154,12 +155,34 @@ def require_session(session_cookie: Optional[str]) -> dict:
     return sess
 
 
+# Discord のサーバーIDは17〜20桁の数字。パス結合の前に必ず通す。
+_GUILD_ID_RE = re.compile(r"^\d{17,20}$")
+
+
 def require_admin_for_guild(sess: dict, guild_id: str) -> dict:
-    # Email-auth users with allowed=True get blanket access to any guild
-    # that has a deployment dir on the volume — same as a Discord admin.
-    if sess.get("auth_method") == "email":
+    """このセッションが、そのサーバーを触ってよいかを判定する。
+
+    以前はメール認証というだけで全サーバーを素通しにしていた。複数社が
+    使う前提だと、URL のサーバーIDを差し替えるだけで他社の APIキーが
+    見える状態だったため、担当サーバーの照合を必須にした。
+
+    判定は毎回ユーザーストアを読む。Cookie に焼き込むと、担当から外した
+    あとも 7 日間有効な古いセッションで入れてしまう。
+    """
+    if not _GUILD_ID_RE.match(str(guild_id)):
+        raise HTTPException(status_code=404, detail="unknown guild")
+
+    if sess.get("is_root"):
         return {"id": guild_id, "name": guild_id}
-    # Discord auth: session stores admin-only guilds; presence == admin.
+
+    if sess.get("auth_method") == "email":
+        email = sess.get("user_id") or sess.get("username") or ""
+        if user_store.can_access_guild(email, guild_id):
+            return {"id": guild_id, "name": guild_id}
+        log.warning("担当外のサーバーへのアクセスを拒否しました（%s → %s）", email, guild_id)
+        raise HTTPException(status_code=403, detail="このサーバーの担当ではありません")
+
+    # Discord 認証: セッションには管理者権限を持つサーバーだけが入っている
     for g in sess.get("guilds", []):
         if str(g["id"]) == str(guild_id):
             return g
@@ -299,9 +322,14 @@ async def auth_login(
 
     # For email users, populate the visible guild list from disk so the
     # dashboard.html iteration works the same way as Discord-auth.
+    # 担当サーバーだけを出す。以前は全デプロイを列挙していたため、
+    # 他社のサーバー名まで一覧に並んでいた。
+    allowed = user_store.allowed_guilds(user["email"]) if not user.get("is_root") else None
     guilds = []
     bot_token = os.environ.get("DISCORD_TOKEN_DEFAULT")
     for gid in config_store.list_deployments():
+        if allowed is not None and str(gid) not in allowed:
+            continue
         name = gid  # placeholder; we don't fetch from Discord here to keep login fast
         env_vals = config_store.read_env(gid)
         tok = env_vals.get("DISCORD_TOKEN_SUPPORT") or bot_token
