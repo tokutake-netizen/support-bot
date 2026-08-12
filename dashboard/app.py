@@ -2082,7 +2082,7 @@ async def template_export(
     env_vals = config_store.read_env(guild_id)
     ticket_cat = env_vals.get("TICKET_CATEGORY_ID") or None
     snap = await server_template.snapshot_guild(bot_token, guild_id, ticket_category_id=ticket_cat)
-    server_template.save_template(snap)
+    server_template.save_template(snap, guild_id)
     return RedirectResponse(
         f"/guild/{guild_id}/setup"
         f"?template_exported=1"
@@ -2102,7 +2102,7 @@ async def template_apply(
     bot_token = _bot_token_for(guild_id)
     if not bot_token:
         raise HTTPException(status_code=400, detail="BOT token not configured")
-    template = server_template.load_template()
+    template = server_template.load_template(guild_id)
     if not template:
         raise HTTPException(status_code=400, detail="no template saved yet — export from a source guild first")
     summary = await server_template.apply_template(bot_token, guild_id, template)

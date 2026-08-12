@@ -26,5 +26,13 @@ def load(name: str, default: Any = None) -> Any:
 
 
 def save(name: str, data: Any) -> None:
+    """一時ファイルに書いてから差し替える。
+
+    直書きだと、書き込み中にプロセスが落ちた場合に壊れた JSON が残る。
+    load() は壊れていると既定値（空）を返す作りなので、抽選のエントリーや
+    競りの入札履歴が「黙って全部消える」ことになる。
+    """
     path = DATA_DIR / name
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), "utf-8")
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), "utf-8")
+    tmp.replace(path)

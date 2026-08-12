@@ -120,7 +120,11 @@ def write_env(guild_id: str, updates: dict[str, str]) -> None:
         if k not in existing_keys:
             lines_out.append(f"{k}={_encode_value(v)}")
 
-    env_path.write_text("\n".join(lines_out) + "\n", "utf-8")
+    # 直書きだと、途中で落ちたときに .env が壊れて 1社分の設定
+    # （Discord トークンや API キー）がまとめて失われる。
+    tmp = env_path.with_suffix(".env.tmp")
+    tmp.write_text("\n".join(lines_out) + "\n", "utf-8")
+    tmp.replace(env_path)
 
 
 def list_deployments() -> list[str]:

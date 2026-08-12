@@ -29,18 +29,28 @@ CH_NEWS = 5
 CH_FORUM = 15
 
 
-def template_path() -> Path:
+def template_path(guild_id: Optional[str] = None) -> Path:
+    """テンプレートの保存先。
+
+    以前は全社で1ファイルを共有していた。A社がエクスポートすると B社の
+    テンプレートを上書きし、A社のチャンネル構成（＝営業上の情報）を
+    B社が参照・適用できてしまう状態だった。サーバー単位に分ける。
+    """
     raw = os.environ.get("SERVER_TEMPLATE_FILE")
     if raw:
         return Path(raw)
+    if guild_id:
+        from . import config_store
+        return config_store.deployment_dir(str(guild_id)) / "data" / "server_template.json"
+    # guild_id 無しは移行期の旧パス（読み取りのフォールバックにのみ使う）
     root = os.environ.get("DEPLOYMENTS_ROOT")
     if root:
         return Path(root).parent / "server_template.json"
     return Path(__file__).resolve().parent.parent / "server_template.json"
 
 
-def load_template() -> Optional[dict]:
-    p = template_path()
+def load_template(guild_id: Optional[str] = None) -> Optional[dict]:
+    p = template_path(guild_id)
     if not p.exists():
         return None
     try:
@@ -49,8 +59,8 @@ def load_template() -> Optional[dict]:
         return None
 
 
-def save_template(data: dict) -> None:
-    p = template_path()
+def save_template(data: dict, guild_id: Optional[str] = None) -> None:
+    p = template_path(guild_id)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(data, indent=2, ensure_ascii=False), "utf-8")
 
