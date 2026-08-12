@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% import "_icons.html" as icon %}
+{% block title %}{{ tenant.name }} — 会社設定 — Musubot{% endblock %}
+{% block head %}
+<style>
+  .pw-box{background:var(--yellow-bg);border:1px solid var(--yellow);border-radius:10px;
+          padding:14px 16px;margin-bottom:16px}
+  .pw-box code{font-size:17px;font-weight:700;background:var(--surface);padding:6px 12px;
+               border-radius:6px;letter-spacing:.04em}
+  .g-pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px;margin-bottom:10px}
+  .g-pick label{display:flex;align-items:center;gap:8px;background:var(--surface);
+                border:1px solid var(--line);border-radius:8px;padding:9px 12px;
+                font-size:13px;cursor:pointer;font-family:"SF Mono",Menlo,monospace}
+  .g-pick input{width:auto;height:auto}
+</style>
+{% endblock %}
+{% block body %}
+{% with page = "admin" %}{% include "_nav.html" %}{% endwith %}
+
+<div class="page">
+  <a href="/admin" class="back-link">{{ icon.chevronLeft(15) }} 会社一覧へ戻る</a>
+  <h1>{{ tenant.name }}</h1>
+  <p class="subtitle">
+    識別子 <code>{{ tenant.slug }}</code>
+    {% if tenant.status == 'active' %}<span class="badge running">利用中</span>
+    {% else %}<span class="badge stopped">停止中</span>{% endif %}
+  </p>
+
+  {% if request.query_params.get("ok") %}<div class="flash ok">{{ request.query_params.get("ok") }}</div>{% endif %}
+  {% if request.query_params.get("err") %}<div class="flash warn">{{ request.query_params.get("err") }}</div>{% endif %}
+
+  {% if request.query_params.get("pw") %}
+    {% set shown = pop_secret(request.query_params.get("pw")) %}
+    {% if shown %}
+    <div class="pw-box">
+      <div style="font-weight:700;color:var(--heading);margin-bottom:8px">初期パスワード（この画面でしか表示されません）</div>
+      <code>{{ shown }}</code>
+      <div class="hint" style="margin-top:8px">
+        ご本人に手渡しで伝えてください。<b>初回ログイン時に本人が変更します</b>ので、この文字列は使い捨てです。
+        画面を再読み込みすると消えます。
+      </div>
+    </div>
+    {% endif %}
+  {% endif %}
+
+  {# ---------- 担当者 ---------- #}
+  <h2>{{ icon.users(17) }} 担当者 <span class="help">{{ users | length }} 名</span></h2>
+  <div class="card">
+    {% if users %}
+      {% for u in users %}
+      <div class="feature">
+        <div>
+          <div class="name">
+            <code>{{ u.email }}</code>
+            {% if u.role == 'tenant_admin' %}<span class="badge info">管理者</span>{% else %}<span class="badge">スタッフ</span>{% endif %}
+            {% if u.allowed %}<span class="badge running">有効</span>{% else %}<span class="badge stopped">無効</span>{% endif %}
+            {% if u.must_change_password %}<span class="badge unconfigured">初回変更待ち</span>{% endif %}
+          </div>
+          <div class="desc">
+            {% if u.must_change_password %}初期パスワードのまま。本人が最初のログインで変更します。
+            {% else %}本人が設定したパスワードを使用中{% endif %}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+          <form method="post" action="/admin/tenants/{{ tenant.slug }}/users/reset"
+                onsubmit="return confirm('{{ u.email }} のパスワードを再発行します。いまのパスワードは使えなくなります。よろしいですか？')">
+            <input type="hidden" name="email" value="{{ u.email }}">
+            <button class="btn outline btn-sm">パスワード再発行</button>
+          </form>
+          <form method="post" action="/admin/tenants/{{ tenant.slug }}/users/role">
+            <input type="hidden" name="email" value="{{ u.email }}">
+            <input type="hidden" name="role" value="{{ 'staff' if u.role == 'tenant_admin' else 'tenant_admin' }}">
+            <button class="btn outline btn-sm">{{ 'スタッフにする' if u.role == 'tenant_admin' else '管理者にする' }}</button>
+          </form>
+          <form method="post" action="/admin/tenants/{{ tenant.slug }}/users/toggle">
+            <input type="hidden" name="email" value="{{ u.email }}">
+            <input type="hidden" name="allowed" value="{{ '0' if u.allowed else '1' }}">
+            <button class="btn {{ 'red' if u.allowed else 'outline' }} btn-sm">{{ '無効化' if u.allowed else '再有効化' }}</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p style="color:var(--muted);margin:0 0 14px">まだ担当者がいません。下から追加してください。</p>
+    {% endif %}
+
+    <div class="help-box" style="margin-top:16px">
+      <div class="h">パスワードの扱い</div>
+      初期パスワードは<b>自動生成</b>されます。管理者が文字列を決める方式にしていないのは、
+      恒常パスワードを管理者が知っていると、本人になりすました操作をログで区別できなくなるためです。
+      本人が初回ログインで変更するまで、他の画面には進めません。
+    </div>
+
+    <form method="post" action="/admin/tenants/{{ tenant.slug }}/users/invite">
+      <div class="row">
+        <div class="field">
+          <label>メールアドレス<span class="req">*</span></label>
+          <input type="email" name="email" required placeholder="tantou@example.co.jp">
+        </div>
+        <div class="field">
+          <label>権限</label>
+          <select name="role">
+            <option value="tenant_admin">管理者（APIキー・BOT起動停止まで）</option>
+            <option value="staff" selected>スタッフ（日々の運用のみ）</option>
+          </select>
+        </div>
+      </div>
+      <button type="submit" class="btn">{{ icon.mail(16) }} 担当者を追加して初期パスワードを発行</button>
+    </form>
+  </div>
+
+  {# ---------- 担当サーバー ---------- #}
+  <h2>{{ icon.servers(17) }} 担当サーバー <span class="help">{{ guilds | length }} 件</span></h2>
+  <div class="card">
+    <p class="section-desc" style="margin-top:0">
+      この会社の担当者が触れる Discord サーバーです。<b>ここに無いサーバーには一切アクセスできません。</b>
+    </p>
+    <form method="post" action="/admin/tenants/{{ tenant.slug }}/guilds">
+      <div class="g-pick">
+        {% for g in guilds %}
+          <label>
+            <input type="checkbox" name="guild_id" value="{{ g.id }}" checked>
+            <span>{{ g.id }}{% if g.running %} ●{% endif %}</span>
+          </label>
+        {% endfor %}
+        {% for g in unassigned %}
+          <label style="border-style:dashed">
+            <input type="checkbox" name="guild_id" value="{{ g }}">
+            <span>{{ g }}（未割当）</span>
+          </label>
+        {% endfor %}
+      </div>
+      <div class="field">
+        <label>サーバーIDを直接追加（任意）</label>
+        <input type="text" name="guild_id_manual" pattern="\d{17,20}" placeholder="17〜20桁の数字">
+        <div class="hint">チェックを外すと担当から外れます。他社に割り当て済みのサーバーは追加できません。</div>
+      </div>
+      <button type="submit" class="btn">{{ icon.save(16) }} 担当サーバーを保存</button>
+    </form>
+  </div>
+
+  {# ---------- 会社の情報・利用停止 ---------- #}
+  <h2>{{ icon.settings(17) }} 会社の情報</h2>
+  <div class="card">
+    <form method="post" action="/admin/tenants/{{ tenant.slug }}/update">
+      <div class="row">
+        <div class="field">
+          <label>会社名</label>
+          <input type="text" name="name" value="{{ tenant.name }}" maxlength="60">
+        </div>
+        <div class="field">
+          <label>メモ</label>
+          <input type="text" name="note" value="{{ tenant.note }}" maxlength="120">
+        </div>
+      </div>
+      <button type="submit" class="btn outline">{{ icon.save(16) }} 保存</button>
+    </form>
+
+    <div style="border-top:1px solid var(--line);margin-top:20px;padding-top:16px">
+      {% if tenant.status == 'active' %}
+        <div style="font-weight:700;color:var(--heading);margin-bottom:6px">利用を停止する</div>
+        <p class="hint" style="margin-top:0">
+          停止すると、この会社の担当者は<b>すぐに全サーバーへ入れなくなります</b>（ログイン中の人も含む）。
+          設定やデータは残るので、いつでも再開できます。
+        </p>
+        <form method="post" action="/admin/tenants/{{ tenant.slug }}/status"
+              onsubmit="return confirm('{{ tenant.name }} の利用を停止します。よろしいですか？')">
+          <input type="hidden" name="status" value="suspended">
+          <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer">
+            <input type="checkbox" name="stop_bots" value="1" style="width:auto;height:auto">
+            <span>担当サーバーの BOT も停止する</span>
+          </label>
+          <button type="submit" class="btn red">利用を停止</button>
+        </form>
+      {% else %}
+        <form method="post" action="/admin/tenants/{{ tenant.slug }}/status">
+          <input type="hidden" name="status" value="active">
+          <button type="submit" class="btn">利用を再開</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

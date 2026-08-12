@@ -13,6 +13,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import re
+import secrets
 import urllib.parse
 import json
 import logging
@@ -54,6 +55,7 @@ from . import (
     schedule_store,
     server_template,
     shipping_master,
+    tenants,
 )
 from .discord_api import DiscordREST, assignable_roles, channels_grouped
 
@@ -120,6 +122,24 @@ def _asset_version() -> str:
 
 templates.env.globals["asset_v"] = _asset_version()
 
+
+
+# 初期パスワードのまま他のページを触らせない。発行された文字列は管理者も
+# 知っているので、本人が変えるまでは操作をさせない。
+_PW_EXEMPT = ("/account/password", "/logout", "/login", "/static", "/healthz",
+              "/oauth", "/register", "/forgot", "/line/webhook")
+
+
+@app.middleware("http")
+async def force_password_change(request: Request, call_next):
+    path = request.url.path
+    if not path.startswith(_PW_EXEMPT):
+        sess = get_session(request.cookies.get("session"))
+        if sess and sess.get("must_change_password"):
+            if request.method == "GET":
+                return RedirectResponse("/account/password", status_code=303)
+            raise HTTPException(status_code=403, detail="先にパスワードを変更してください")
+    return await call_next(request)
 
 # -------------------------- session helpers --------------------------
 
@@ -324,7 +344,12 @@ async def auth_login(
     # dashboard.html iteration works the same way as Discord-auth.
     # 担当サーバーだけを出す。以前は全デプロイを列挙していたため、
     # 他社のサーバー名まで一覧に並んでいた。
-    allowed = user_store.allowed_guilds(user["email"]) if not user.get("is_root") else None
+    if user.get("is_root"):
+        allowed = None
+    elif user.get("tenant"):
+        allowed = tenants.guilds_for_tenant(user["tenant"])
+    else:
+        allowed = user_store.allowed_guilds(user["email"])
     guilds = []
     bot_token = os.environ.get("DISCORD_TOKEN_DEFAULT")
     for gid in config_store.list_deployments():
@@ -348,6 +373,8 @@ async def auth_login(
         "username": user["email"],
         "user_id": user["email"],
         "is_root": user.get("is_root", False),
+        "tenant": user.get("tenant"),
+        "must_change_password": user.get("must_change_password", False),
         "guilds": guilds,
     }
     # 303 でないと 307 が POST を引き継ぎ、GET 専用の /dashboard が 405 を返す。
@@ -453,14 +480,15 @@ async def admin_users_approve(
         if not ok:
             # Fall back to showing the password on the admin screen so the
             # admin can deliver it manually.
+            # パスワードは URL に載せない（アクセスログと履歴に残るため）
             return RedirectResponse(
-                f"/admin/users?approved={email}&password={password}&mail_err={msg}",
+                f"/admin/users?approved={email}&pw={_stash_secret(password)}&mail_err={msg}",
                 status_code=303,
             )
         return RedirectResponse(f"/admin/users?approved={email}&mailed=1", status_code=303)
     # SMTP not configured — surface the password so admin can hand it over manually
     return RedirectResponse(
-        f"/admin/users?approved={email}&password={password}&mail_err=smtp_not_configured",
+        f"/admin/users?approved={email}&pw={_stash_secret(password)}&mail_err=smtp_not_configured",
         status_code=303,
     )
 
@@ -488,13 +516,284 @@ async def admin_users_toggle(
     return RedirectResponse("/admin/users?toggled=1", status_code=303)
 
 
+# -------------------------- 会員ページ（0枚目・スーパー管理者のみ） --------------------------
+
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_home(request: Request, session: Optional[str] = Cookie(None)):
+    """会社の一覧。Musubot を提供している相手をここで管理する。"""
+    sess = require_session(session)
+    require_root(sess)
+
+    rows = []
+    for tn in tenants.list_tenants():
+        us = user_store.users_of_tenant(tn["slug"])
+        rows.append({
+            **tn,
+            "user_count": len(us),
+            "running": sum(1 for g in tn["guilds"] if bot_manager.is_running(g)),
+        })
+    return templates.TemplateResponse(
+        "admin_tenants.html",
+        {"request": request, "session": sess, "tenants": rows,
+         "unassigned": tenants.unassigned_guilds(), "page": "admin"},
+    )
+
+
+@app.post("/admin/tenants/add")
+async def admin_tenant_add(
+    request: Request, session: Optional[str] = Cookie(None)
+):
+    sess = require_session(session)
+    require_root(sess)
+    form = await request.form()
+    name = str(form.get("name") or "").strip()
+    if not name:
+        return RedirectResponse("/admin?err=会社名を入力してください", status_code=303)
+    tn = tenants.add(name, str(form.get("note") or ""))
+    return RedirectResponse(f"/admin/tenants/{tn['slug']}?ok=会社を追加しました", status_code=303)
+
+
+@app.get("/admin/tenants/{slug}", response_class=HTMLResponse)
+async def admin_tenant_detail(
+    request: Request, slug: str, session: Optional[str] = Cookie(None)
+):
+    sess = require_session(session)
+    require_root(sess)
+    tn = tenants.get(slug)
+    if not tn:
+        raise HTTPException(status_code=404, detail="会社が見つかりません")
+
+    guilds = []
+    for gid in tn["guilds"]:
+        guilds.append({
+            "id": gid,
+            "running": bot_manager.is_running(gid),
+            "configured": (config_store.deployment_dir(gid) / ".env").exists(),
+        })
+    return templates.TemplateResponse(
+        "admin_tenant.html",
+        {"request": request, "session": sess, "tenant": tn, "guilds": guilds,
+         "users": user_store.users_of_tenant(slug),
+         "unassigned": tenants.unassigned_guilds(), "page": "admin"},
+    )
+
+
+@app.post("/admin/tenants/{slug}/update")
+async def admin_tenant_update(
+    request: Request, slug: str, session: Optional[str] = Cookie(None)
+):
+    sess = require_session(session)
+    require_root(sess)
+    form = await request.form()
+    tenants.update(slug, name=str(form.get("name") or ""), note=str(form.get("note") or ""))
+    return RedirectResponse(f"/admin/tenants/{slug}?ok=保存しました", status_code=303)
+
+
+@app.post("/admin/tenants/{slug}/status")
+async def admin_tenant_status(
+    request: Request, slug: str, session: Optional[str] = Cookie(None)
+):
+    """利用停止・再開。停止すると、その会社の人は全サーバーに入れなくなる。"""
+    sess = require_session(session)
+    require_root(sess)
+    form = await request.form()
+    status = str(form.get("status") or "active")
+    tenants.set_status(slug, status)
+    if status == "suspended" and str(form.get("stop_bots") or "") == "1":
+        for gid in tenants.guilds_for_tenant(slug):
+            try:
+                bot_manager.stop(gid)
+            except Exception:  # noqa: BLE001 — 停止できなくても台帳は更新済み
+                log.warning("利用停止に伴う BOT 停止に失敗しました（%s）", gid)
+    msg = "利用を停止しました" if status == "suspended" else "利用を再開しました"
+    return RedirectResponse(f"/admin/tenants/{slug}?ok={msg}", status_code=303)
+
+
+@app.post("/admin/tenants/{slug}/guilds")
+async def admin_tenant_guilds(
+    request: Request, slug: str, session: Optional[str] = Cookie(None)
+):
+    sess = require_session(session)
+    require_root(sess)
+    form = await request.form()
+    ids = [str(x).strip() for x in form.getlist("guild_id") if str(x).strip()]
+    extra = str(form.get("guild_id_manual") or "").strip()
+    if extra:
+        ids.append(extra)
+    bad = [g for g in ids if not _GUILD_ID_RE.match(g)]
+    if bad:
+        return RedirectResponse(
+            f"/admin/tenants/{slug}?err=サーバーIDの形式が不正です（{bad[0]}）", status_code=303
+        )
+    ok, moved = tenants.set_guilds(slug, ids)
+    if not ok:
+        return RedirectResponse(f"/admin/tenants/{slug}?err=会社が見つかりません", status_code=303)
+    msg = "担当サーバーを更新しました"
+    if moved:
+        names = "、".join(sorted({name for _, name in moved}))
+        msg += f"（{len(moved)}件を {names} から移しました）"
+    return RedirectResponse(
+        f"/admin/tenants/{slug}?{urllib.parse.urlencode({'ok': msg})}", status_code=303
+    )
+
+
+@app.post("/admin/tenants/{slug}/users/invite")
+async def admin_tenant_invite(
+    request: Request, slug: str, session: Optional[str] = Cookie(None)
+):
+    """担当者を追加し、初期パスワードを発行する。"""
+    sess = require_session(session)
+    require_root(sess)
+    form = await request.form()
+    email = str(form.get("email") or "")
+    role = str(form.get("role") or "staff")
+    try:
+        _, password = user_store.invite(email, slug, role, added_by=sess.get("username", ""))
+    except ValueError as e:
+        return RedirectResponse(f"/admin/tenants/{slug}?err={e}", status_code=303)
+
+    # パスワードは URL に載せない（アクセスログとブラウザ履歴に残るため）。
+    # 一度だけ取り出せる置き場に入れ、画面表示後に消す。
+    token = _stash_secret(password)
+    sent = _mail_password(email, password)
+    q = urllib.parse.urlencode({
+        "ok": f"{email} を追加しました" + ("（メール送信済み）" if sent else ""),
+        "pw": "" if sent else token,
+    })
+    return RedirectResponse(f"/admin/tenants/{slug}?{q}", status_code=303)
+
+
+@app.post("/admin/tenants/{slug}/users/reset")
+async def admin_tenant_reset(
+    request: Request, slug: str, session: Optional[str] = Cookie(None)
+):
+    sess = require_session(session)
+    require_root(sess)
+    form = await request.form()
+    email = str(form.get("email") or "")
+    password = user_store.reset_password(email)
+    if not password:
+        return RedirectResponse(f"/admin/tenants/{slug}?err=ユーザーが見つかりません", status_code=303)
+    sent = _mail_password(email, password)
+    token = _stash_secret(password)
+    q = urllib.parse.urlencode({
+        "ok": f"{email} のパスワードを再発行しました" + ("（メール送信済み）" if sent else ""),
+        "pw": "" if sent else token,
+    })
+    return RedirectResponse(f"/admin/tenants/{slug}?{q}", status_code=303)
+
+
+@app.post("/admin/tenants/{slug}/users/toggle")
+async def admin_tenant_toggle(
+    request: Request, slug: str, session: Optional[str] = Cookie(None)
+):
+    sess = require_session(session)
+    require_root(sess)
+    form = await request.form()
+    user_store.set_allowed(str(form.get("email") or ""), str(form.get("allowed") or "0") == "1")
+    return RedirectResponse(f"/admin/tenants/{slug}?ok=アクセス権を更新しました", status_code=303)
+
+
+@app.post("/admin/tenants/{slug}/users/role")
+async def admin_tenant_role(
+    request: Request, slug: str, session: Optional[str] = Cookie(None)
+):
+    sess = require_session(session)
+    require_root(sess)
+    form = await request.form()
+    user_store.set_role(str(form.get("email") or ""), str(form.get("role") or "staff"))
+    return RedirectResponse(f"/admin/tenants/{slug}?ok=権限を変更しました", status_code=303)
+
+
+def _mail_password(email: str, password: str) -> bool:
+    """初期パスワードをメールで送る。送れたかどうかを返す。
+
+    送れなかった場合は画面に一度だけ出して手渡ししてもらう。
+    """
+    if not mailer.smtp_configured():
+        return False
+    base = os.environ.get("DASHBOARD_BASE_URL", "").rstrip("/")
+    login_url = f"{base}/login" if base else "/login"
+    try:
+        subject, body = mailer.render_approval_email(email, password, login_url)
+        ok, msg = mailer.send(email, subject, body)
+        if not ok:
+            log.warning("初期パスワードのメール送信に失敗しました（%s）: %s", email, msg)
+        return bool(ok)
+    except Exception:  # noqa: BLE001 — メール不通でも招待自体は成立している
+        log.warning("初期パスワードのメール送信で例外が出ました（%s）", email, exc_info=True)
+        return False
+
+
+# -------------------------- パスワードの初回変更 --------------------------
+
+# 初期パスワードを1回だけ画面に出すための一時置き場。URL に平文を載せない
+# ためのもので、プロセス内に持つ（再起動で消えて構わない性質のもの）。
+_SECRET_STASH: dict[str, str] = {}
+
+
+def _stash_secret(value: str) -> str:
+    token = secrets.token_urlsafe(12)
+    _SECRET_STASH[token] = value
+    if len(_SECRET_STASH) > 50:      # 取り出されなかった分を捨てる
+        for k in list(_SECRET_STASH)[:-50]:
+            _SECRET_STASH.pop(k, None)
+    return token
+
+
+def pop_secret(token: str) -> str:
+    return _SECRET_STASH.pop(token or "", "")
+
+
+templates.env.globals["pop_secret"] = pop_secret
+
+
+@app.get("/account/password", response_class=HTMLResponse)
+async def account_password_form(request: Request, session: Optional[str] = Cookie(None)):
+    sess = require_session(session)
+    return templates.TemplateResponse(
+        "account_password.html",
+        {"request": request, "session": sess,
+         "forced": bool(sess.get("must_change_password"))},
+    )
+
+
+@app.post("/account/password")
+async def account_password_save(
+    request: Request, response: Response, session: Optional[str] = Cookie(None)
+):
+    sess = require_session(session)
+    form = await request.form()
+    new = str(form.get("password") or "")
+    if new != str(form.get("password2") or ""):
+        return RedirectResponse("/account/password?err=確認用と一致しません", status_code=303)
+    try:
+        ok = user_store.change_password(sess.get("user_id") or "", new)
+    except ValueError as e:
+        return RedirectResponse(f"/account/password?err={e}", status_code=303)
+    if not ok:
+        return RedirectResponse("/account/password?err=変更できませんでした", status_code=303)
+
+    sess["must_change_password"] = False
+    resp = RedirectResponse("/dashboard?pw=changed", status_code=303)
+    set_session(resp, sess)
+    return resp
+
+
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, session: Optional[str] = Cookie(None)):
     sess = get_session(session)
     if not sess:
         return RedirectResponse("/login")
-    admin_guilds = list(sess.get("guilds", []))
-    # Annotate with bot running status
+    # セッションのギルド一覧は最大7日間そのまま残る。担当から外れた
+    # サーバーが一覧に出ないよう、表示のたびに権限で絞り直す。
+    admin_guilds = [
+        g for g in sess.get("guilds", [])
+        if sess.get("is_root")
+        or sess.get("auth_method") != "email"
+        or user_store.can_access_guild(sess.get("user_id") or "", str(g["id"]))
+    ]
     for g in admin_guilds:
         gid = str(g["id"])
         g["bot_running"] = bot_manager.is_running(gid)

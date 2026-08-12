@@ -110,6 +110,8 @@ def authenticate(email: str, password: str) -> Optional[dict]:
         "added_by": record.get("added_by"),
         "created_at": record.get("created_at"),
         "guilds": allowed_guilds(email),
+        "tenant": record.get("tenant"),
+        "must_change_password": bool(record.get("must_change_password")),
     }
 
 
@@ -149,8 +151,21 @@ def set_allowed_guilds(email: str, guild_ids: Optional[list[str]]) -> bool:
 
 
 def can_access_guild(email: str, guild_id: str) -> bool:
+    """このユーザーがそのサーバーを触ってよいか。
+
+    会社（テナント）に属していればそちらが正。会社が利用停止なら全部拒否。
+    会社に属していない旧来のユーザーは、個別の担当リストで判定する。
+    """
+    email = (email or "").strip().lower()
+    slug = tenant_of(email)
+    if slug:
+        from . import tenants
+        if not tenants.is_active(slug):
+            return False
+        return str(guild_id) in tenants.guilds_for_tenant(slug)
+
     allowed = allowed_guilds(email)
-    if allowed is None:      # 未移行のユーザー
+    if allowed is None:      # 未移行のユーザー（従来どおり全部）
         return True
     return str(guild_id) in allowed
 
@@ -170,6 +185,118 @@ def migrate_existing_users(all_guild_ids: list[str]) -> int:
     if n:
         _save(users)
     return n
+
+
+# ---------- 会社（テナント）との紐づけ ----------
+
+def set_tenant(email: str, slug: Optional[str]) -> bool:
+    email = (email or "").strip().lower()
+    users = _load()
+    if email not in users:
+        return False
+    if slug:
+        users[email]["tenant"] = slug
+    else:
+        users[email].pop("tenant", None)
+    _save(users)
+    return True
+
+
+def tenant_of(email: str) -> Optional[str]:
+    rec = _load().get((email or "").strip().lower())
+    return rec.get("tenant") if rec else None
+
+
+def users_of_tenant(slug: str) -> list[dict]:
+    out = []
+    for email, rec in _load().items():
+        if rec.get("tenant") != slug:
+            continue
+        out.append({
+            "email": email,
+            "allowed": bool(rec.get("allowed")),
+            "status": rec.get("status", "approved"),
+            "role": rec.get("role", "staff"),
+            "must_change_password": bool(rec.get("must_change_password")),
+            "created_at": rec.get("created_at"),
+        })
+    out.sort(key=lambda u: u["email"])
+    return out
+
+
+def set_role(email: str, role: str) -> bool:
+    if role not in ("tenant_admin", "staff"):
+        return False
+    email = (email or "").strip().lower()
+    users = _load()
+    if email not in users:
+        return False
+    users[email]["role"] = role
+    _save(users)
+    return True
+
+
+def role_of(email: str) -> str:
+    rec = _load().get((email or "").strip().lower())
+    return (rec or {}).get("role", "staff")
+
+
+# ---------- 初期パスワードと初回変更 ----------
+
+def invite(email: str, tenant: str, role: str = "staff", added_by: str = "") -> tuple[dict, str]:
+    """担当者を追加し、自動生成の初期パスワードを返す。
+
+    管理者が任意の文字列を決められるようにはしない。管理者が恒常パスワードを
+    知っている状態だと、本人になりすました操作をログで区別できなくなるため。
+    初回ログイン時に本人が変更する。
+    """
+    email = (email or "").strip().lower()
+    if not email or "@" not in email:
+        raise ValueError("メールアドレスの形式が正しくありません")
+    users = _load()
+    password = _gen_password()
+    salt, pwhash = _hash_password(password)
+    users[email] = {
+        **users.get(email, {}),
+        "pwhash": pwhash,
+        "salt": salt,
+        "allowed": True,
+        "status": "approved",
+        "tenant": tenant,
+        "role": role if role in ("tenant_admin", "staff") else "staff",
+        "must_change_password": True,
+        "added_by": added_by,
+        "created_at": int(time.time()),
+    }
+    _save(users)
+    return {"email": email, "tenant": tenant, "role": role}, password
+
+
+def reset_password(email: str) -> Optional[str]:
+    """初期パスワードを再発行する。次回ログイン時に本人が変更する。"""
+    email = (email or "").strip().lower()
+    users = _load()
+    if email not in users:
+        return None
+    password = _gen_password()
+    users[email]["salt"], users[email]["pwhash"] = _hash_password(password)
+    users[email]["must_change_password"] = True
+    _save(users)
+    return password
+
+
+def change_password(email: str, new_password: str) -> bool:
+    """本人がパスワードを変更する。強制変更フラグを落とす。"""
+    email = (email or "").strip().lower()
+    if len(new_password or "") < 10:
+        raise ValueError("パスワードは10文字以上にしてください")
+    users = _load()
+    if email not in users:
+        return False
+    users[email]["salt"], users[email]["pwhash"] = _hash_password(new_password)
+    users[email]["must_change_password"] = False
+    _save(users)
+    return True
 
 
 # ---------- user management (admin operations) ----------

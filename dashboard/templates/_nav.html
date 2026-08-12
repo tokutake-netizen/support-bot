@@ -12,6 +12,7 @@
   <nav class="topnav">
     <a href="/dashboard"{% if page == "dashboard" %} class="active"{% endif %}>{{ icon.servers(16) }} サーバー一覧</a>
     {% if session.is_root %}
+      <a href="/admin"{% if page == "admin" %} class="active"{% endif %}>{{ icon.users(16) }} 会社管理</a>
       <a href="/forwarding"{% if page == "forwarding" %} class="active"{% endif %}>{{ icon.forward(16) }} 画像転送</a>
       <a href="/admin/users"{% if page == "users" %} class="active"{% endif %}>{{ icon.users(16) }} ユーザー管理</a>
     {% endif %}

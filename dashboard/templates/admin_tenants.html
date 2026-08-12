@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% import "_icons.html" as icon %}
+{% block title %}会社一覧 — Musubot{% endblock %}
+{% block head %}
+<style>
+  .t-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+  .t-card{background:var(--tile);color:#fff;border-radius:12px;padding:20px;display:block;
+          text-decoration:none;transition:background .15s,transform .15s}
+  .t-card:hover{background:var(--tile-hover);text-decoration:none;transform:translateY(-2px)}
+  .t-card.suspended{background:var(--bg3);color:var(--muted)}
+  .t-card.suspended .t-name{color:var(--heading)}
+  .t-name{font-size:16px;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .t-meta{margin-top:12px;font-size:12.5px;color:rgba(255,255,255,.7)}
+  .t-card.suspended .t-meta{color:var(--muted)}
+  .t-slug{font-family:"SF Mono",Menlo,monospace;font-size:11px;opacity:.6}
+</style>
+{% endblock %}
+{% block body %}
+{% with page = "admin" %}{% include "_nav.html" %}{% endwith %}
+
+<div class="page">
+  <h1>会社一覧</h1>
+  <p class="subtitle">Musubot を提供している会社を管理します。会社ごとに担当サーバーと担当者を割り当て、パスワードを発行します。</p>
+
+  {% if request.query_params.get("ok") %}<div class="flash ok">{{ request.query_params.get("ok") }}</div>{% endif %}
+  {% if request.query_params.get("err") %}<div class="flash warn">{{ request.query_params.get("err") }}</div>{% endif %}
+
+  <h2>{{ icon.users(17) }} 登録されている会社 <span class="help">{{ tenants | length }} 社</span></h2>
+  <div class="t-grid">
+    {% for t in tenants %}
+    <a class="t-card{% if t.status != 'active' %} suspended{% endif %}" href="/admin/tenants/{{ t.slug }}">
+      <span class="t-name">
+        {{ t.name }}
+        {% if t.status == 'active' %}<span class="badge running">利用中</span>
+        {% else %}<span class="badge stopped">停止中</span>{% endif %}
+      </span>
+      <div class="t-slug">{{ t.slug }}</div>
+      <div class="t-meta">
+        サーバー {{ t.guilds | length }} ・ 担当者 {{ t.user_count }}名 ・ BOT稼働 {{ t.running }}
+        {% if t.note %}<br>{{ t.note }}{% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  <h2>{{ icon.plus(17) }} 会社を追加</h2>
+  <div class="card">
+    <form method="post" action="/admin/tenants/add">
+      <div class="row">
+        <div class="field">
+          <label>会社名<span class="req">*</span></label>
+          <input type="text" name="name" required maxlength="60" placeholder="例: 株式会社サンプル">
+          <div class="hint">識別子は自動で作られます。あとから会社名だけ変更できます。</div>
+        </div>
+        <div class="field">
+          <label>メモ（任意）</label>
+          <input type="text" name="note" maxlength="120" placeholder="例: 2026年8月導入・カード販売">
+        </div>
+      </div>
+      <button type="submit" class="btn">{{ icon.plus(16) }} 追加する</button>
+    </form>
+  </div>
+
+  {% if unassigned %}
+  <h2>{{ icon.alert(17) }} どの会社にも割り当てられていないサーバー <span class="help">{{ unassigned | length }} 件</span></h2>
+  <div class="card">
+    <p class="section-desc" style="margin-top:0">
+      これらのサーバーは、いまスーパー管理者しか触れません。担当する会社の詳細ページで割り当ててください。
+    </p>
+    {% for g in unassigned %}
+      <span class="chip">{{ g }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
