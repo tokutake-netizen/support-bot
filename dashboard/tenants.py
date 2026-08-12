@@ -224,3 +224,48 @@ def unassigned_guilds() -> list[str]:
     for t in ensure_bootstrap().values():
         assigned.update(str(g) for g in t.get("guilds", []))
     return [str(g) for g in config_store.list_deployments() if str(g) not in assigned]
+
+
+# ---------- API キーと利用量（原価が誰に付くかを分ける） ----------
+
+def api_key(slug: str, name: str) -> str:
+    """その会社のAPIキー。未設定なら空。
+
+    共通キーにフォールバックさせない。フォールバックすると、他社の利用が
+    こちらの請求書に乗る。
+    """
+    t = ensure_bootstrap().get(slug) or {}
+    return str((t.get("api_keys") or {}).get(name) or "").strip()
+
+
+def set_api_key(slug: str, name: str, value: str) -> bool:
+    data = ensure_bootstrap()
+    if slug not in data:
+        return False
+    keys = data[slug].setdefault("api_keys", {})
+    if value.strip():
+        keys[name] = value.strip()
+    else:
+        keys.pop(name, None)
+    _save(data)
+    return True
+
+
+def add_usage(slug: str, name: str, calls: int = 1, chars: int = 0) -> None:
+    """月ごとの利用量を数える。どの会社がどれだけ使ったかを後から言えるように。"""
+    import datetime
+    data = ensure_bootstrap()
+    if slug not in data:
+        return
+    month = datetime.datetime.now().strftime("%Y-%m")
+    u = data[slug].setdefault("usage", {}).setdefault(month, {}).setdefault(name, {})
+    u["calls"] = int(u.get("calls", 0)) + calls
+    u["chars"] = int(u.get("chars", 0)) + chars
+    _save(data)
+
+
+def usage(slug: str, month: Optional[str] = None) -> dict:
+    import datetime
+    month = month or datetime.datetime.now().strftime("%Y-%m")
+    t = ensure_bootstrap().get(slug) or {}
+    return (t.get("usage") or {}).get(month, {})

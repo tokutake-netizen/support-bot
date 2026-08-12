@@ -43,6 +43,7 @@ from datetime import datetime, timezone
 
 from . import (
     auth,
+    backup,
     bot_manager,
     config_store,
     forward_store,
@@ -90,6 +91,69 @@ async def bootstrap_tenants() -> None:
             log.info("担当サーバーが未設定だった %d 人に、既定会社の担当を付与しました", n)
     except Exception:  # noqa: BLE001 — 起動そのものは止めない
         log.exception("テナント台帳の初期化に失敗しました")
+
+
+@app.on_event("startup")
+async def start_background_tasks() -> None:
+    """日次バックアップと、BOTの死活監視を回す。
+
+    これまで BOT が死んでも再起動も通知もされず、誰かがダッシュボードを
+    開くまで気づけなかった。他社に提供している以上、顧客より先に気づける
+    状態にしておく必要がある。
+    """
+    import asyncio
+
+    async def daily_backup() -> None:
+        while True:
+            try:
+                # 圧縮は同期処理。スレッドに逃がさないと、その間ダッシュボードが
+                # 止まる（ヘルスチェックが返らなくなった）。
+                await asyncio.to_thread(backup.create)
+                n = await asyncio.to_thread(backup.prune)
+                if n:
+                    log.info("古いバックアップを %d 件削除しました", n)
+                free = backup.disk_free_mb()
+                if 0 <= free < 200:
+                    log.warning("ボリュームの空きが少なくなっています: %.0f MB", free)
+            except Exception:  # noqa: BLE001 — バックアップ失敗で本体を止めない
+                log.exception("日次バックアップに失敗しました")
+            await asyncio.sleep(24 * 3600)
+
+    async def watch_bots() -> None:
+        # 起動直後は autostart と重なるので少し待つ
+        await asyncio.sleep(90)
+        down: dict[str, int] = {}
+        while True:
+            try:
+                for gid in config_store.list_deployments():
+                    if not (config_store.deployment_dir(gid) / ".env").exists():
+                        continue
+                    if bot_manager.is_running(gid):
+                        down.pop(gid, None)
+                        continue
+                    # 起動したことがあるものだけを対象にする（未設定は無視）
+                    env = config_store.read_env(gid)
+                    if not env.get("DISCORD_TOKEN_SUPPORT"):
+                        continue
+                    n = down.get(gid, 0) + 1
+                    down[gid] = n
+                    if n <= 3:      # 3回まで自動復帰を試みる
+                        log.warning("BOT が停止しています。再起動します（%s / %d回目）", gid, n)
+                        try:
+                            bot_manager.start(gid)
+                        except Exception:  # noqa: BLE001
+                            log.exception("BOT の再起動に失敗しました（%s）", gid)
+                    elif n == 4:
+                        log.error(
+                            "BOT が繰り返し停止しています。自動復帰を諦めました（%s）。"
+                            "稼働状況・ログを確認してください", gid,
+                        )
+            except Exception:  # noqa: BLE001
+                log.exception("死活監視でエラーが出ました")
+            await asyncio.sleep(60)
+
+    asyncio.create_task(daily_backup())
+    asyncio.create_task(watch_bots())
 
 
 @app.on_event("startup")
@@ -271,7 +335,19 @@ def require_root(sess: dict) -> None:
 
 @app.get("/healthz")
 async def healthz() -> dict:
-    return {"ok": True}
+    """外形監視用。中身を見ずに常に ok を返していたため、子BOTが全滅
+    していても緑のままだった。稼働数を添えて、実態が分かるようにする。"""
+    configured = running = 0
+    try:
+        for gid in config_store.list_deployments():
+            if not config_store.read_env(gid).get("DISCORD_TOKEN_SUPPORT"):
+                continue
+            configured += 1
+            if bot_manager.is_running(gid):
+                running += 1
+    except Exception:  # noqa: BLE001 — 数えられなくてもヘルスチェックは返す
+        log.warning("healthz でBOT数を数えられませんでした", exc_info=True)
+    return {"ok": True, "bots_configured": configured, "bots_running": running}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -715,6 +791,8 @@ async def admin_tenant_detail(
         "admin_tenant.html",
         {"request": request, "session": sess, "tenant": tn, "guilds": guilds,
          "users": user_store.users_of_tenant(slug),
+         "gemini_set": bool(tenants.api_key(slug, "gemini")),
+         "usage": tenants.usage(slug),
          "unassigned": tenants.unassigned_guilds(), "page": "admin"},
     )
 
@@ -776,6 +854,18 @@ async def admin_tenant_guilds(
     return RedirectResponse(
         f"/admin/tenants/{slug}?{urllib.parse.urlencode({'ok': msg})}", status_code=303
     )
+
+
+@app.post("/admin/tenants/{slug}/apikey")
+async def admin_tenant_apikey(
+    request: Request, slug: str, session: Optional[str] = Cookie(None)
+):
+    """会社ごとのAPIキー。原価をその会社に付けるためのもの。"""
+    sess = require_session(session)
+    require_root(sess)
+    form = await request.form()
+    tenants.set_api_key(slug, "gemini", str(form.get("gemini") or ""))
+    return RedirectResponse(f"/admin/tenants/{slug}?ok=APIキーを保存しました", status_code=303)
 
 
 @app.post("/admin/tenants/{slug}/users/invite")
@@ -1047,14 +1137,41 @@ ASSISTANT_MODES = {
 }
 
 
+def _assistant_key(sess: dict) -> tuple[str, Optional[str]]:
+    """アシスタントに使う Gemini キーと、原価を負担する会社を返す。
+
+    以前はサービス共通のキーを全社が使えた。どの会社が使っても請求は
+    こちらに来て、しかも誰がどれだけ使ったかの記録もなかった。会社ごとの
+    キーを使い、共通キーへのフォールバックはしない。
+    """
+    if sess.get("is_root"):
+        return os.environ.get("GEMINI_API_KEY", ""), None
+
+    slug = None
+    if sess.get("auth_method") == "email":
+        slug = user_store.tenant_of(sess.get("user_id") or "")
+    if not slug:
+        # Discord 認証は、担当サーバーからテナントを引く
+        for g in sess.get("guilds", []):
+            slug = tenants.tenant_for_guild(str(g["id"]))
+            if slug:
+                break
+    if not slug:
+        return "", None
+    return tenants.api_key(slug, "gemini"), slug
+
+
 @app.post("/api/assistant/chat")
 async def assistant_chat(request: Request, session: Optional[str] = Cookie(None)):
-    require_session(session)
-    key = os.environ.get("GEMINI_API_KEY", "")
+    sess = require_session(session)
+    key, tenant_slug = _assistant_key(sess)
     if not key:
         raise HTTPException(
             status_code=503,
-            detail="GEMINI_API_KEY が未設定です。Railway の Variables に追加してください。",
+            detail=(
+                "アシスタントは、この会社の Gemini API キーが設定されていないため使えません。"
+                "管理者にご依頼ください。"
+            ),
         )
     body = await request.json()
     mode = body.get("mode") or "chat"
@@ -1071,6 +1188,12 @@ async def assistant_chat(request: Request, session: Optional[str] = Cookie(None)
         contents = [c for c in contents if c["role"] == "user"][-1:]
     if not contents:
         raise HTTPException(status_code=400, detail="メッセージが空です")
+
+    if tenant_slug:
+        tenants.add_usage(
+            tenant_slug, "gemini",
+            chars=sum(len(c["parts"][0]["text"]) for c in contents),
+        )
 
     model = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
     payload = {

@@ -139,6 +139,47 @@
     </form>
   </div>
 
+
+  {# ---------- APIキーと利用量 ---------- #}
+  <h2>{{ icon.key(17) }} この会社のAPIキー</h2>
+  <div class="card">
+    <div class="help-box">
+      <div class="h">原価をどこに付けるか</div>
+      翻訳（DeepL）と意図判定（Anthropic）のキーは、各社が自分のダッシュボードで登録し、
+      <b>その会社に直接請求が行きます</b>。<br>
+      一方、ダッシュボードのアシスタント（Gemini）だけは、ここで会社ごとに登録します。
+      <b>登録しないとアシスタントは使えません。</b>共通キーへは切り替わらないので、
+      他社の利用が当社の請求書に乗ることはありません。
+    </div>
+    <form method="post" action="/admin/tenants/{{ tenant.slug }}/apikey">
+      <div class="field">
+        <label>Gemini API キー {% if gemini_set %}<span class="badge running">設定済み</span>{% else %}<span class="badge">未設定</span>{% endif %}</label>
+        <input type="password" name="gemini" autocomplete="off"
+               placeholder="{% if gemini_set %}変更する場合のみ入力（空欄なら削除）{% else %}AIza...{% endif %}">
+        <div class="hint">空欄で保存すると削除され、その会社はアシスタントを使えなくなります。</div>
+      </div>
+      <button type="submit" class="btn outline">{{ icon.save(16) }} 保存</button>
+    </form>
+
+    {% if usage %}
+    <div style="border-top:1px solid var(--line);margin-top:18px;padding-top:14px">
+      <div style="font-weight:700;color:var(--heading);margin-bottom:8px">今月の利用量</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13.5px">
+        <tr style="color:var(--muted);font-size:12px;text-align:left">
+          <th style="padding:6px">サービス</th><th style="padding:6px;text-align:right">回数</th><th style="padding:6px;text-align:right">文字数</th>
+        </tr>
+        {% for name, u in usage.items() %}
+        <tr style="border-top:1px solid var(--line)">
+          <td style="padding:8px 6px">{{ name }}</td>
+          <td style="padding:8px 6px;text-align:right;font-variant-numeric:tabular-nums">{{ "{:,}".format(u.calls or 0) }}</td>
+          <td style="padding:8px 6px;text-align:right;font-variant-numeric:tabular-nums">{{ "{:,}".format(u.chars or 0) }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% endif %}
+  </div>
+
   {# ---------- 会社の情報・利用停止 ---------- #}
   <h2>{{ icon.settings(17) }} 会社の情報</h2>
   <div class="card">
