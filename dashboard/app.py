@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import urllib.parse
 import json
 import logging
 import os
@@ -51,6 +52,7 @@ from . import (
     member_stats,
     schedule_store,
     server_template,
+    shipping_master,
 )
 from .discord_api import DiscordREST, assignable_roles, channels_grouped
 
@@ -736,6 +738,8 @@ ROBOTS = [
         url="/guild/{gid}/robot/translation",
         active_if=["TRANSLATE_CHANNEL_IDS", "TICKET_CATEGORY_IDS"],
         needs=[], summary=[("担当", "TRANSLATE_CHANNEL_IDS", "channel")],
+        shared=["TRANSLATE_PROVIDER", "TRANSLATE_DEFAULT_MODE"],
+        local=["TRANSLATE_CHANNEL_IDS", "TICKET_CATEGORY_IDS"],
     ),
     dict(
         key="ticket", name="受付ロボ", desc="お客様専用の問い合わせ部屋を用意", icon="ticket",
@@ -744,41 +748,66 @@ ROBOTS = [
         needs=["TICKET_STAFF_ROLE_IDS"],
         summary=[("カテゴリ", "TICKET_CATEGORY_ID", "category"),
                  ("スタッフ", "TICKET_STAFF_ROLE_IDS", "role")],
+        shared=["FORCE_UI_LANG_TICKET"],
+        local=["TICKET_CATEGORY_ID", "TICKET_STAFF_ROLE_IDS", "CARD_GAME_CHANNEL_ID"],
     ),
     dict(
         key="welcome", name="お迎えロボ", desc="新しく入った人を歓迎して案内", icon="sparkles",
         url="/guild/{gid}/robot/welcome",
         active_if=["WELCOME_CHANNEL_ID"], needs=[],
         summary=[("投稿先", "WELCOME_CHANNEL_ID", "channel")],
+        shared=["WELCOME_TITLE", "WELCOME_DESCRIPTION", "WELCOME_COLOR",
+                "WELCOME_BANNER_URL", "WELCOME_THUMBNAIL_URL"],
+        local=["WELCOME_CHANNEL_ID", "WELCOME_AUTOROLE_IDS",
+               "WELCOME_RULES_CHANNEL_ID", "WELCOME_INTRO_CHANNEL_ID"],
     ),
     dict(
         key="suggester", name="気配りロボ", desc="会話を読んで最適な窓口へ案内", icon="sparkles",
         url="/guild/{gid}/robot/suggester",
         active_if=["COMMUNITY_CHANNEL_ID"], needs=["ANTHROPIC_API_KEY"],
         summary=[("監視", "COMMUNITY_CHANNEL_ID", "channel")],
+        shared=["PRODUCT_ADVICE_TEXT", "PRODUCT_ADVICE_TEXT_EN",
+                "SHIPPING_ADVICE_TEXT", "SHIPPING_ADVICE_TEXT_EN",
+                "SUGGEST_MIN_CONFIDENCE"],
+        local=["COMMUNITY_CHANNEL_ID", "PRODUCT_INQUIRY_CHANNEL_ID",
+               "SHIPPING_GUIDE_CHANNEL_ID"],
     ),
     dict(
         key="shipping", name="送料ロボ", desc="宛先と重さから送料を即計算", icon="box",
         url="/guild/{gid}/robot/shipping",
         active_if=["SHIPPING_SHEET_ID"], needs=[],
         summary=[("許可", "ALLOW_CH_SHIPPING", "channel")],
+        shared=["SHIPPING_SHEET_ID", "SHIPPING_SHEET_NAME", "PACKAGING_WEIGHT_G",
+                "SHIPPING_DHL_FUEL_SURCHARGE_PCT",
+                "SHIPPING_FEDEX_FUEL_SURCHARGE_PCT",
+                "SHIPPING_EXTRA_SURCHARGE_PCT"],
+        local=["ALLOW_CH_SHIPPING", "ALLOW_CAT_SHIPPING"],
     ),
     dict(
         key="auction", name="競りロボ", desc="ボタン入札のオークションを進行", icon="gavel",
         url="/guild/{gid}/robot/auction",
         active_if=["ALLOW_CH_AUCTION", "ALLOW_CAT_AUCTION", "AUCTION_MANAGER_ROLE_IDS"],
         needs=[], summary=[("許可", "ALLOW_CH_AUCTION", "channel")],
+        shared=["AUCTION_DEFAULT_RESERVE_PRICE", "AUCTION_DEFAULT_MIN_INCREMENT",
+                "AUCTION_DEFAULT_ANTI_SNIPE_WINDOW",
+                "AUCTION_DEFAULT_ANTI_SNIPE_EXTEND"],
+        local=["ALLOW_CH_AUCTION", "ALLOW_CAT_AUCTION",
+               "AUCTION_MANAGER_ROLE_IDS", "AUCTION_TICKET_CATEGORY_ID"],
     ),
     dict(
         key="invite", name="案内ロボ", desc="どの招待から来たかを記録", icon="door",
         url="/guild/{gid}/robot/invite",
         active_if=["INVITE_LOG_CHANNEL_ID", "ALLOW_CH_INVITE"], needs=[],
         summary=[("ログ", "INVITE_LOG_CHANNEL_ID", "channel")],
+        shared=[],
+        local=["INVITE_LOG_CHANNEL_ID", "ALLOW_CH_INVITE",
+               "INVITE_CREATOR_ROLE_IDS", "MODERATOR_CHANNEL_ID"],
     ),
     dict(
         key="forwarding", name="運び屋ロボ", desc="画像を別のチャンネルへ届ける", icon="forward",
         url="/guild/{gid}/robot/forwarding",
         active_if=[], needs=[], summary=[],   # 件数で判定するため env は見ない
+        shared=[], local=[],
     ),
     dict(
         key="line", name="LINEロボ", desc="LINEグループの画像をDiscordへ運ぶ", icon="send",
@@ -786,21 +815,27 @@ ROBOTS = [
         active_if=["LINE_FORWARD_CHANNEL_ID"],
         needs=["LINE_CHANNEL_SECRET", "LINE_CHANNEL_ACCESS_TOKEN"],
         summary=[("転送先", "LINE_FORWARD_CHANNEL_ID", "channel")],
+        shared=["LINE_CHANNEL_SECRET", "LINE_CHANNEL_ACCESS_TOKEN",
+                "LINE_ALLOWED_SOURCE_IDS", "LINE_FORWARD_TEXT"],
+        local=["LINE_FORWARD_CHANNEL_ID"],
     ),
     dict(
         key="schedule", name="お知らせロボ", desc="決まった時刻にメッセージを投稿", icon="mail",
         url="/guild/{gid}/schedule",
         active_if=[], needs=[], summary=[],
+        shared=[], local=[],
     ),
     dict(
         key="giveaway", name="抽選ロボ", desc="参加ボタン付きの抽選を開催", icon="gift",
         url="/guild/{gid}/giveaway",
         active_if=[], needs=[], summary=[],
+        shared=[], local=[],
     ),
     dict(
         key="onboarding", name="道しるべロボ", desc="入室時のアンケートとロール付与", icon="layers",
         url="/guild/{gid}/onboarding",
         active_if=[], needs=[], summary=[],
+        shared=[], local=[],
     ),
 ]
 ROBOTS_BY_KEY = {r["key"]: r for r in ROBOTS}
@@ -991,6 +1026,16 @@ async def robot_page(
     ctx["robot"] = robot
     ctx["subpage"] = "robot"
 
+    # 「他のサーバーにも適用」用。自分が管理者の、このサーバー以外を出す。
+    ctx["other_guilds"] = [
+        {"id": str(g["id"]), "name": g.get("name") or str(g["id"])}
+        for g in sess.get("guilds", [])
+        if str(g["id"]) != str(guild_id)
+    ]
+    ctx["shared_values"] = [
+        (k, ctx["env"].get(k, "")) for k in robot.get("shared", []) if ctx["env"].get(k, "")
+    ]
+
     if robot_key == "shipping":
         fuel_cache: dict = {}
         fuel_path = config_store.deployment_dir(guild_id) / "data" / "fuel_surcharge.json"
@@ -1004,6 +1049,14 @@ async def robot_page(
     if robot_key == "forwarding":
         ctx.update(await _forwarding_ctx(guild_id))
 
+    if robot_key == "shipping":
+        cfg = shipping_master.load_config(guild_id)
+        ctx["ship_cfg"] = {
+            "own": shipping_master.has_own_config(guild_id),
+            "blocks": len(cfg.get("blocks", {}).get("_aliases", {})),
+            "countries": len(cfg.get("countries", [])),
+        }
+
     if robot_key == "line":
         # LINE 側に貼ってもらう webhook URL。公開URLが分からない環境では
         # リクエストのホストから組み立てる。
@@ -1013,6 +1066,63 @@ async def robot_page(
         ctx["webhook_url"] = f"{base}/line/webhook/{guild_id}"
 
     return templates.TemplateResponse(f"robot_{robot_key}.html", ctx)
+
+
+@app.post("/guild/{guild_id}/robot/{robot_key}/copy")
+async def robot_copy(
+    request: Request,
+    guild_id: str,
+    robot_key: str,
+    session: Optional[str] = Cookie(None),
+):
+    """このロボットの設定を、別のサーバーにも適用する。
+
+    コピーするのは shared に挙げたキーだけ。チャンネルIDやロールIDは
+    サーバーごとに違う値なので、持っていっても存在しない ID を指すことに
+    なる。コピー先では改めて選び直してもらう。
+    """
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+
+    robot = ROBOTS_BY_KEY.get(robot_key)
+    if not robot or not robot.get("shared"):
+        raise HTTPException(status_code=400, detail="このロボットに共通設定はありません")
+
+    form = await request.form()
+    targets = [str(x) for x in form.getlist("target") if str(x) != str(guild_id)]
+    if not targets:
+        return RedirectResponse(
+            f"/guild/{guild_id}/robot/{robot_key}?copy_err=コピー先のサーバーを選んでください",
+            status_code=303,
+        )
+
+    src = config_store.read_env(guild_id)
+    payload = {k: src.get(k, "") for k in robot["shared"] if src.get(k, "")}
+    if not payload:
+        return RedirectResponse(
+            f"/guild/{guild_id}/robot/{robot_key}?copy_err=コピーする内容がまだありません",
+            status_code=303,
+        )
+
+    done = []
+    for gid in targets:
+        # コピー先も自分が管理者であることを確認する（他人のサーバーに書かない）
+        try:
+            require_admin_for_guild(sess, gid)
+        except HTTPException:
+            log.warning("コピー先 %s の権限がないため飛ばしました", gid)
+            continue
+        config_store.ensure_deployment(gid)
+        config_store.write_env(gid, payload)
+        if bot_manager.is_running(gid):
+            bot_manager.restart(gid)
+        done.append(gid)
+        log.info("%s の %s 設定を %s にコピーしました", guild_id, robot_key, gid)
+
+    return RedirectResponse(
+        f"/guild/{guild_id}/robot/{robot_key}?copied={len(done)}&keys={len(payload)}",
+        status_code=303,
+    )
 
 
 async def _forwarding_ctx(guild_id: str) -> dict:
@@ -1990,6 +2100,76 @@ async def update_bot_appearance(
     key = "appearance_ok" if ok else "appearance_err"
     return RedirectResponse(
         f"/guild/{guild_id}/setup?{key}={msg}#tab-appearance", status_code=303
+    )
+
+
+# -------------------------- 送料設定のマスター複製・取り込み --------------------------
+
+
+@app.get("/guild/{guild_id}/robot/shipping/master.xlsx")
+async def shipping_master_download(
+    guild_id: str,
+    session: Optional[str] = Cookie(None),
+    source: str = "current",
+):
+    """送料設定を Excel で書き出す。
+
+    source=master ならリポジトリ同梱のマスター、既定はこのサーバーの現状。
+    他社に導入するときは master を落として渡す。
+    """
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+
+    data = shipping_master.build_workbook(None if source == "master" else guild_id)
+    name = "Musubot送料設定_マスター.xlsx" if source == "master" else "Musubot送料設定.xlsx"
+    quoted = urllib.parse.quote(name)
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quoted}"},
+    )
+
+
+@app.post("/guild/{guild_id}/robot/shipping/import")
+async def shipping_import(
+    request: Request,
+    guild_id: str,
+    session: Optional[str] = Cookie(None),
+):
+    """スプレッドシートからの貼り付けを取り込む。"""
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    form = await request.form()
+    text = str(form.get("pasted") or "")
+
+    back = f"/guild/{guild_id}/robot/shipping"
+    try:
+        kind, count, warnings = shipping_master.apply_paste(guild_id, text)
+    except ValueError as e:
+        return RedirectResponse(f"{back}?import_err={e}", status_code=303)
+    except Exception:  # noqa: BLE001 — 取り込み失敗で画面を落とさない
+        log.exception("送料設定の取り込みに失敗しました（%s）", guild_id)
+        return RedirectResponse(f"{back}?import_err=取り込みに失敗しました", status_code=303)
+
+    msg = f"{kind}を{count}件取り込みました"
+    if warnings:
+        msg += f"（注意 {len(warnings)}件）"
+    q = urllib.parse.urlencode({"import_ok": msg, "warn": " / ".join(warnings[:5])})
+    return RedirectResponse(f"{back}?{q}", status_code=303)
+
+
+@app.post("/guild/{guild_id}/robot/shipping/reset")
+async def shipping_reset(
+    guild_id: str,
+    session: Optional[str] = Cookie(None),
+):
+    """取り込んだ独自設定を捨てて、同梱マスターに戻す。"""
+    sess = require_session(session)
+    require_admin_for_guild(sess, guild_id)
+    done = shipping_master.reset_config(guild_id)
+    msg = "マスターに戻しました" if done else "独自設定はありません"
+    return RedirectResponse(
+        f"/guild/{guild_id}/robot/shipping?import_ok={msg}", status_code=303
     )
 
 

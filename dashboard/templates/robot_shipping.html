@@ -15,10 +15,63 @@
   {% endif %}
   {% if not discord_ok %}
     <div class="callout">
-      Discord 連携が未完了です。先に <a href="/guild/{{ guild_id }}/settings">基盤設定</a> で BOT トークンを保存してください。
+      チャンネルを選ぶには、先に <a href="/guild/{{ guild_id }}/settings">基盤設定</a> で Discord BOT トークンを保存してください。
+      下の送料設定（発送ルール・国一覧）は、Discord 連携の前でも用意できます。
     </div>
-  {% else %}
+  {% endif %}
 
+  {% if request.query_params.get("import_ok") %}
+    <div class="flash ok">{{ request.query_params.get("import_ok") }}
+      {% if request.query_params.get("warn") %}<br><span style="font-size:12px">{{ request.query_params.get("warn") }}</span>{% endif %}
+    </div>
+  {% elif request.query_params.get("import_err") %}
+    <div class="flash warn">{{ request.query_params.get("import_err") }}</div>
+  {% endif %}
+
+  <h2>{{ icon.layers(17) }} 送料設定（発送ルール・国一覧）
+    <span class="help">
+      {% if ship_cfg.own %}このサーバー独自の設定{% else %}マスターをそのまま使用中{% endif %}
+      ・{{ ship_cfg.blocks }}ブロック / {{ ship_cfg.countries }}カ国
+    </span>
+  </h2>
+  <div class="card">
+    <div class="help-box">
+      <div class="h">他社に導入するとき</div>
+      <b>① マスターをダウンロード</b> → Googleドライブにドラッグしてスプレッドシートにする →
+      <b>② 導入先に合わせて直す</b> → <b>③ タブごとに見出し行から全体をコピーして、下に貼り付けて取り込む</b>。
+      これでそのサーバーだけの送料設定になります。
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">
+      <a href="/guild/{{ guild_id }}/robot/shipping/master.xlsx?source=master" class="btn">
+        {{ icon.box(16) }} マスターをダウンロード
+      </a>
+      <a href="/guild/{{ guild_id }}/robot/shipping/master.xlsx" class="btn outline">
+        いまの設定をダウンロード
+      </a>
+      {% if ship_cfg.own %}
+      <form method="post" action="/guild/{{ guild_id }}/robot/shipping/reset" style="display:inline"
+            onsubmit="return confirm('このサーバーの独自設定を捨てて、マスターに戻します。よろしいですか？')">
+        <button type="submit" class="btn red btn-sm">マスターに戻す</button>
+      </form>
+      {% endif %}
+    </div>
+
+    <form method="post" action="/guild/{{ guild_id }}/robot/shipping/import">
+      <div class="field" style="margin-top:14px">
+        <label>設定を貼り付けて取り込む</label>
+        <textarea name="pasted" rows="6" required
+                  placeholder="スプレッドシートの「発送ルール」または「国一覧」タブを、見出し行を含めて全体コピーして貼り付けてください。"></textarea>
+        <div class="hint">
+          どちらのタブを貼ったかは見出しから自動で判別します。1回に1タブぶんずつ貼ってください。
+          取り込むと、そのタブの内容は<b>丸ごと置き換わります</b>。
+        </div>
+      </div>
+      <button type="submit" class="btn">{{ icon.save(16) }} 取り込む</button>
+    </form>
+  </div>
+
+  {% if discord_ok %}
   <form method="post" action="/guild/{{ guild_id }}/save" enctype="multipart/form-data">
     <input type="hidden" name="_next" value="/guild/{{ guild_id }}/robot/shipping">
     <input type="hidden" name="_present" value="ALLOW_CH_SHIPPING">
