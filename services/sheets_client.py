@@ -17,6 +17,71 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
 CACHE_TTL_SECONDS = 300  # 5 minutes
 
 
+RULES_SHEET_NAME = "発送ルール"
+
+# 「運送会社ルール」欄に書ける値。表記ゆれを吸収する。
+CARRIER_RULES = {
+    "DHL固定": "DHL",
+    "DHL": "DHL",
+    "Fedex固定": "Fedex",
+    "FEDEX固定": "Fedex",
+    "Fedex": "Fedex",
+    "安い方": "cheaper",
+    "安いほう": "cheaper",
+    "自動": "cheaper",
+}
+
+
+def parse_rules(rows: list[list[str]]) -> dict[str, dict[str, str]]:
+    """「発送ルール」タブを読む。
+
+    人が触るのはこのタブだけで済むようにするためのもの。1行1ブロックで
+      ブロックコード / 送料表タブの見出し / 運送会社ルール / メモ / 対象国
+    が並ぶ。見出し行は日本語なので、列位置ではなく見出し名で探す。
+
+    戻り値: {ブロックコード: {"display": 表示名, "carrier": "DHL"|"Fedex"|"cheaper"}}
+    """
+    if not rows:
+        return {}
+    header_idx = None
+    for i, row in enumerate(rows[:10]):
+        if any("ブロックコード" in (c or "") for c in row):
+            header_idx = i
+            break
+    if header_idx is None:
+        return {}
+
+    header = [(c or "").strip() for c in rows[header_idx]]
+
+    def col(*keywords: str) -> Optional[int]:
+        for ci, name in enumerate(header):
+            if any(k in name for k in keywords):
+                return ci
+        return None
+
+    c_code = col("ブロックコード")
+    c_disp = col("見出し")
+    c_rule = col("運送会社")
+    if c_code is None:
+        return {}
+
+    out: dict[str, dict[str, str]] = {}
+    for row in rows[header_idx + 1:]:
+        if c_code >= len(row):
+            continue
+        code = (row[c_code] or "").strip()
+        if not code or code.startswith("#"):
+            continue
+        disp = (row[c_disp] or "").strip() if c_disp is not None and c_disp < len(row) else ""
+        rule_raw = (row[c_rule] or "").strip() if c_rule is not None and c_rule < len(row) else ""
+        carrier = CARRIER_RULES.get(rule_raw, "")
+        if rule_raw and not carrier:
+            log.warning("発送ルールの『%s』を解釈できません（%s）。安い方として扱います", rule_raw, code)
+            carrier = "cheaper"
+        out[code] = {"display": disp, "carrier": carrier or "cheaper"}
+    return out
+
+
 def _is_carrier_choice_header(cell: Optional[str]) -> bool:
     """「どちらの運送会社で送るか」を示す列見出しか。
 
